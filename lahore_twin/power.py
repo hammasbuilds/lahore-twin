@@ -20,7 +20,7 @@ APPLIANCES = {
     "fridge":     (150, True, "compressor, ~40% duty"),
     "router":     (15, True, "internet"),
     "tv":         (110, False, "LED TV"),
-    "ac":         (1450, False, "1.5-ton inverter AC at full output"),
+    "ac":         (1650, False, "1.5-ton inverter AC at full output (5.3 kW cooling / COP 3.2)"),
     "pump":       (750, False, "1 hp water motor, roof tank"),
     "washer":     (500, False, "twin-tub washing machine"),
     "iron":       (1000, False, "steam iron"),

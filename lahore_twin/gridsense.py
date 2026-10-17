@@ -48,6 +48,7 @@ class Base:
         self.soc = inverter.battery.soc
         self.pv = 0.0
         self.load = 0.0
+        self.load_t = None
         self.tank = 0.6
         self.tank_msg = None
         self.volts = 230.0
@@ -61,7 +62,7 @@ class Base:
         bus.subscribe("home/grid/state", self._on_grid)
         bus.subscribe("home/battery/soc", lambda m: setattr(self, "soc", m.payload))
         bus.subscribe("home/pv/kw", lambda m: setattr(self, "pv", m.payload))
-        bus.subscribe("home/house/load", lambda m: setattr(self, "load", m.payload))
+        bus.subscribe("home/house/load", self._on_load)
         bus.subscribe("home/tank/level", self._on_tank)
         bus.subscribe("home/grid/voltage", self._on_volts)
         bus.subscribe("home/+/presence", lambda m: self.presence.__setitem__(m.topic.split("/")[1], m.payload))
@@ -93,6 +94,9 @@ class Base:
 
     def _on_grid(self, m: Message) -> None:
         self.grid, self.grid_msg = bool(m.payload), m.id
+
+    def _on_load(self, m: Message) -> None:
+        self.load, self.load_t = m.payload, m.t
 
     def _on_tank(self, m: Message) -> None:
         self.tank, self.tank_msg = m.payload, m.id
@@ -170,6 +174,7 @@ class UpsCtrl(DefaultCtrl):
 
 class GridSense(Base):
     name = "gridsense"
+    COMFORT = True               # pre-cool, solar soak, AC allowance in the night reserve
     AC_KW_OUTAGE = 0.75          # average draw of a 1.5-ton inverter AC holding 27 °C at night
     HEADROOM_KW = 5.5            # keep under the 6 kW rating with margin
 
@@ -179,6 +184,9 @@ class GridSense(Base):
         self.lowv_since = None
         self.lowv_cut = False
         self.precool_rooms: set[str] = set()
+        self.soak_rooms: set[str] = set()
+        self.soak_prev: set[str] = set()
+        self.soak_decided_at = None
         self.outage_began = None
         self.kwp = 6.0
 
@@ -210,7 +218,7 @@ class GridSense(Base):
             return b.min_soc + 0.10, None
         night = o.start % DAY >= hm("21:00") or o.start % DAY < hm("06:00")
         dur_h = (o.end - max(o.start, t)) / 3600
-        e = self.essential_kw(night) * dur_h + (self.AC_KW_OUTAGE * dur_h if night else 0.0)
+        e = self.essential_kw(night) * dur_h + (self.AC_KW_OUTAGE * dur_h if night and self.COMFORT else 0.0)
         return min(0.95, b.min_soc + 1.15 * e / b.capacity_kwh), o
 
     # ---- the loop --------------------------------------------------------
@@ -225,12 +233,24 @@ class GridSense(Base):
         # battery strategy
         if self.grid:
             self.outage_began = None
-            if soon and self.soc < target:
-                hours = max(0.25, (o.start - t) / 3600)
+            s = self.sc.season
+            # the reserve must be in place before the peak window when the outage comes after it,
+            # so it is bought at the off-peak price
+            before_peak = o is not None and t < s.peak[0] <= o.start
+            ready_by = s.peak[0] if before_peak else (o.start if o is not None else t)
+            if soon and self.soc < target and not (peak and self.soc >= target - 0.08):
+                hours = max(0.25, (ready_by - t) / 3600)
                 need_kwh = (target - self.soc) * b.capacity_kwh - 0.8 * self.solar_kwh_between(t, o.start)
                 rate = min(3.0, max(0.0, need_kwh / hours * 1.2))
                 self.set_inverter(InverterSettings("UTI", target, round(rate, 1)), None,
-                                  f"hold {target * 100:.0f}% for the {why_o}")
+                                  f"hold {target * 100:.0f}% for the {why_o}"
+                                  + (" — charged before the peak window" if before_peak and rate else ""))
+            elif before_peak and o is not None and o.start % DAY >= s.peak[0] and t >= hm("14:00"):
+                # a night outage ahead: bank the afternoon sun, let the afternoon run on the grid at
+                # off-peak price, and arrive at the peak window with the battery full
+                hold = min(0.95, target + 0.30)
+                self.set_inverter(InverterSettings("SBU", hold, 0.0), None,
+                                  f"bank the afternoon sun for the evening and the {why_o}: keep {hold * 100:.0f}%")
             elif peak:
                 self.set_inverter(InverterSettings("SBU", max(target, 0.20), 0.0), None,
                                   f"peak tariff {_clock(self.sc.season.peak[0])}–{_clock(self.sc.season.peak[1])}: "
@@ -281,19 +301,25 @@ class GridSense(Base):
 
     def _acs(self, t: int, o, why_o: str) -> None:
         self.precool_rooms = set()
+        self.soak_prev, self.soak_rooms = self.soak_rooms, set()
         acs = [aid for aid, a in self.apps.items() if a.kind == "ac"]
         if self.lowv_cut:
             for aid in acs:
                 self.command(aid, False, self.volts_msg, f"protecting the compressor: {self.volts:.0f} V")
             return
         if self.grid:
+            soak_now = self._soak_plan(acs)
             for aid in acs:
                 room = self.apps[aid].room
-                pre = (o is not None and 0 <= o.start - t <= 2400 and
+                pre = self.COMFORT and (o is not None and 0 <= o.start - t <= 2400 and
                        (self.presence.get(room, 0) or (o.start % DAY >= hm("21:30") and room.startswith("bed"))))
                 if pre and (self.state.get(aid) or self.headroom_ok(aid)):
                     self.precool_rooms.add(room)
                     self.command(aid, True, None, f"pre-cool to 23.5 °C before the {why_o}")
+                elif room in soak_now and (self.state.get(aid) or self.headroom_ok(aid)):
+                    self.soak_rooms.add(room)
+                    self.command(aid, True, None, f"battery full, sun would be exported at Rs 11 — "
+                                                  f"cool the room with it instead")
                 else:
                     self.command(aid, self.wants.get(aid, False), self.want_msg.get(aid), "someone wants it")
             return
@@ -329,6 +355,40 @@ class GridSense(Base):
         for aid in acs:
             if aid not in wanted:
                 self.command(aid, False, self.want_msg.get(aid), "not wanted")
+
+    SOAK_KW = 1.65              # a soaking AC pulls the room down at full output first
+
+    def _soak_plan(self, acs) -> set[str]:
+        """Share the spare sun among occupied rooms, one AC at a time.
+
+        Each soaking AC is charged SOAK_KW against the surplus; the ones already soaking
+        are kept first (while the sun roughly covers them), then new rooms join only on
+        a clear margin. Deciding rooms independently let three ACs start on one surplus,
+        overdraw it together, and all stop — a flap every minute.
+        """
+        if not self.COMFORT or self.soc < 0.90:
+            return set()
+        # the house load is measured once a minute: decide only on a fresh reading, or the plan
+        # acts six times on a number taken before its own last change
+        if self.load_t == self.soak_decided_at:
+            return set(self.soak_prev)
+        self.soak_decided_at = self.load_t
+        running = [a for a in acs if self.apps[a].room in self.soak_prev and self.state.get(a)]
+        budget = self.pv - self.load + self.SOAK_KW * len(running)
+        keep: set[str] = set()
+        candidates = [a for a in acs if self.presence.get(self.apps[a].room, 0) and not self.wants.get(a)]
+        candidates.sort(key=lambda a: (a not in running, -self.presence.get(self.apps[a].room, 0)))
+        started = False
+        for aid in candidates:
+            room = self.apps[aid].room
+            if aid in running and budget >= self.SOAK_KW - 0.5:
+                keep.add(room)
+                budget -= self.SOAK_KW
+            elif aid not in running and not started and self.soc > 0.97 and budget >= self.SOAK_KW + 0.5:
+                keep.add(room)                  # at most one new room per reading
+                budget -= self.SOAK_KW
+                started = True
+        return keep
 
     def _pump(self, t: int, o, why_o: str, soon: bool) -> None:
         surplus = self.pv - self.load
@@ -392,10 +452,21 @@ class GridSense(Base):
     def setpoint(self, room: str, t: int) -> float:
         if room in self.precool_rooms:
             return 23.5
+        if room in self.soak_rooms:
+            return 25.0
         return 27.0 if not self.grid else 26.0
 
     def precooling(self, room: str, t: int) -> bool:
-        return room in self.precool_rooms
+        return room in self.precool_rooms or room in self.soak_rooms
 
 
-CONTROLLERS = {"default": DefaultCtrl, "ups": UpsCtrl, "gridsense": GridSense}
+class GridSenseEco(GridSense):
+    """Same guarantees (never dark while the battery can carry the essentials, compressors
+    protected, inside the inverter's rating), but no comfort extras: the reserve covers fans,
+    lights, fridge and router only; no pre-cooling, no solar soak. ACs in an outage still run
+    when the battery has energy beyond the reserve."""
+    name = "gridsense_eco"
+    COMFORT = False
+
+
+CONTROLLERS = {"default": DefaultCtrl, "ups": UpsCtrl, "gridsense_eco": GridSenseEco, "gridsense": GridSense}

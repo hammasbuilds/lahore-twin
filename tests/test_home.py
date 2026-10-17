@@ -21,7 +21,7 @@ def plan():
 @pytest.fixture(scope="module")
 def day(plan):
     sc = build(plan, JUNE, seed=7)
-    return sc, {m: HomeSim(sc, m).run() for m in ("default", "ups", "gridsense")}
+    return sc, {m: HomeSim(sc, m).run() for m in ("default", "ups", "gridsense_eco", "gridsense")}
 
 
 # ---- physics ---------------------------------------------------------------
@@ -116,13 +116,17 @@ def test_gridsense_holds_a_reserve_before_a_published_outage(day):
 
 
 def test_outage_rationing_does_not_flap(day):
+    """Flapping = one AC changing state more than three times inside ten minutes."""
     sc, sims = day
-    gs = sims["gridsense"]
-    flips = 0
-    for o in sc.outages:
-        changes = [c for c in gs.dev_changes if c[1].startswith("ac:") and o.start <= c[0] < o.end]
-        flips += len(changes)
-    assert flips <= 12, flips
+    for mode in ("gridsense", "gridsense_eco"):
+        changes: dict[str, list[int]] = {}
+        for t, aid, _, _ in sims[mode].dev_changes:
+            if aid.startswith("ac:"):
+                changes.setdefault(aid, []).append(t)
+        for aid, ts in changes.items():
+            for i in range(len(ts)):
+                window = [x for x in ts[i:] if x - ts[i] <= 600]
+                assert len(window) <= 3, (mode, aid, ts[i], len(window))
 
 
 def test_gridsense_never_trips_the_inverter_over_five_days(plan):
@@ -162,3 +166,16 @@ def test_committed_home_replay_matches_the_current_code():
     text = (ROOT / "viewer" / "home_replay.js").read_text(encoding="utf-8")
     meta = json.loads(text[len("window.HOME = "):].rstrip().rstrip(";"))["meta"]
     assert meta.get("digest") == source_digest("home"), "run `python demo_home.py` to regenerate viewer/home_replay.js"
+
+
+def test_eco_is_never_dark_and_cheaper_than_the_default_over_five_days(plan):
+    """The product claim: the same reliability guarantees for less money."""
+    bills = {"default": 0, "gridsense_eco": 0}
+    for seed in range(1, 6):
+        sc = build(plan, JUNE, seed=seed)
+        for mode in bills:
+            m = HomeSim(sc, mode).run().metrics()
+            bills[mode] += m["bill_rs"]
+            if mode == "gridsense_eco":
+                assert m["house_dark_min"] == 0 and m["no_fan_person_min"] == 0, seed
+    assert bills["gridsense_eco"] < bills["default"]

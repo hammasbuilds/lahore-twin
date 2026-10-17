@@ -15,7 +15,8 @@ import time
 from lahore_twin.export_home import MODES, run_all, write
 from lahore_twin.home import describe
 
-NAMES = {"default": "Inverter default", "ups": "UPS circuit", "gridsense": "GridSense"}
+NAMES = {"default": "Inverter default", "ups": "UPS circuit", "gridsense_eco": "GridSense eco",
+         "gridsense": "GridSense"}
 ROWS = [("House dark (min)", "house_dark_min"), ("No fan when wanted (person-min)", "no_fan_person_min"),
         ("Too hot to sleep (person-min)", "hot_sleep_person_min"),
         ("Too hot awake (person-min)", "hot_awake_person_min"), ("Roof tank empty (min)", "tank_empty_min"),
@@ -27,10 +28,10 @@ ROWS = [("House dark (min)", "house_dark_min"), ("No fan when wanted (person-min
 
 def table(m: dict) -> None:
     w = 34
-    print(f"{'':{w}}" + "".join(f"{NAMES[k]:>18}" for k in MODES))
+    print(f"{'':{w}}" + "".join(f"{NAMES[k]:>17}" for k in MODES))
     for label, key in ROWS:
-        print(f"{label:{w}}" + "".join(f"{m[k][key]:>18}" for k in MODES))
-    print(f"{'Jobs finished late':{w}}" + "".join(f"{len(m[k]['jobs_late']):>18}" for k in MODES))
+        print(f"{label:{w}}" + "".join(f"{m[k][key]:>17}" for k in MODES))
+    print(f"{'Jobs finished late':{w}}" + "".join(f"{len(m[k]['jobs_late']):>17}" for k in MODES))
 
 
 def main() -> None:
@@ -78,7 +79,7 @@ def spread(a) -> None:
         for k in MODES:
             v = [r[k][key] for r in rows]
             cells.append(f"{sum(v) / len(v):.1f} / {max(v):g}")
-        print(f"  {label:<34}" + "".join(f"{c:>18}" for c in cells))
+        print(f"  {label:<34}" + "".join(f"{c:>17}" for c in cells))
 
 
 if __name__ == "__main__":

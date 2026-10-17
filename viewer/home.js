@@ -11,7 +11,7 @@
   const plan = H.plan;
   const rooms = Object.fromEntries(plan.rooms.map((r) => [r.id, r]));
   const APPS = Object.fromEntries(H.appliances.map((a) => [a.id, a]));
-  const MODE_NAMES = { default: "Inverter default", ups: "UPS circuit", gridsense: "GridSense" };
+  const MODE_NAMES = { default: "Inverter default", ups: "UPS circuit", gridsense_eco: "GridSense eco", gridsense: "GridSense" };
   const ROLE_NAMES = { father: "Father", mother: "Mother", grandmother: "Dadi", school: "School child", student: "University student", helper: "Helper" };
 
   // ---- index ----
@@ -377,7 +377,7 @@
   ];
   function renderCompare() {
     const names = Object.keys(H.modes), ms = names.map((n) => H.modes[n].metrics);
-    const SHORT = { default: "Default", ups: "UPS", gridsense: "Grid&shy;Sense" };
+    const SHORT = { default: "Default", ups: "UPS", gridsense_eco: "Eco", gridsense: "Grid&shy;Sense" };
     let html = `<h3>Whole day, same family, same outages</h3><table class="cmp" style="font-size:12px"><tr><th></th>${names.map((n) => `<th title="${MODE_NAMES[n]}">${SHORT[n]}</th>`).join("")}</tr>`;
     for (const [label, key, dir] of ROWS) {
       const vals = ms.map((m) => m[key]);

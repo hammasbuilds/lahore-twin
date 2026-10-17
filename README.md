@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 61 tests, including the viewer's core under node
+python -m pytest -q          # 62 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 python demo_home.py           # the house under three controllers; writes viewer/home_replay.js
 ```
@@ -178,38 +178,47 @@ forecast; none sees an unannounced cut coming.
 |---|---|
 | Inverter default | every circuit on the inverter, fixed settings, everything runs when wanted, pump on its float switch |
 | UPS circuit | the common Lahore wiring: fans, lights, fridge, router and TV on the inverter; ACs, pump, washer, iron and microwave die in an outage |
-| GridSense | holds a battery reserve sized for the next published outage, pre-cools bedrooms and fills the tank before it, moves laundry and ironing into solar hours, runs on battery in the peak-tariff window, rations ACs during an outage by the energy left (sleepers first), keeps every heavy load inside the inverter's rating, and cuts the AC and fridge below 190 V |
+| GridSense eco | GridSense's guarantees without the comfort extras: a reserve for fans, lights, fridge and router, off-peak charging, battery in the peak window, compressor protection |
+| GridSense | holds a battery reserve sized for the next published outage, pre-cools bedrooms and fills the tank before it, cools occupied rooms with sun that would otherwise be exported at Rs 11, moves laundry and ironing into solar hours, runs on battery in the peak-tariff window, rations ACs during an outage by the energy left (sleepers first), keeps every heavy load inside the inverter's rating, and cuts the AC and fridge below 190 V |
 
 `python demo_home.py`, June, seed 7 (a simulated house, not a measurement):
 
 ```
-                                    Inverter default       UPS circuit         GridSense
-House dark (min)                                  37                 0                 0
-No fan when wanted (person-min)                  224                 0                 0
-Too hot to sleep (person-min)                    398               860               395
-Too hot awake (person-min)                      1763              2248              1226
-Roof tank empty (min)                              0                 0                 0
-Grid at peak price (kWh)                         0.0               4.3               1.0
-Grid off-peak (kWh)                             4.34              8.76              3.84
-Exported (kWh)                                  7.11              8.02              6.14
-Solar used at home (%)                          81.2              63.5              83.8
-Solar wasted (kWh)                               0.0              5.79               0.0
-Day's bill (Rs)                                  314               392               331
-Inverter overload trips                            0                 0                 0
-AC/fridge below 190 V (min)                       10                10                 0
-Jobs finished late                                 0                 0                 0
+                                   Inverter default      UPS circuit    GridSense eco        GridSense
+House dark (min)                                 37                0                0                0
+No fan when wanted (person-min)                 224                0                0                0
+Too hot to sleep (person-min)                   398              860              642              312
+Too hot awake (person-min)                     1763             2248             1763              691
+Roof tank empty (min)                             0                0                0                0
+Grid at peak price (kWh)                        0.0              4.3              0.0             0.99
+Grid off-peak (kWh)                            4.34             8.76             3.84             3.84
+Exported (kWh)                                 7.11             8.02              6.1             2.27
+Solar used at home (%)                         81.2             63.5             83.8             94.0
+Solar wasted (kWh)                              0.0             5.79              0.0              0.0
+Day's bill (Rs)                                 314              392              279              374
+Inverter overload trips                           0                0                0                0
+AC/fridge below 190 V (min)                      10               10                0                0
+Jobs finished late                                0                0                0                0
 ```
 
-Over ten June days (`python demo_home.py --days 10`) the default setup leaves
-the house dark 33 minutes a day on average (up to 65) when the battery hits
-cut-off in the night outage; GridSense and the UPS circuit never go dark. The
-UPS circuit pays for it in heat — the ACs are not on the inverter, so nights in
-an outage are hot (700 person-minutes too hot to sleep against GridSense's 368)
-and solar is wasted when the battery is full during a cut (5.7 kWh a day).
+Over ten June days (`python demo_home.py --days 10`, mean per day):
 
-GridSense is not yet the cheapest: it buys grid power to hold its reserve and
-pre-cool, so its average day costs Rs 541 against Rs 487 for both others. That
-is the first thing the review rounds go after.
+| | Inverter default | UPS circuit | GridSense eco | GridSense |
+|---|---:|---:|---:|---:|
+| house dark, minutes | 33 | 0 | 0 | 0 |
+| person-minutes without a fan when wanted | 198 | 0 | 0 | 0 |
+| person-minutes too hot to sleep | 430 | 700 | 541 | 335 |
+| person-minutes too hot awake | 1,770 | 2,146 | 1,777 | 925 |
+| grid at peak price, kWh | 2.1 | 4.2 | 1.5 | 2.5 |
+| solar used at home | 85% | 62% | 86% | 94% |
+| bill, Rs | 487 | 487 | **446** | 558 |
+
+The default setup goes dark when the battery reaches cut-off in the night
+outage. The UPS circuit never goes dark but cannot run an AC in an outage and
+wastes 5.7 kWh of solar a day when the battery is full during a cut. **GridSense
+eco** gives the same never-dark guarantee for 8% less money than either. **GridSense**
+buys comfort with it: the coolest house by far, at Rs 558 — partly because it
+cools rooms with sun that would otherwise be sold back at Rs 11.
 
 Tariff assumptions: off-peak Rs 42, peak Rs 50, export Rs 11 per kWh (the
 proposed gross-metering buyback). The bill values each controller's end-of-day

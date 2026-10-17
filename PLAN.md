@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | built; review rounds next |
+| 2 | Home + GridSense — load-shedding energy manager | review round 1 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -432,4 +432,41 @@ the tests, then found:
 
 ### Round log
 
-_(rounds start after the build)_
+**Build (ef54897).** House plan, family routines, published + unannounced
+outages, PV/battery/inverter/tank physics, three controllers, home viewer,
+16 tests. Found in the build's own checks: the occupants' AC wish had no
+hysteresis (switched off at 28 °C, rooms hovered there, battery barely used);
+exported solar was counted as "used at home" (100% everywhere); telemetry was
+logged every minute because the bus matches the last topic segment (`kw`,
+`level`); the AC rationing in outages flapped every few seconds (the estimate
+counted the running AC's own drain); GridSense tripped the inverter 0.8×/day
+(pre-cooling three ACs plus the pump on a 6 kW unit). Each replay now has its
+own source digest, so changing home code no longer marks the office stale.
+
+**Round 1 — GridSense's bill.**
+- *Found:* GridSense cost more than doing nothing (Rs 541 vs 487 a day over ten
+  days). Decomposed: +2.4 kWh/day of load (ACs kept running in outages and
+  pre-cooling where the default house goes dark) and +0.7 kWh at peak price,
+  while still exporting 4.5 kWh/day at Rs 11 against Rs 42–50 imports.
+- *Fixed (cost):* the reserve for an outage after 18:30 is bought before the
+  peak window; before a night outage the afternoon sun is banked (loads run on
+  off-peak grid, the battery arrives at 18:30 full).
+- *Added (comfort):* a solar soak — with the battery full and sun about to be
+  exported, occupied rooms are cooled to 25 °C with it.
+- *Found:* the bill alone cannot separate "cheaper" from "delivers more", so
+  GridSense got two profiles. **Eco** keeps the guarantees (never dark while the
+  battery can carry essentials, compressor protection, inside the inverter
+  rating) without comfort extras: Rs 446/day, 8% below both baselines, least
+  peak import. **Comfort**: Rs 558, the coolest house (925 vs 1,770 person-min
+  too hot awake).
+- *Found:* a new flapping test (one AC changing state >3× in 10 min — the old
+  test counted total changes, a proxy that broke as soon as GridSense did more)
+  caught the soak flapping every minute. Two causes, traced tick by tick: rooms
+  decided independently (three ACs started on one surplus, overdrew it, all
+  stopped), and the house load is measured once a minute (six decisions on a
+  number taken before the last change). *Fixed:* a shared surplus budget, one
+  new room per fresh reading, each AC charged its real full draw (5.3 kW / COP
+  3.2 = 1.65 kW — the appliance table's 1.45 kW was also low, which caused a
+  remaining overload trip at 21:30 on one day).
+- Tests 16 → 17 (eco is never dark and cheaper than the default over five days;
+  the flapping test replaced). 0 overload trips over ten days for all four.

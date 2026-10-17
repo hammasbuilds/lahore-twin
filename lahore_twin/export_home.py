@@ -11,7 +11,7 @@ from .home import CATEGORIES, build
 from .home_sim import HOME_COLOURS, TARIFF, HomeSim
 from .plan import Plan
 
-MODES = ("default", "ups", "gridsense")
+MODES = ("default", "ups", "gridsense_eco", "gridsense")
 
 
 def run_all(seed: int = 7, season: str = "june", category: str = "IV") -> tuple[dict, dict[str, HomeSim]]:
