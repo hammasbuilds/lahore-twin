@@ -76,6 +76,7 @@ class Sim:
         self.queue: list[str] = []
         self.serving: tuple[str, int] | None = None
         self.seat_taken: dict[tuple, str] = {}
+        self.claimed: dict[tuple, str] = {}
         self.pir_latch: dict[str, int] = {}
         self.last_in_pass: dict[str, int] = {}
         self.badge_doors = {frozenset((d.a, d.b)): d for d in self.plan.doors if d.gate == "badge"}
@@ -135,6 +136,8 @@ class Sim:
 
     def _start_stay(self, p: Person, s: Stay, t: int) -> None:
         self._leave_lunch(p)
+        if s.kind != "stay":
+            self._release(p)
         if s.kind == "lunch":
             p.mode = "queue"
             self.queue.append(p.id)
@@ -147,7 +150,24 @@ class Sim:
             self._next_round_stop(p, t)
             return
         p.mode = "walking"
-        self._walk(p, s.spot, t, s.label)
+        self._walk(p, self._claim(p, s), t, s.label)
+
+    def _claim(self, p: Person, s: Stay):
+        """A free spot from the stay's pool, so two people never stand on one point."""
+        self._release(p)
+        if not s.pool:
+            return s.spot
+        free = [tuple(q) for q in self.plan.spots[s.pool] if tuple(q) not in self.claimed]
+        if not free:
+            return s.spot          # all taken: wait at the first one (a queue for the stall)
+        spot = self.rng_people.choice(free)
+        self.claimed[spot] = p.id
+        return spot
+
+    def _release(self, p: Person) -> None:
+        for spot, who in list(self.claimed.items()):
+            if who == p.id:
+                del self.claimed[spot]
 
     def _leave_lunch(self, p: Person) -> None:
         if p.id in self.queue:

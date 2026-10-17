@@ -243,7 +243,7 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
         start = p.arrive
         mtg = min(events, key=lambda e: e[0]) if events else None
         out = [Stay(start, plan.spots["kiosk"][0], "Visitor check-in", on_arrive="kiosk_checkin")]
-        out.append(Stay(start + 90, rng.choice(plan.spots["lobby_seat"]), "Waiting in lobby"))
+        out.append(Stay(start + 90, plan.spots["lobby_seat"][0], "Waiting in lobby", pool="lobby_seat"))
         if mtg:
             out.append(mtg[2])
         out.append(Stay(p.leave, p.entry, "Leaving", kind="leave"))
@@ -277,7 +277,7 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
     # prayer: a share of people join each congregation
     for name, t in (("Zuhr", ZUHR), ("Asr", ASR)):
         if p.arrive < t - 300 and p.leave > t + 900 and rng.random() < 0.45:
-            add(t - 240, t + 660, Stay(t - 240, rng.choice(plan.spots["prayer_spot"]), f"{name} prayer"))
+            add(t - 240, t + 660, Stay(t - 240, plan.spots["prayer_spot"][0], f"{name} prayer", pool="prayer_spot"))
 
     # lunch: try a preferred time, slide forward until it fits
     if p.role not in ("visitor",) and p.arrive < hm("12:30") and p.leave > hm("14:30"):
@@ -294,9 +294,9 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
     while t < p.leave - 1200:
         if rng.random() < 0.7:
             wc = {"m": "wc_m_spot", "f": "wc_f_spot"}[p.gender] if rng.random() > 0.08 else "wc_a_spot"
-            add(t, t + rng.randint(180, 360), Stay(t, rng.choice(plan.spots[wc]), "Washroom"))
+            add(t, t + rng.randint(180, 360), Stay(t, plan.spots[wc][0], "Washroom", pool=wc))
         else:
-            add(t, t + rng.randint(180, 300), Stay(t, plan.spots["pantry"][0], "Coffee"))
+            add(t, t + rng.randint(180, 300), Stay(t, plan.spots["coffee_spot"][0], "Coffee", pool="coffee_spot"))
         t += rng.randint(5400, 10800)
 
     events.sort(key=lambda e: e[0])

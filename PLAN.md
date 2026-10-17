@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 4 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 5 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -209,3 +209,19 @@ could claim another person's badge pass.
 - Evening review (19:45, schedule): after the 18:30 switch-off an overtime
   worker re-switched the workspace lights by hand at 19:00 and sat with the AC
   off — the schedule's documented weakness, visible in the replay.
+
+**Round 5 — crowding, frame cost, contrast.**
+- *Found:* up to 10 people drawn on one point. Shared spots were picked at
+  random when the day was generated, so two people could share a prayer place
+  or a stall; and 19 people attend Zuhr in a room with 10 places, so the
+  overflow stacked. *Fixed:* stays name a pool and claim a free spot on arrival
+  (released when they move on); the prayer room holds 4 rows of 7; coffee has
+  its own spots beside the office boy's pantry. Stacked person-minutes per day:
+  ~110 → ~16, all of them a person waiting for a busy stall, the queue tail, or
+  the office boy at a desk serving tea. Test added (≤30, never in prayer rows).
+- *Measured:* frame cost in Chromium with every panel forced to rebuild:
+  4–16 ms (events log is the heaviest); playback refreshes panels at 4 Hz.
+- *Found:* contrast computed from the live tokens (not eyeballed): light theme
+  accent 3.68:1 and ok-green 3.77:1 on white, below 4.5:1 for the small labels
+  and pills that use them. *Fixed:* #0e7490 / #047857 → 5.36:1 and 5.48:1. Dark
+  theme already ≥ 5.6:1 everywhere. Tests 29 → 30.

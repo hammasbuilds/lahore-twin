@@ -32,6 +32,7 @@ class Stay:
     priority: int = 0
     on_arrive: str = ""    # manual_checkin | kiosk_checkin — an action fired on reaching the spot
     until: int = 0         # lunch: latest time to give up and go back
+    pool: str = ""         # shared spots (prayer rows, stalls, seats): take a free one on arrival
 
 
 @dataclass

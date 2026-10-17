@@ -358,3 +358,24 @@ def test_drifted_door_counters_are_rezeroed_to_the_estimate():
     assert att.counted_inside == 4          # not yet: needs 15 minutes of disagreement
     att.rollcall_tick(1000 + 900)
     assert att.counted_inside == att.estimate_inside()
+
+
+def test_people_do_not_stand_on_each_other(day):
+    """Shared spots are claimed on arrival; only a full washroom or queue tail may stack."""
+    sc, _ = day
+    import collections
+    s = Sim(sc, "pir")
+    stacked = collections.Counter()
+    orig = s._report
+
+    def watch(t):
+        c = collections.Counter((round(p.pos[0], 2), round(p.pos[1], 2))
+                                for p in s.people if p.on_site and not p.path)
+        stacked.update(k for k, v in c.items() if v > 1)
+        orig(t)
+
+    s._report = watch
+    s.run()
+    assert sum(stacked.values()) <= 30, stacked.most_common(5)     # person-minutes in a day
+    prayer = {tuple(x) for x in s.plan.spots["prayer_spot"]}
+    assert not any(k in prayer for k in stacked)
