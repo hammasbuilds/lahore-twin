@@ -18,7 +18,8 @@ python demo.py               # simulate the office day three ways, write the rep
 # then open viewer/index.html in a browser — no server, no network
 python -m pytest -q          # 62 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
-python demo_home.py           # the house under three controllers; writes viewer/home_replay.js
+python demo_home.py           # the house under four controllers; writes viewer/home_replay.js
+python tools/sweep_home.py    # home invariants: 2 seasons x 3 feeder categories x 5 days (~11 min)
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.

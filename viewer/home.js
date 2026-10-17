@@ -361,30 +361,31 @@
 
   // ---- compare ----
   const ROWS = [
-    ["House dark, minutes", "house_dark_min", "min"],
-    ["Person-minutes wanting a fan, none running", "no_fan_person_min", "min"],
-    ["Person-minutes too hot to sleep (>30 °C felt)", "hot_sleep_person_min", "min"],
-    ["Person-minutes too hot awake (>32 °C felt)", "hot_awake_person_min", "min"],
-    ["Roof tank empty, minutes", "tank_empty_min", "min"],
-    ["Grid at peak price, kWh", "grid_peak_kwh", "min"],
-    ["Grid off-peak, kWh", "grid_offpeak_kwh", "min"],
+    ["House dark, min", "house_dark_min", "min"],
+    ["No fan when wanted", "no_fan_person_min", "min"],
+    ["Too hot to sleep", "hot_sleep_person_min", "min"],
+    ["Too hot awake", "hot_awake_person_min", "min"],
+    ["Tank empty, min", "tank_empty_min", "min"],
+    ["Peak grid, kWh", "grid_peak_kwh", "min"],
+    ["Off-peak grid, kWh", "grid_offpeak_kwh", "min"],
     ["Exported, kWh", "export_kwh", "info"],
-    ["Solar used at home, %", "solar_used_pct", "max"],
+    ["Solar used, %", "solar_used_pct", "max"],
     ["Solar wasted, kWh", "solar_wasted_kwh", "min"],
-    ["Day's bill, Rs (battery change valued)", "bill_rs", "min"],
-    ["Inverter overload trips", "overload_trips", "min"],
-    ["AC/fridge running below 190 V, minutes", "low_voltage_stress_min", "min"],
+    ["Bill, Rs", "bill_rs", "min"],
+    ["Overload trips", "overload_trips", "min"],
+    ["Under 190 V, min", "low_voltage_stress_min", "min"],
   ];
   function renderCompare() {
     const names = Object.keys(H.modes), ms = names.map((n) => H.modes[n].metrics);
     const SHORT = { default: "Default", ups: "UPS", gridsense_eco: "Eco", gridsense: "Grid&shy;Sense" };
-    let html = `<h3>Whole day, same family, same outages</h3><table class="cmp" style="font-size:12px"><tr><th></th>${names.map((n) => `<th title="${MODE_NAMES[n]}">${SHORT[n]}</th>`).join("")}</tr>`;
+    let html = `<h3>Whole day, same family, same outages</h3><div style="overflow-x:auto"><table class="cmp" style="font-size:12px"><tr><th></th>${names.map((n) => `<th title="${MODE_NAMES[n]}">${SHORT[n]}</th>`).join("")}</tr>`;
     for (const [label, key, dir] of ROWS) {
       const vals = ms.map((m) => m[key]);
       const best = dir === "min" ? Math.min(...vals) : dir === "max" ? Math.max(...vals) : null;
       html += `<tr><td>${label}</td>${vals.map((v) => `<td class="num ${v === best ? "best" : ""}">${Number.isInteger(v) ? v.toLocaleString("en") : v.toFixed(1)}</td>`).join("")}</tr>`;
     }
-    html += `<tr><td>Jobs finished late</td>${ms.map((m) => `<td class="num">${m.jobs_late.length}</td>`).join("")}</tr></table>`;
+    html += `<tr><td>Jobs late</td>${ms.map((m) => `<td class="num">${m.jobs_late.length}</td>`).join("")}</tr></table></div>`;
+    html += `<p class="muted" style="font-size:12px">"No fan when wanted", "too hot to sleep" (felt above 30 °C) and "too hot awake" (felt above 32 °C) are person-minutes; a running fan counts as 2 °C cooler. "Under 190 V" is minutes the AC or fridge ran on low voltage. Green = best.</p>`;
     html += `<p class="muted" style="font-size:12px">Simulated house, not a measurement. Tariff assumptions: off-peak Rs ${H.meta.tariff.offpeak}, peak Rs ${H.meta.tariff.peak}, export Rs ${H.meta.tariff.export} per kWh. The bill values each controller's end-of-day battery change at the off-peak rate, so leaving the battery flat does not look cheap.</p>`;
     $("pane-compare").innerHTML = html;
   }

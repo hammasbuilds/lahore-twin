@@ -209,6 +209,13 @@ class GridSense(Base):
         scale = self.kwp * s.pv_kwh_per_kwp / s.shape_integral_hours() * self.sc.forecast_factor
         return sum(s.clear_sky_shape(t) * scale for t in range(int(a), int(b), 300)) * 300 / 3600
 
+    def projected_soc(self, t: int, until: int) -> float:
+        """Battery level expected at `until` with no intervention: sun minus the present load."""
+        b = self.inv.battery
+        sun = self.solar_kwh_between(t, until)
+        use = max(self.load, 0.3) * (until - t) / 3600
+        return min(1.0, self.soc + (sun - use) / b.capacity_kwh)
+
     def reserve_soc(self, t: int) -> tuple[float, object]:
         """SOC to hold for the next published outage: essentials for its length,
         plus one AC for the sleepers if it falls at night."""
@@ -245,7 +252,8 @@ class GridSense(Base):
                 self.set_inverter(InverterSettings("UTI", target, round(rate, 1)), None,
                                   f"hold {target * 100:.0f}% for the {why_o}"
                                   + (" — charged before the peak window" if before_peak and rate else ""))
-            elif before_peak and o is not None and o.start % DAY >= s.peak[0] and t >= hm("14:00"):
+            elif (before_peak and o is not None and o.start % DAY >= s.peak[0] and t >= hm("14:00")
+                  and self.projected_soc(t, s.peak[0]) < target + 0.15):
                 # a night outage ahead: bank the afternoon sun, let the afternoon run on the grid at
                 # off-peak price, and arrive at the peak window with the battery full
                 hold = min(0.95, target + 0.30)
@@ -300,7 +308,7 @@ class GridSense(Base):
         return 1.0                 # an unannounced cut: assume an hour more
 
     def _acs(self, t: int, o, why_o: str) -> None:
-        self.precool_rooms = set()
+        self.precool_prev, self.precool_rooms = self.precool_rooms, set()
         self.soak_prev, self.soak_rooms = self.soak_rooms, set()
         acs = [aid for aid, a in self.apps.items() if a.kind == "ac"]
         if self.lowv_cut:
@@ -311,7 +319,11 @@ class GridSense(Base):
             soak_now = self._soak_plan(acs)
             for aid in acs:
                 room = self.apps[aid].room
-                pre = self.COMFORT and (o is not None and 0 <= o.start - t <= 2400 and
+                # a pre-cool in progress keeps going: the gate is "warm when it started", or the
+                # AC would stop as soon as it had done its job and restart when the room warmed
+                warm = room in self.precool_prev or (
+                    self.temps.get(room, 30.0) > 26.0 and self.sc.season.outdoor_temp(o.start if o else t) > 28.0)
+                pre = self.COMFORT and warm and (o is not None and 0 <= o.start - t <= 2400 and
                        (self.presence.get(room, 0) or (o.start % DAY >= hm("21:30") and room.startswith("bed"))))
                 if pre and (self.state.get(aid) or self.headroom_ok(aid)):
                     self.precool_rooms.add(room)
@@ -376,7 +388,9 @@ class GridSense(Base):
         running = [a for a in acs if self.apps[a].room in self.soak_prev and self.state.get(a)]
         budget = self.pv - self.load + self.SOAK_KW * len(running)
         keep: set[str] = set()
-        candidates = [a for a in acs if self.presence.get(self.apps[a].room, 0) and not self.wants.get(a)]
+        # only rooms that are actually warm: in October a 24 °C room needs no cooling, free sun or not
+        candidates = [a for a in acs if self.presence.get(self.apps[a].room, 0) and not self.wants.get(a)
+                      and (self.temps.get(self.apps[a].room, 30.0) > 28.0 or self.apps[a].room in self.soak_prev)]
         candidates.sort(key=lambda a: (a not in running, -self.presence.get(self.apps[a].room, 0)))
         started = False
         for aid in candidates:

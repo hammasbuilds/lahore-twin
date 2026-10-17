@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 1 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 2 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -470,3 +470,23 @@ own source digest, so changing home code no longer marks the office stale.
   remaining overload trip at 21:30 on one day).
 - Tests 16 → 17 (eco is never dark and cheaper than the default over five days;
   the flapping test replaced). 0 overload trips over ten days for all four.
+
+**Round 2 — seasons and feeder categories (30 days).**
+- *Added:* `tools/sweep_home.py` — June and October × categories III, IV, V ×
+  five days; invariants for both GridSense profiles: never darker than the
+  default, no overload trips, no AC flapping, tank never dry, no late jobs.
+  0 violations.
+- *Found:* October exposed what June hid. Comfort GridSense cost Rs 40–64/day
+  against the default's 7–17 with nobody too hot in any setup — it pre-cooled
+  and soaked 24 °C rooms. Eco looked Rs 2–4 dearer than the default; traced on
+  one day, every setup imported 0 kWh and the bill was only the battery's end
+  change (~0.1 kWh apart: noise, not cost). Afternoon banking was also holding
+  the battery from 14:00 even when it would reach 18:30 full anyway.
+- *Fixed:* pre-cool only when the room is above 26 °C and the outage hours will
+  be hot outdoors; soak only rooms above 28 °C; banking only when a projection
+  (SOC + forecast sun − present load) says the reserve would not be there by
+  18:30. October comfort Rs 48 → 36/day (category IV); June comfort unchanged.
+- *Found (my own regression):* the new "warm" gate on pre-cooling had no
+  hysteresis — the AC stopped once the room dropped below 26 °C and restarted
+  as it warmed (5 changes in 9 minutes). The flapping test caught it. *Fixed:*
+  a pre-cool in progress keeps going.
