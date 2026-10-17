@@ -32,6 +32,7 @@ CO2_HIGH, CO2_OK = 1000, 800
 LATE_FROM = hm("09:16")
 RETRIGGER = 60              # motion this soon after switching off means the room was not empty
 CO2_EXTEND = 300            # a CO2 "still occupied" verdict holds for this long
+ROLLCALL_GAP, ROLLCALL_FOR = 2, 900
 HOLD_MULT_MAX = 4
 # optimum start: rooms used every day, and when their first occupant usually walks in
 # (in a real building this comes from weeks of badge history)
@@ -315,6 +316,11 @@ class Attendance:
         self.beams: list[list] = []      # [t, msg_id, resolved]
         self.tailgate_alerts: list[int] = []
         self.double_counts: list[int] = []
+        # roll-call: two independent views of how many people are behind the badge doors
+        self.inside: dict[str, bool] = {}     # register: last badge direction per person
+        self.counted_inside = 0               # door counters: ins minus outs
+        self.mismatch_since: int | None = None
+        self.unidentified = 0                 # tailgate entries whose person is not yet known
         bus.subscribe("office/gate/badge", self._on_badge)
         bus.subscribe("office/gate/beam", self._on_beam)
         bus.subscribe("office/reception/manual", self._on_manual)
@@ -336,8 +342,12 @@ class Attendance:
         pid, direction, gate = m.payload["person"], m.payload["dir"], m.payload["gate"]
         if direction == "in":
             self.creds.append([m.t, pid, False, gate])
+            self.inside[pid] = True
             self._first_in(pid, m.t, "badge", m.id)
         else:
+            if pid not in self.checkin and self.unidentified > 0:
+                self.unidentified -= 1        # someone who never badged in leaves: the tailgater
+            self.inside[pid] = False
             self.checkout[pid] = m.t
 
     def _on_clock(self, m: Message) -> None:
@@ -350,6 +360,7 @@ class Attendance:
     def _on_manual(self, m: Message) -> None:
         pid = m.payload
         self.creds.append([m.t, pid, False, "manual"])     # manual: valid at the main gate
+        self.inside[pid] = True
         self._first_in(pid, m.t, "manual at reception", m.id)
 
     def _on_kiosk(self, m: Message) -> None:
@@ -357,7 +368,34 @@ class Attendance:
 
     def _on_beam(self, m: Message) -> None:
         if m.payload["dir"] == "in":
+            self.counted_inside += 1
             self.beams.append([m.t, m.id, False, m.payload["gate"]])
+        else:
+            self.counted_inside = max(0, self.counted_inside - 1)
+
+    def register_inside(self) -> int:
+        return sum(self.inside.values())
+
+    def estimate_inside(self) -> int:
+        """Best evacuation count: the register plus entries nobody badged for."""
+        return self.register_inside() + self.unidentified
+
+    def rollcall_tick(self, t: int) -> None:
+        """Door counters drift (every missed count accumulates), so when they have
+        disagreed with the badge estimate by 2+ for 15 minutes they are re-zeroed."""
+        est = self.estimate_inside()
+        gap = self.counted_inside - est
+        if abs(gap) >= ROLLCALL_GAP:
+            if self.mismatch_since is None:
+                self.mismatch_since = t
+            if t - self.mismatch_since >= ROLLCALL_FOR:
+                self.bus.publish("office/gate/rezero", est, None,
+                                 f"Door counters drifted to {self.counted_inside} against a badge estimate of "
+                                 f"{est} since {clock(self.mismatch_since)} — re-zeroed")
+                self.counted_inside = est
+                self.mismatch_since = None
+        else:
+            self.mismatch_since = None
 
     def tick(self, t: int) -> None:
         for beam in self.beams:
@@ -391,6 +429,7 @@ class Attendance:
                 match[2] = True
             else:
                 self.tailgate_alerts.append(bt)
+                self.unidentified += 1
                 self.bus.publish("office/alert/tailgate", bt, bid,
                                  f"Someone entered at {clock(bt)} without a badge read — possible tailgating")
 

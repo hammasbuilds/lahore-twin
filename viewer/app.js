@@ -152,9 +152,10 @@ if (typeof document !== "undefined") (function () {
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     const [W, H] = plan.size;
-    const pad = 56;
-    const s = Math.min((w - pad * 2) / W, (h - pad * 2 - 30) / H);
-    view = { s, ox: (w - W * s) / 2, oy: (h - H * s) / 2 + 10 };
+    // room for the layer buttons above and the legend below; little else wasted
+    const top = 56, bottom = w < 700 ? 12 : 58, side = 20;
+    const s = Math.min((w - side * 2) / W, (h - top - bottom) / H);
+    view = { s, ox: (w - W * s) / 2, oy: top + (h - top - bottom - H * s) / 2 };
     const tw = tl.clientWidth, th = tl.clientHeight;
     tl.width = Math.round(tw * dpr); tl.height = Math.round(th * dpr);
     tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -523,16 +524,57 @@ if (typeof document !== "undefined") (function () {
       else if (!arrived) status = `<span class="pill">not arrived</span>`;
       else if (!here) status = reg.out != null && reg.out <= t ? `<span class="pill">left</span>` : `<span class="pill warn">left, no badge-out</span>`;
       else status = `<span class="pill ok">present</span>`;
-      const late = p.role in { staff: 1, manager: 1 } && reg.in != null && reg.in > 9 * 3600 + 15 * 60 && sysIn;
+      const late = p.role in { staff: 1, manager: 1 } && reg.in != null && reg.in >= 9 * 3600 + 16 * 60 && sysIn;
       return `<tr><td>${esc(p.name)}<div class="muted" style="font-size:11.5px">${ROLE_NAMES[p.role]}</div></td><td class="num ${late ? "flag" : ""}">${sysIn ? clock(reg.in) : "—"}</td><td class="num">${reg.out != null && reg.out <= t ? clock(reg.out) : "—"}</td><td>${status}</td></tr>`;
     });
+    const S = M.series, si = seriesIndex(R, t);
+    const est = S.roll_estimate[si], truth = S.roll_truth[si];
+    const off = est - truth;
     $("pane-attendance").innerHTML = `
+      <h3>Evacuation roll-call</h3>
+      <div class="kpis rc">
+        <div class="kpi"><div class="v num">${est}</div><div class="l">Estimated inside the badge line</div></div>
+        <div class="kpi"><div class="v num ${off ? "flag" : ""}">${truth}</div><div class="l">Truly inside (simulator)</div></div>
+      </div>
+      <div class="row"><span class="muted">Badge register says inside</span><span class="num">${S.roll_register[si]}</span></div>
+      <div class="row"><span class="muted">Door counters say inside</span><span class="num">${S.roll_counter[si]}</span></div>
+      <canvas class="chart" id="rc-chart" style="height:110px"></canvas>
+      <p class="muted" style="font-size:12px">Estimate = badge register + entries nobody badged for (tailgates). Door counters drift as missed counts pile up, so they are re-zeroed to the estimate after 15 minutes of disagreement.</p>
+      <h3>Today</h3>
       <div class="row"><span class="muted">Checked in (badge or reception)</span><span class="num">${inSys}</span></div>
       <div class="row"><span class="muted">Arrived (simulator truth)</span><span class="num">${onSite}</span></div>
       <div class="row"><span class="muted">On site but missing from the register</span><span class="num ${mismatch ? "flag" : ""}">${mismatch}</span></div>
       <h3>Register</h3>
       <table><tr><th>Person</th><th>In</th><th>Out</th><th>Status</th></tr>${rows.join("")}</table>
-      <p class="muted" style="font-size:12px">Late (red) = staff checking in after 09:15. The register is built only from badge reads and reception check-ins; the truth column comes from the simulator, which a real building would not have.</p>`;
+      <p class="muted" style="font-size:12px">Late (red) = staff checking in at 09:16 or later. The register is built only from badge reads and reception check-ins; the truth column comes from the simulator, which a real building would not have.</p>`;
+  }
+
+  function drawRollcall() {
+    const c = document.getElementById("rc-chart");
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth, h = c.clientHeight;
+    c.width = w * dpr; c.height = h * dpr;
+    const g = c.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const S = IX.modes[state.mode].series;
+    const max = Math.max(...S.roll_truth, ...S.roll_estimate, 1) * 1.1;
+    const xs = (t) => (w * (t - R.meta.t0)) / (R.meta.t1 - R.meta.t0);
+    const ys = (v) => h - 22 - (h - 30) * (v / max);   // leave the bottom strip for the legend
+    const line = (arr, col, width, dash) => {
+      g.strokeStyle = col; g.lineWidth = width; g.setLineDash(dash || []);
+      g.beginPath(); S.t.forEach((t, i) => (i ? g.lineTo(xs(t), ys(arr[i])) : g.moveTo(xs(t), ys(arr[i])))); g.stroke();
+      g.setLineDash([]);
+    };
+    line(S.roll_counter, palette.muted, 1, [3, 3]);
+    line(S.roll_truth, palette.people, 3);
+    line(S.roll_estimate, palette.accent, 1.5);
+    g.strokeStyle = palette.text; g.globalAlpha = 0.5;
+    g.beginPath(); g.moveTo(xs(state.t), 0); g.lineTo(xs(state.t), h - 14); g.stroke(); g.globalAlpha = 1;
+    g.font = "11px Segoe UI, system-ui"; g.textAlign = "left";
+    [["truth", palette.people], ["estimate", palette.accent], ["counters", palette.muted]].forEach(([n, col], i) => {
+      g.fillStyle = col; g.fillRect(6 + i * 80, h - 9, 10, 3); g.fillStyle = palette.muted; g.fillText(n, 20 + i * 80, h - 4);
+    });
   }
 
   function renderCompare() {
@@ -679,7 +721,7 @@ if (typeof document !== "undefined") (function () {
       renderKpis();
       renderLog(force);
       if (state.sel && $("pane-inspect").classList.contains("on")) renderInspector();
-      if ($("pane-attendance").classList.contains("on")) renderAttendance();
+      if ($("pane-attendance").classList.contains("on")) { renderAttendance(); drawRollcall(); }
       if ($("pane-energy").classList.contains("on")) drawChart();
     }
   }
@@ -728,7 +770,7 @@ if (typeof document !== "undefined") (function () {
   function showTab(name) {
     for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.tab === name);
     for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === "pane-" + name);
-    if (name === "attendance") renderAttendance();
+    if (name === "attendance") { renderAttendance(); drawRollcall(); }
     if (name === "energy") renderCompare();
     if (name === "inspect") renderInspector();
   }

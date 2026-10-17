@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 2 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 3 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -169,3 +169,24 @@ could claim another person's badge pass.
 - *Open for round 3:* the schedule leaves overtime staff warm after 18:30
   (251 person-min); evacuation headcount (door counter vs register) not shown;
   plan view leaves wide empty margins.
+
+**Round 3 — evacuation roll-call.**
+- *Added:* how many people are behind the badge doors right now, three ways:
+  door counters (ins − outs), the badge register (last direction per person),
+  and the truth.
+- *Found:* raw door counters drift — every missed count accumulates, so by
+  mid-morning they were 2 off (mean error 1.58 people, 08:30–18:30) while the
+  register was 0.18 off. A first "counter vs register mismatch" alert fired
+  three times a day on pure sensor drift. *Fixed:* the alert is gone; the
+  estimate is register + entries nobody badged for (each tailgate alert adds
+  one, a badge-out by someone who never badged in removes one), and counters
+  that disagree with it for 15 min are re-zeroed. Seed 7: counters 0.41,
+  register 0.18, estimate 0.10 people off on average; worst case 1.
+- *Viewer:* attendance tab opens with the roll-call (estimate vs truth, register,
+  counters, a day chart). The late threshold in the viewer still used the old
+  09:15 rule — aligned to 09:16. Plan margins cut (top 56, bottom 58, sides 20):
+  the floor plan is ~10% larger.
+- The schedule's overtime heat (251 person-min after the 18:30 switch-off) is
+  left as a measured weakness of that baseline, not patched — it is what a
+  fixed schedule does.
+- Tests 27 → 29.

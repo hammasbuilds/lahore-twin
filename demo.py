@@ -62,6 +62,10 @@ def main() -> None:
     print(f"  tailgates                      {a['tailgates_true']} happened, {a['tailgates_caught']} caught, "
           f"{a['tailgate_false_alarms']} false alarms")
     print(f"  door-counter misses            {a['beam_misses']}")
+    print(f"  evacuation roll-call, 08:30-18:30, people off from the truth (mean / worst):")
+    print(f"    door counters                {a['rollcall_counter_mean_err']} / {a['rollcall_counter_max_err']}")
+    print(f"    badge register               {a['rollcall_register_mean_err']} / {a['rollcall_register_max_err']}")
+    print(f"    register + tailgate entries  {a['rollcall_estimate_mean_err']} / {a['rollcall_estimate_max_err']}")
 
     print("\nAlerts under Motion + CO2")
     for msg in sims["pir+co2"].bus.log:

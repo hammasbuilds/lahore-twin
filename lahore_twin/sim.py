@@ -67,6 +67,7 @@ class Sim:
         self.cars: list[dict] = []
         self.dev_changes: list[list] = []
         self.series = {"t": [], "light_kw": [], "ac_kw": [], "out_temp": [], "on_site": [],
+                       "roll_truth": [], "roll_counter": [], "roll_register": [], "roll_estimate": [],
                        "occ": {r: [] for r in self.env}, "temp": {r: [] for r in self.env},
                        "co2": {r: [] for r in self.env}}
         self.energy = {"light_kwh": 0.0, "ac_kwh": 0.0}
@@ -389,6 +390,12 @@ class Sim:
             s["occ"][rid].append(occ.get(rid, 0))
             s["temp"][rid].append(round(env.temp, 2))
             s["co2"][rid].append(round(env.co2))
+        # roll-call scope: behind the badge doors (everything but the car park and lobby)
+        s["roll_truth"].append(sum(n for r, n in occ.items() if r not in ("parking", "lobby")))
+        s["roll_counter"].append(self.att.counted_inside)
+        s["roll_register"].append(self.att.register_inside())
+        s["roll_estimate"].append(self.att.estimate_inside())
+        self.att.rollcall_tick(t)
 
     # ---- run ------------------------------------------------------------
 
@@ -451,10 +458,23 @@ class Sim:
             "tailgates_caught": caught,
             "tailgate_false_alarms": false_alarms,
             "door_count_alerts": len(self.att.double_counts),
+            **self._rollcall_errors(),
             "beam_misses": self.truth.beam_misses,
             "staff": len(staff),
             "alerts": alerts,
         }
+
+    def _rollcall_errors(self) -> dict:
+        """How far each roll-call view is from the truth, 08:30-18:30, in people."""
+        s = self.series
+        idx = [i for i, t in enumerate(s["t"]) if hm("08:30") <= t < hm("18:30")]
+        def err(key):
+            d = [abs(s[key][i] - s["roll_truth"][i]) for i in idx]
+            return round(sum(d) / max(len(d), 1), 2), max(d, default=0)
+        (cm, cx), (rm, rx), (em, ex) = err("roll_counter"), err("roll_register"), err("roll_estimate")
+        return {"rollcall_counter_mean_err": cm, "rollcall_counter_max_err": cx,
+                "rollcall_register_mean_err": rm, "rollcall_register_max_err": rx,
+                "rollcall_estimate_mean_err": em, "rollcall_estimate_max_err": ex}
 
     def replay_mode(self) -> dict:
         """Device timeline, log and series for this rule set."""

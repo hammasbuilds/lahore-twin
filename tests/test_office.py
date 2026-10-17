@@ -329,3 +329,32 @@ def test_gate_results_do_not_depend_on_the_rule_set(day):
     keys = ("tailgates_true", "tailgates_caught", "tailgate_false_alarms", "beam_misses", "door_count_alerts")
     got = [{k: s.metrics()[k] for k in keys} for s in sims.values()]
     assert got[0] == got[1] == got[2]
+
+
+def test_rollcall_estimate_counts_the_tailgater_until_they_leave():
+    bus = Bus()
+    att = Attendance(bus, {"a": _P("a"), "t": _P("t")})
+    bus.now = 100
+    bus.publish("office/gate/badge", {"person": "a", "dir": "in", "gate": "corr1"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})
+    bus.now = 103
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})     # t follows, no badge
+    att.tick(200)
+    assert att.register_inside() == 1 and att.estimate_inside() == 2
+    bus.now = 5000
+    bus.publish("office/gate/badge", {"person": "t", "dir": "out", "gate": "corr1"})
+    assert att.estimate_inside() == 1      # the unknown entry left
+
+
+def test_drifted_door_counters_are_rezeroed_to_the_estimate():
+    bus = Bus()
+    att = Attendance(bus, {"a": _P("a")})
+    bus.now = 100
+    bus.publish("office/gate/badge", {"person": "a", "dir": "in", "gate": "corr1"})
+    for _ in range(3):                      # three phantom counts
+        bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})
+    att.counted_inside = 4
+    att.rollcall_tick(1000)
+    assert att.counted_inside == 4          # not yet: needs 15 minutes of disagreement
+    att.rollcall_tick(1000 + 900)
+    assert att.counted_inside == att.estimate_inside()
