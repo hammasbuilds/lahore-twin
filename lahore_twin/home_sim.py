@@ -145,7 +145,9 @@ class HomeSim:
         if p.gone:
             return
         if not p.on_site:
-            if t < p.arrive:
+            # someone who went out stays out until their next stay brings them back through
+            # the street (_off_site_return); without this they "arrived" again at their bed
+            if getattr(p, "away", False) or t < p.arrive:
                 return
             p.on_site = True
             p.pos = p.entry
@@ -176,6 +178,7 @@ class HomeSim:
                 p.room = room
             if done and getattr(p, "leaving", False):
                 p.on_site = False
+                p.away = True
                 if p.day[p.idx].kind == "leave":
                     p.gone = True
                 p.room = None
@@ -184,7 +187,8 @@ class HomeSim:
 
     def _off_site_return(self, p: Person, t: int) -> None:
         # someone "Out" comes back when their next stay begins: re-enter from the street
-        if not p.on_site and not p.gone and p.idx + 1 < len(p.day) and p.day[p.idx + 1].t <= t:
+        if getattr(p, "away", False) and not p.gone and p.idx + 1 < len(p.day) and p.day[p.idx + 1].t <= t:
+            p.away = False
             p.on_site = True
             p.pos = self.plan.spots["street"][0]
             p.room = self.plan.room_at(*p.pos)

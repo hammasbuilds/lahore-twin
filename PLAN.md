@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 2 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 3 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -490,3 +490,28 @@ own source digest, so changing home code no longer marks the office stale.
   hysteresis — the AC stopped once the room dropped below 26 °C and restarted
   as it warmed (5 changes in 9 minutes). The flapping test caught it. *Fixed:*
   a pre-cool in progress keeps going.
+
+**Round 3 — using the viewer, and a bug that moved every number.**
+- *Found (UI):* the AC glyph sat under the room-name label, so the red
+  "wanted, no power" cross on the bedroom ACs — the whole point of the UPS
+  circuit's night outage — was invisible. *Fixed:* bottom-right corner. The
+  events log opened on every want/no-longer-want; it now opens on decisions
+  and alerts (UI check asserts it). The home sidebar had one more block than the
+  office's three-row grid, which stretched the tab bar into a large empty gap.
+- *Found:* comfort GridSense pre-cooled both bedrooms at 09:20 for a 10:00
+  outage because someone was in them at that moment; the rooms were empty during
+  the outage. *Fixed:* pre-cool only rooms the household's usual routine uses
+  during the outage (`operations.usual_occupancy` in the plan — what a real
+  controller learns from weeks of presence data). My first table was wrong about
+  the lounge (13:00 start; the mother and Dadi sit there from 07:30) and the
+  numbers said so; corrected.
+- *Found while explaining a surprise:* awake heat in the children's bedroom
+  10:00–13:00, when the children are at school. Traced: everyone who went "Out"
+  reached the street, and the off-site branch — written for someone arriving for
+  the day, with arrival 00:00 — put them straight back at their bed, present and
+  sweltering. Five phantom occupants all day: every earlier home number carried
+  them. *Fixed* (out stays out until the next stay brings them back through the
+  street); test added, fails on the old code. Corrected ten days: eco Rs 418 vs
+  default 456 (8% less, never dark); comfort Rs 515, awake heat 542 vs 733
+  person-min; README re-measured.
+- Tests 62 → 63.

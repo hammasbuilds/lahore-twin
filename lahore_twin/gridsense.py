@@ -209,6 +209,20 @@ class GridSense(Base):
         scale = self.kwp * s.pv_kwh_per_kwp / s.shape_integral_hours() * self.sc.forecast_factor
         return sum(s.clear_sky_shape(t) * scale for t in range(int(a), int(b), 300)) * 300 / 3600
 
+    def expected_in(self, room: str, a: int, b: int) -> bool:
+        """Does the household's usual routine use `room` at some point between a and b?
+
+        A real controller learns this from weeks of presence data; here it is the
+        plan's `operations.usual_occupancy`.
+        """
+        for start, end in self.sc.plan.operations.get("usual_occupancy", {}).get(room, []):
+            s, e = hm(start), hm(end)
+            spans = [(s, e)] if s < e else [(s, DAY), (0, e)]
+            for x, y in spans:
+                if a % DAY < y and b % DAY > x or (b % DAY < a % DAY and (x < b % DAY or y > a % DAY)):
+                    return True
+        return False
+
     def projected_soc(self, t: int, until: int) -> float:
         """Battery level expected at `until` with no intervention: sun minus the present load."""
         b = self.inv.battery
@@ -321,10 +335,12 @@ class GridSense(Base):
                 room = self.apps[aid].room
                 # a pre-cool in progress keeps going: the gate is "warm when it started", or the
                 # AC would stop as soon as it had done its job and restart when the room warmed
+                expected = self.expected_in(room, o.start, o.end) if o is not None else False
                 warm = room in self.precool_prev or (
                     self.temps.get(room, 30.0) > 26.0 and self.sc.season.outdoor_temp(o.start if o else t) > 28.0)
-                pre = self.COMFORT and warm and (o is not None and 0 <= o.start - t <= 2400 and
-                       (self.presence.get(room, 0) or (o.start % DAY >= hm("21:30") and room.startswith("bed"))))
+                # pre-cool only a room the household will use during the outage (learned routine),
+                # not one that merely has someone in it now
+                pre = self.COMFORT and warm and expected and (o is not None and 0 <= o.start - t <= 2400)
                 if pre and (self.state.get(aid) or self.headroom_ok(aid)):
                     self.precool_rooms.add(room)
                     self.command(aid, True, None, f"pre-cool to 23.5 °C before the {why_o}")

@@ -179,3 +179,21 @@ def test_eco_is_never_dark_and_cheaper_than_the_default_over_five_days(plan):
             if mode == "gridsense_eco":
                 assert m["house_dark_min"] == 0 and m["no_fan_person_min"] == 0, seed
     assert bills["gridsense_eco"] < bills["default"]
+
+
+def test_people_who_go_out_are_not_at_home(plan):
+    """The bug this guards: someone reaching the street was 'arriving' again at their bed."""
+    from lahore_twin.home_sim import HomeSim as HS
+    s = HS(build(plan, JUNE, seed=1), "default")
+    seen = {}
+    orig = s._physics
+
+    def watch(t):
+        orig(t)
+        if t == hm("10:30"):
+            seen.update({p.id: p.on_site for p in s.people})
+
+    s._physics = watch
+    s.run()
+    out = [p.id for p in s.people if any(st.label == "Out" for st in p.day)]
+    assert out and all(seen[pid] is False for pid in out), seen

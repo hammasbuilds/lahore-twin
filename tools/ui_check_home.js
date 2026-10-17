@@ -33,7 +33,10 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   await page.click("#layers button[data-layer=state]");
   await page.click(".tabs button[data-tab=day]"); await page.waitForTimeout(200); await shot("07-day");
   await page.click(".tabs button[data-tab=compare]"); await page.waitForTimeout(200); await shot("08-compare");
-  await page.click(".tabs button[data-tab=events]"); await page.check("#only-key"); await setT("23:59"); await shot("09-decisions");
+  await page.click(".tabs button[data-tab=events]");
+  if (!(await page.isChecked("#only-key"))) throw new Error("the log should open on decisions and alerts");
+  await setT("23:59"); await shot("09-decisions");
+  await page.uncheck("#only-key"); await page.waitForTimeout(150); await shot("09b-full-log"); await page.check("#only-key");
   const first = page.locator("#log li[data-msg]").first(); await first.waitFor({ state: "visible" });
   await first.click(); await page.waitForTimeout(200); await shot("10-why");
   // a real click on a person

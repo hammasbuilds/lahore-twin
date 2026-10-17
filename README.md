@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 62 tests, including the viewer's core under node
+python -m pytest -q          # 63 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 python demo_home.py           # the house under four controllers; writes viewer/home_replay.js
 python tools/sweep_home.py    # home invariants: 2 seasons x 3 feeder categories x 5 days (~11 min)
@@ -186,17 +186,17 @@ forecast; none sees an unannounced cut coming.
 
 ```
                                    Inverter default      UPS circuit    GridSense eco        GridSense
-House dark (min)                                 37                0                0                0
-No fan when wanted (person-min)                 224                0                0                0
-Too hot to sleep (person-min)                   398              860              642              312
-Too hot awake (person-min)                     1763             2248             1763              691
+House dark (min)                                 35                0                0                0
+No fan when wanted (person-min)                 212                0                0                0
+Too hot to sleep (person-min)                   380              847              544              384
+Too hot awake (person-min)                      729             1141              729              494
 Roof tank empty (min)                             0                0                0                0
-Grid at peak price (kWh)                        0.0              4.3              0.0             0.99
-Grid off-peak (kWh)                            4.34             8.76             3.84             3.84
-Exported (kWh)                                 7.11             8.02              6.1             2.27
-Solar used at home (%)                         81.2             63.5             83.8             94.0
-Solar wasted (kWh)                              0.0             5.79              0.0              0.0
-Day's bill (Rs)                                 314              392              279              374
+Grid at peak price (kWh)                        0.0              4.3              0.0             0.87
+Grid off-peak (kWh)                            4.34             8.72             3.84             3.84
+Exported (kWh)                                 7.62             8.71             6.62             4.65
+Solar used at home (%)                         79.8             61.5             82.5             87.7
+Solar wasted (kWh)                              0.0             5.83              0.0              0.0
+Day's bill (Rs)                                 308              383              282              341
 Inverter overload trips                           0                0                0                0
 AC/fridge below 190 V (min)                      10               10                0                0
 Jobs finished late                                0                0                0                0
@@ -206,20 +206,24 @@ Over ten June days (`python demo_home.py --days 10`, mean per day):
 
 | | Inverter default | UPS circuit | GridSense eco | GridSense |
 |---|---:|---:|---:|---:|
-| house dark, minutes | 33 | 0 | 0 | 0 |
-| person-minutes without a fan when wanted | 198 | 0 | 0 | 0 |
-| person-minutes too hot to sleep | 430 | 700 | 541 | 335 |
-| person-minutes too hot awake | 1,770 | 2,146 | 1,777 | 925 |
-| grid at peak price, kWh | 2.1 | 4.2 | 1.5 | 2.5 |
-| solar used at home | 85% | 62% | 86% | 94% |
-| bill, Rs | 487 | 487 | **446** | 558 |
+| house dark, minutes | 31 | 0 | 0 | 0 |
+| person-minutes without a fan when wanted | 187 | 0 | 0 | 0 |
+| person-minutes too hot to sleep | 404 | 683 | 505 | 362 |
+| person-minutes too hot awake | 733 | 1,081 | 733 | 542 |
+| grid at peak price, kWh | 1.9 | 4.2 | 1.4 | 2.3 |
+| solar used at home | 84% | 59% | 85% | 89% |
+| bill, Rs | 456 | 468 | **418** | 515 |
 
 The default setup goes dark when the battery reaches cut-off in the night
 outage. The UPS circuit never goes dark but cannot run an AC in an outage and
-wastes 5.7 kWh of solar a day when the battery is full during a cut. **GridSense
-eco** gives the same never-dark guarantee for 8% less money than either. **GridSense**
-buys comfort with it: the coolest house by far, at Rs 558 — partly because it
-cools rooms with sun that would otherwise be sold back at Rs 11.
+wastes 5.8 kWh of solar a day when the battery is full during a cut. **GridSense
+eco** gives the same never-dark guarantee for 8% less than the default. **GridSense**
+buys comfort with it: the coolest house awake and asleep, at Rs 515 — partly
+because it cools rooms with sun that would otherwise be sold back at Rs 11.
+Over 2 seasons × 3 feeder categories × 5 days (`tools/sweep_home.py`) neither
+profile is ever darker than the default, trips the inverter, flaps an AC,
+empties the tank or finishes a job late; in October nobody is too hot under
+any setup and all bills are small (Rs 7–50 a day).
 
 Tariff assumptions: off-peak Rs 42, peak Rs 50, export Rs 11 per kWh (the
 proposed gross-metering buyback). The bill values each controller's end-of-day

@@ -172,7 +172,7 @@
     const spot = { fridge: "fridge", pump: "pump", washer: "washer", iron: "iron" }[a.kind];
     if (spot && plan.spots[spot]) return plan.spots[spot][0];
     if (a.kind === "fan") return [cx, cy];
-    if (a.kind === "ac") return [cx, y0 + 0.45];
+    if (a.kind === "ac") return [x1 - 0.95, y1 - 0.45];   // bottom-right corner: room names own the top edge
     if (a.kind === "tv") return [cx, y1 - 0.9];
     if (a.kind === "router") return [x1 - 0.5, y0 + 0.5];
     if (a.kind === "microwave") return [x0 + 0.6, y0 + 0.6];
