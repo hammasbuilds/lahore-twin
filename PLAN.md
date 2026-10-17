@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 5 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 6 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -225,3 +225,22 @@ could claim another person's badge pass.
   accent 3.68:1 and ok-green 3.77:1 on white, below 4.5:1 for the small labels
   and pills that use them. *Fixed:* #0e7490 / #047857 → 5.36:1 and 5.48:1. Dark
   theme already ≥ 5.6:1 everywhere. Tests 29 → 30.
+
+**Round 6 — the hardware claim, made real.**
+- *Found:* the README promised "replace Bus.publish with an MQTT client" but
+  nothing in the repo spoke MQTT. *Added:* `mqtt.py`, a stdlib MQTT 3.1.1
+  client (QoS 0) and a two-way bridge; `python -m lahore_twin.live` streams the
+  office to a broker in real time or faster. Only sensor topics are accepted
+  from outside; commands and alerts are produced by the rules alone.
+- *Found while building it:* (1) the first bridge suppressed everything
+  published while a device message was being injected — including the rules'
+  light command, the very thing a relay waits for; now only the injected message
+  is not echoed. (2) `Sim.run()` reset every position on each call, so running
+  in two pieces teleported people; positions now start in the constructor and
+  `run()` resumes. (3) keepalive pings were timed in simulated seconds — at 1×
+  speed that is 10 real minutes, past the broker's 60 s keepalive; now wall time.
+- Tests 30 → 34, against a fake broker that speaks the wire protocol (CONNECT,
+  SUBSCRIBE, PUBLISH, PINGREQ): a pushed PIR message switches the light and the
+  command reaches the broker; outside commands are refused; 3-byte remaining
+  lengths round-trip; live mode streams only from `--start`. Not yet run against
+  a physical board — stated in the README.

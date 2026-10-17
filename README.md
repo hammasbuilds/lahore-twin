@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 29 tests, including the viewer's core under node
+python -m pytest -q          # 34 tests, including the viewer's core under node
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.
@@ -95,9 +95,31 @@ compare tab puts the three rule sets side by side.
 
 ### Swapping in hardware
 
-Rules subscribe to topics such as `office/meet_l/motion` and publish
-`office/meet_l/light`. Replace `Bus.publish` with an MQTT client and point an
-ESP32 running a PIR + relay at the same topics.
+`lahore_twin/mqtt.py` is a standard-library MQTT 3.1.1 client and a bridge.
+
+```bash
+python -m lahore_twin.live --broker 192.168.1.10 --speed 60          # whole day, 60x
+python -m lahore_twin.live --broker localhost --start 09:00 --hours 1 --speed 1
+```
+
+Every bus message is published to `lahore-twin/<topic>` as JSON
+`{"t", "payload", "cause", "text"}`, so Home Assistant or any MQTT dashboard sees
+the building. A real device publishes into the same rules on these topics
+(anything else — commands, alerts — is refused):
+
+| topic | payload | from |
+|---|---|---|
+| `lahore-twin/office/<room>/motion` | `1` | PIR |
+| `lahore-twin/office/<room>/co2` | ppm, e.g. `812.0` | CO₂ sensor (SCD40, MH-Z19) |
+| `lahore-twin/office/<room>/temp` | °C, e.g. `25.4` | temperature sensor |
+| `lahore-twin/office/<room>/switch` | `true` | wall switch |
+| `lahore-twin/office/gate/badge` | `{"person", "dir", "gate"}` | badge reader |
+| `lahore-twin/office/gate/beam` | `{"dir", "gate"}` | door beam counter |
+
+The rules answer on `lahore-twin/office/<room>/light` and `.../ac` (`true` /
+`false`), which a relay node subscribes to. Tested against a fake broker that
+speaks the wire protocol (`tests/test_mqtt.py`); not yet run against a physical
+board.
 
 ## Layout
 

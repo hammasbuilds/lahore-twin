@@ -48,6 +48,8 @@ class Sim:
         self.rng_gate = random.Random(seed * 1000 + 3)
         self.people: list[Person] = copy.deepcopy(scenario.people)
         self.by_id = {p.id: p for p in self.people}
+        for p in self.people:
+            p.pos = p.entry
         self.bus = Bus()
         self.auto = Automation(self.bus, self.plan, mode, scenario.bookings)
         self.att = Attendance(self.bus, self.by_id)
@@ -419,9 +421,10 @@ class Sim:
 
     # ---- run ------------------------------------------------------------
 
-    def run(self, t0: int = T0, t1: int = T1) -> "Sim":
-        for p in self.people:
-            p.pos = p.entry
+    def run(self, t0: int = T0, t1: int = T1, on_tick=None) -> "Sim":
+        """Simulate t0..t1. ``on_tick(t)`` runs after every second (live mode paces and polls MQTT there).
+
+        Calling it again continues from where the last call stopped."""
         for t in range(t0, t1):
             self.bus.now = t
             for p in self.people:
@@ -440,6 +443,8 @@ class Sim:
                 self.att.tick(t)
             elif t in (hm("08:30"), hm("18:30")):
                 self.auto.tick(t)
+            if on_tick is not None:
+                on_tick(t)
         self.bus.now = t1
         self.att.tick(t1 + 10)
         self.att.finish(t1)
