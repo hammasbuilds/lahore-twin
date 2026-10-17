@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 63 tests, including the viewer's core under node
+python -m pytest -q          # 65 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 python demo_home.py           # the house under four controllers; writes viewer/home_replay.js
 python tools/sweep_home.py    # home invariants: 2 seasons x 3 feeder categories x 5 days (~11 min)
@@ -224,6 +224,14 @@ Over 2 seasons × 3 feeder categories × 5 days (`tools/sweep_home.py`) neither
 profile is ever darker than the default, trips the inverter, flaps an AC,
 empties the tank or finishes a job late; in October nobody is too hot under
 any setup and all bills are small (Rs 7–50 a day).
+
+Stress cases (five days each): a clear-sky forecast on an overcast day, a
+two-hour unannounced cut ending half an hour before the night outage, and a
+six-hour feeder on an overcast day. The default setup is dark 248–318 minutes
+in each; both GridSense profiles 0. It corrects its forecast from what the
+panels actually produce, keeps the next outage's reserve through an unannounced
+cut, never spends the battery below ~1.5 hours of essentials, and tops up when an
+earlier outage left it low.
 
 Tariff assumptions: off-peak Rs 42, peak Rs 50, export Rs 11 per kWh (the
 proposed gross-metering buyback). The bill values each controller's end-of-day

@@ -177,6 +177,8 @@ class GridSense(Base):
     COMFORT = True               # pre-cool, solar soak, AC allowance in the night reserve
     AC_KW_OUTAGE = 0.75          # average draw of a 1.5-ton inverter AC holding 27 °C at night
     HEADROOM_KW = 5.5            # keep under the 6 kW rating with margin
+    # never spend below this, even at peak: ~1.5 h of fans, lights and fridge for a cut nobody announced
+    UNANNOUNCED_FLOOR = 0.25
 
     def __init__(self, *a):
         super().__init__(*a)
@@ -189,6 +191,8 @@ class GridSense(Base):
         self.soak_decided_at = None
         self.outage_began = None
         self.kwp = 6.0
+        self.pv_seen_kwh = 0.0
+        self.pv_expected_kwh = 0.0
 
     # ---- planning --------------------------------------------------------
 
@@ -206,7 +210,7 @@ class GridSense(Base):
 
     def solar_kwh_between(self, a: int, b: int) -> float:
         s = self.sc.season
-        scale = self.kwp * s.pv_kwh_per_kwp / s.shape_integral_hours() * self.sc.forecast_factor
+        scale = self.kwp * s.pv_kwh_per_kwp / s.shape_integral_hours() * self.sky_factor()
         return sum(s.clear_sky_shape(t) * scale for t in range(int(a), int(b), 300)) * 300 / 3600
 
     def expected_in(self, room: str, a: int, b: int) -> bool:
@@ -222,6 +226,22 @@ class GridSense(Base):
                 if a % DAY < y and b % DAY > x or (b % DAY < a % DAY and (x < b % DAY or y > a % DAY)):
                     return True
         return False
+
+    def sky_factor(self) -> float:
+        """The day-ahead forecast, corrected by what the panels have actually produced.
+
+        After two hours of daylight the observed/expected ratio replaces the forecast,
+        so an overcast day that was forecast clear is noticed by mid-morning.
+        """
+        if self.pv_expected_kwh < self.kwp * 0.5:     # not enough daylight yet to judge
+            return self.sc.forecast_factor
+        return max(0.2, min(1.1, self.pv_seen_kwh / self.pv_expected_kwh * self.sc.forecast_factor))
+
+    def _watch_sun(self, t: int) -> None:
+        s = self.sc.season
+        clear = self.kwp * s.pv_kwh_per_kwp / s.shape_integral_hours() * s.clear_sky_shape(t)
+        self.pv_expected_kwh += clear * self.sc.forecast_factor * 10 / 3600
+        self.pv_seen_kwh += self.pv * 10 / 3600
 
     def projected_soc(self, t: int, until: int) -> float:
         """Battery level expected at `until` with no intervention: sun minus the present load."""
@@ -245,6 +265,7 @@ class GridSense(Base):
     # ---- the loop --------------------------------------------------------
 
     def tick(self, t: int) -> None:
+        self._watch_sun(t)
         b = self.inv.battery
         target, o = self.reserve_soc(t)
         soon = o is not None and 0 <= o.start - t <= 4 * 3600
@@ -273,10 +294,17 @@ class GridSense(Base):
                 hold = min(0.95, target + 0.30)
                 self.set_inverter(InverterSettings("SBU", hold, 0.0), None,
                                   f"bank the afternoon sun for the evening and the {why_o}: keep {hold * 100:.0f}%")
+            elif self.soc < self.UNANNOUNCED_FLOOR - 0.02 and (not peak or self.soc < self.UNANNOUNCED_FLOOR - 0.08):
+                # insurance: an earlier outage on a dull day can leave the battery near cut-off for
+                # hours while the grid is up; a cut nobody announced would then black the house out
+                self.set_inverter(InverterSettings("UTI", self.UNANNOUNCED_FLOOR, 2.0), None,
+                                  f"battery at {self.soc * 100:.0f}% — top up to {self.UNANNOUNCED_FLOOR * 100:.0f}% "
+                                  f"in case of an unannounced cut")
             elif peak:
-                self.set_inverter(InverterSettings("SBU", max(target, 0.20), 0.0), None,
+                floor = max(target, self.UNANNOUNCED_FLOOR)
+                self.set_inverter(InverterSettings("SBU", floor, 0.0), None,
                                   f"peak tariff {_clock(self.sc.season.peak[0])}–{_clock(self.sc.season.peak[1])}: "
-                                  f"run on battery, keep {max(target, 0.2) * 100:.0f}%"
+                                  f"run on battery, keep {floor * 100:.0f}%"
                                   + (f" for the {why_o}" if o else ""))
             else:
                 self.set_inverter(InverterSettings("SBU", max(target, 0.25), 0.0), None,
@@ -319,7 +347,10 @@ class GridSense(Base):
         cur = next((x for x in self.published if x.start <= t < x.end), None)
         if cur:
             return (cur.end - t) / 3600
-        return 1.0                 # an unannounced cut: assume an hour more
+        # an unannounced cut has no published end: assume it runs 1.5 h (they run 20-90 min)
+        # from when it began, and never less than half an hour more
+        began = self.outage_began if self.outage_began is not None else t
+        return max(0.5, 1.5 - (t - began) / 3600)
 
     def _acs(self, t: int, o, why_o: str) -> None:
         self.precool_prev, self.precool_rooms = self.precool_rooms, set()
@@ -357,6 +388,11 @@ class GridSense(Base):
         night = t % DAY >= hm("21:00") or t % DAY < hm("06:00")
         energy = b.usable_kwh - (self.inv.settings.cutoff_soc - b.min_soc) * b.capacity_kwh \
             - self.essential_kw(night) * hours - 0.4 + self.pv * hours * 0.5
+        nxt = next((x for x in self.published if x.start >= t + hours * 3600 - 60), None)
+        if nxt is not None and nxt.start - (t + hours * 3600) < 3 * 3600:
+            # an unannounced cut shortly before a published one: keep that outage's reserve
+            target, _ = self.reserve_soc(nxt.start - 1)
+            energy -= max(0.0, (target - b.min_soc) * b.capacity_kwh)
         per_ac = self.AC_KW_OUTAGE * hours
         wanted = [aid for aid in acs if self.wants.get(aid)]
         # sleepers first (the elderly and children sleep in the bedrooms), the lounge last

@@ -197,3 +197,24 @@ def test_people_who_go_out_are_not_at_home(plan):
     s.run()
     out = [p.id for p in s.people if any(st.label == "Out" for st in p.day)]
     assert out and all(seen[pid] is False for pid in out), seen
+
+
+@pytest.mark.parametrize("case", ["forecast_wrong", "cut_before_night"])
+def test_gridsense_keeps_the_lights_on_when_its_assumptions_fail(plan, case):
+    """Stress cases from home round 4: a clear-sky forecast on an overcast day, and an
+    unannounced cut ending half an hour before the published night outage."""
+    from lahore_twin.home import Outage
+    # seeds with the shape each case needs (4: a long unannounced cut at 21:38; 1 and 7: a
+    # published 22:00 night outage to cut in front of)
+    for seed in ((2, 4) if case == "forecast_wrong" else (1, 7)):
+        sc = build(plan, JUNE, seed=seed)
+        if case == "forecast_wrong":
+            sc.day_factor, sc.forecast_factor = 0.45, 1.0
+        else:
+            night = next(o for o in sc.outages if o.published and o.start >= hm("20:00"))
+            sc.outages = [o for o in sc.outages if not (night.start - 3 * 3600 < o.start < night.start)]
+            sc.outages.append(Outage(night.start - 9000, night.start - 1800, False))
+            sc.outages.sort(key=lambda o: o.start)
+        for mode in ("gridsense_eco", "gridsense"):
+            m = HomeSim(sc, mode).run().metrics()
+            assert m["house_dark_min"] == 0 and m["no_fan_person_min"] == 0, (case, seed, mode)

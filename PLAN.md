@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 3 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 4 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -515,3 +515,25 @@ own source digest, so changing home code no longer marks the office stale.
   default 456 (8% less, never dark); comfort Rs 515, awake heat 542 vs 733
   person-min; README re-measured.
 - Tests 62 → 63.
+
+**Round 4 — when GridSense's assumptions fail (stress tests, 5 days each).**
+House-dark minutes summed over five days (default / eco / comfort), before → after:
+- forecast says clear, day is overcast: 318 / 8 / 13 → 318 / **0 / 0**
+- 2 h unannounced cut ending 30 min before the night outage: 248 / 42 / 0 → 248 / **0 / 0**
+- category V (6 h) and overcast: 252 / 5 / 0 → 252 / **0 / 0**
+Four causes, each traced to the minute it went dark:
+1. Outage AC rationing only asked whether the battery lasts *this* cut; during
+   an unannounced cut it spent the reserve meant for the published outage half
+   an hour later. *Fixed:* the next outage's reserve is subtracted when it starts
+   before the battery could recharge.
+2. The day-ahead forecast was trusted all day. *Fixed:* after two hours of
+   daylight, observed/expected solar replaces it (`sky_factor`).
+3. Spending the battery in the peak window went down to 20%; an unannounced cut
+   at 21:38 then started at 13% and the house went dark. *Fixed:* a standing
+   25% floor (~1.5 h of essentials) even at peak.
+4. On a dull day an afternoon outage left the battery near cut-off for hours with
+   the grid up — GridSense only grid-charged for a *published* outage within
+   4 h. *Fixed:* insurance top-up to the floor whenever below it with the grid up
+   (at peak only if very low). Also: an unannounced cut is now assumed to last
+   1.5 h from its start (they run 20–90 min), not "one more hour" forever.
+Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
