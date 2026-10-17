@@ -388,7 +388,7 @@ def test_committed_replay_matches_the_current_code():
     from lahore_twin.export import source_digest
     text = (ROOT / "viewer" / "replay.js").read_text(encoding="utf-8")
     meta = json.loads(text[len("window.REPLAY = "):].rstrip().rstrip(";"))["meta"]
-    assert meta.get("digest") == source_digest(), "run `python demo.py` to regenerate viewer/replay.js"
+    assert meta.get("digest") == source_digest("office"), "run `python demo.py` to regenerate viewer/replay.js"
 
 
 def test_forgotten_tap_out_lowers_the_estimate():
@@ -467,3 +467,12 @@ def test_plan_specific_names_come_from_the_plan(tmp_path):
     f.write_text(json.dumps(raw), encoding="utf-8")
     with pytest.raises(ValueError, match="no_such_room"):
         Plan.load(f)
+
+
+def test_every_engine_module_belongs_to_a_replay_digest():
+    """A module that feeds a replay but is missing from SOURCES would let that replay go stale silently."""
+    from lahore_twin.export import SOURCES
+    listed = {n for files in SOURCES.values() for n in files}
+    helpers = {"__init__.py", "mqtt.py", "live.py"}          # not part of any replay
+    for f in (ROOT / "lahore_twin").glob("*.py"):
+        assert f.name in listed or f.name in helpers, f.name

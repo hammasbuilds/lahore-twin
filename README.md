@@ -7,7 +7,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 | # | Phase | What it simulates | Status |
 |---|---|---|---|
 | 1 | [Office tower](#phase-1--office-tower) | 34 people, badge gate, meeting rooms, lights, AC, CO₂, attendance | built, in review |
-| 2 | Home + GridSense | load-shedding-aware home energy manager | planned |
+| 2 | [Home + GridSense](#phase-2--home--gridsense) | a Lahore family, 6 kWp solar, 10 kWh battery, load-shedding | built, in review |
 | 3 | Hospital | staff, patients, IoT devices, management panel | planned |
 | 4 | Lahore traffic | OpenStreetMap road network, smart signals, hotspot finder | planned |
 | 5 | Junction fix planner | test underpass / U-turn / flyover options; ambulance green wave | planned |
@@ -16,8 +16,9 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 44 tests, including the viewer's core under node
+python -m pytest -q          # 61 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
+python demo_home.py           # the house under three controllers; writes viewer/home_replay.js
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.
@@ -155,14 +156,83 @@ The rules answer on `lahore-twin/state/office/<room>/light` and `.../ac`
 speaks the wire protocol (`tests/test_mqtt.py`); not yet run against a physical
 board.
 
+## Phase 2 — Home + GridSense
+
+A single-storey 10-marla house in Lahore: car porch, drawing room, TV lounge,
+kitchen, inverter store, dining, three bedrooms, two baths, back yard with the
+water pump. A family of six and a part-time helper live a June day: school and
+office, cooking, prayer, an afternoon nap, TV, laundry and ironing.
+
+**Power.** 6 kWp of panels (Lahore June ≈ 6.3 kWh per kWp per day, NASA POWER),
+a 10 kWh LFP battery (90% usable), a 6 kW hybrid inverter that trips for a minute
+when overloaded, three 1.5-ton inverter ACs, fans, lights, fridge, router, TV,
+a 1 hp pump filling a 1000 L roof tank, washer, iron, microwave. Mains voltage
+sags toward 200 V in the evening, with dips below 190 V.
+
+**The grid.** A LESCO-style feeder category sets the published load-shedding
+(category IV: 5 hours, one block at night); one or two unannounced cuts come on
+top. All three controllers see the published schedule and a day-ahead solar
+forecast; none sees an unannounced cut coming.
+
+| controller | what it is |
+|---|---|
+| Inverter default | every circuit on the inverter, fixed settings, everything runs when wanted, pump on its float switch |
+| UPS circuit | the common Lahore wiring: fans, lights, fridge, router and TV on the inverter; ACs, pump, washer, iron and microwave die in an outage |
+| GridSense | holds a battery reserve sized for the next published outage, pre-cools bedrooms and fills the tank before it, moves laundry and ironing into solar hours, runs on battery in the peak-tariff window, rations ACs during an outage by the energy left (sleepers first), keeps every heavy load inside the inverter's rating, and cuts the AC and fridge below 190 V |
+
+`python demo_home.py`, June, seed 7 (a simulated house, not a measurement):
+
+```
+                                    Inverter default       UPS circuit         GridSense
+House dark (min)                                  37                 0                 0
+No fan when wanted (person-min)                  224                 0                 0
+Too hot to sleep (person-min)                    398               860               395
+Too hot awake (person-min)                      1763              2248              1226
+Roof tank empty (min)                              0                 0                 0
+Grid at peak price (kWh)                         0.0               4.3               1.0
+Grid off-peak (kWh)                             4.34              8.76              3.84
+Exported (kWh)                                  7.11              8.02              6.14
+Solar used at home (%)                          81.2              63.5              83.8
+Solar wasted (kWh)                               0.0              5.79               0.0
+Day's bill (Rs)                                  314               392               331
+Inverter overload trips                            0                 0                 0
+AC/fridge below 190 V (min)                       10                10                 0
+Jobs finished late                                 0                 0                 0
+```
+
+Over ten June days (`python demo_home.py --days 10`) the default setup leaves
+the house dark 33 minutes a day on average (up to 65) when the battery hits
+cut-off in the night outage; GridSense and the UPS circuit never go dark. The
+UPS circuit pays for it in heat — the ACs are not on the inverter, so nights in
+an outage are hot (700 person-minutes too hot to sleep against GridSense's 368)
+and solar is wasted when the battery is full during a cut (5.7 kWh a day).
+
+GridSense is not yet the cheapest: it buys grid power to hold its reserve and
+pre-cool, so its average day costs Rs 541 against Rs 487 for both others. That
+is the first thing the review rounds go after.
+
+Tariff assumptions: off-peak Rs 42, peak Rs 50, export Rs 11 per kWh (the
+proposed gross-metering buyback). The bill values each controller's end-of-day
+battery change at the off-peak rate, so leaving the battery flat does not look
+cheap. Appliance wattages are nameplate assumptions; no measured Pakistani
+appliance dataset was found.
+
+`viewer/home.html` replays the day: people, spinning fans, AC and light state,
+a power-flow card (solar, battery, grid, house), battery and tank gauges, an
+outage strip with unannounced cuts hatched, the day's power and battery charts,
+every decision with its cause, and the three controllers side by side.
+
 ## Layout
 
 ```
 lahore_twin/   plan.py (rooms, doors, A* routing) · bus.py (MQTT-style bus with cause ids)
                office.py (people, calendar, schedules) · people.py · devices.py (room physics)
                rules.py (automation, attendance) · sim.py (1 s loop) · export.py (replay)
-plans/         office.json — the floor plan as data
-viewer/        index.html, app.js — offline replay viewer; replay.js is generated
+               climate.py · home.py (family, outages) · power.py (PV, battery, inverter, tank)
+               gridsense.py (three home controllers) · home_sim.py · export_home.py
+plans/         office.json, home.json — the floor plans as data
+viewer/        index.html + app.js (office), home.html + home.js (home), core.js + twin.css shared;
+               replay.js and home_replay.js are generated
 tools/         ui_check.js — drives the viewer in headless Chromium for review rounds
 PLAN.md        research notes, design, and the review-round log
 ```

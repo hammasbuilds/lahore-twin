@@ -1,6 +1,6 @@
 // Unit checks for the viewer's pure functions (positions, device state, why-chains).
 const assert = require("assert");
-const core = require("../viewer/app.js");
+const core = require("../viewer/core.js");
 
 const pts = [[0, 0], [3, 0], [3, 4]];
 assert.deepStrictEqual(core.pointAlong(pts, 0).slice(0, 2), [0, 0]);

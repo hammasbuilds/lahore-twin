@@ -43,6 +43,10 @@ class RoomEnv:
     co2: float = C_OUT + 30
     compressor: bool = False
     vent_boost: bool = False
+    climate: object = None          # anything with outdoor_temp(t); None = the office's October curve
+    setpoint: float = SETPOINT
+    ac_capacity_w: float = 0.0      # thermal W; 0 = sized by floor area (office ducted units)
+    mass_scale: float = 1.0         # brick-and-concrete houses hold heat longer than an office
 
     def __post_init__(self):
         # no two rooms are built alike: +-25% on envelope and thermal mass, fixed per
@@ -63,17 +67,21 @@ class RoomEnv:
 
     @property
     def ac_capacity(self) -> float:      # thermal W
-        return 120.0 * self.area
+        return self.ac_capacity_w or 120.0 * self.area
+
+    def outside(self, t: float) -> float:
+        return self.climate.outdoor_temp(t) if self.climate is not None else outdoor_temp(t)
 
     def step(self, dt: float, t: float, people: int, light_on: bool, ac_enabled: bool) -> float:
         """Advance dt seconds. Returns electrical watts drawn by the AC."""
         ua = 6.0 * self.area * self.envelope
-        cap = 20e3 * self.area * self.mass
+        cap = 20e3 * self.area * self.mass * self.mass_scale
+        t_out = self.outside(t)
         gains = people * HEAT_PERSON + (self.light_watts if light_on else 0.0)
         # inverter AC (what Lahore offices mostly fit): capacity modulates across the
         # band instead of cycling on and off: 0% at setpoint - band, 100% at + band
         if self.has_ac and ac_enabled:
-            frac = min(1.0, max(0.0, (self.temp - (SETPOINT - BAND)) / (2 * BAND)))
+            frac = min(1.0, max(0.0, (self.temp - (self.setpoint - BAND)) / (2 * BAND)))
         else:
             frac = 0.0
         self.compressor = frac > 0
@@ -81,7 +89,7 @@ class RoomEnv:
         ach = 3.0 if self.vent_boost else 1.0
         # outdoor air brings outdoor heat: rho*cp/3600 = 0.335 W per (m3/h)·K. In a Lahore
         # afternoon more ventilation means more cooling, so a vent boost is never free.
-        vent = 0.335 * self.volume * ach * (outdoor_temp(t) - self.temp)
-        self.temp += dt * (ua * (outdoor_temp(t) - self.temp) + vent + gains - cooling) / cap
+        vent = 0.335 * self.volume * ach * (t_out - self.temp)
+        self.temp += dt * (ua * (t_out - self.temp) + vent + gains - cooling) / cap
         self.co2 += dt * (people * GEN / self.volume - ach / 3600.0 * (self.co2 - C_OUT))
         return cooling / COP

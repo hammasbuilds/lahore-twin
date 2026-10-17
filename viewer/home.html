@@ -1,0 +1,93 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home Twin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='5' fill='%23fbbf24'/%3E%3Cpath d='M8 17l8-7 8 7M11 15v9h10v-9' stroke='%230b1220' stroke-width='2.4' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="twin.css">
+<style>
+.flow { padding: 8px 14px 4px; border-bottom: 1px solid var(--line); }
+.flow svg { width: 100%; height: 190px; display: block; }
+.flow .node rect { fill: var(--panel-2); stroke: var(--line); }
+.flow .node text { fill: var(--text); font: 600 12px "Segoe UI", system-ui, sans-serif; }
+.flow .node .sub { fill: var(--muted); font-weight: 500; font-size: 11px; }
+.flow .wire { stroke: var(--line); stroke-width: 3; fill: none; }
+.flow .live { stroke-width: 3; fill: none; stroke-dasharray: 6 8; }
+.flow .live.solar { stroke: var(--solar); }
+.flow .live.battery { stroke: var(--battery); }
+.flow .live.grid { stroke: var(--grid); }
+.flow .live.home { stroke: var(--text); opacity: .7; }
+.flow .down { stroke: var(--outage); stroke-dasharray: 3 5; }
+.kpis.k3 { grid-template-columns: repeat(3, 1fr); }
+.gauge { height: 6px; background: var(--line); border-radius: 3px; margin-top: 6px; overflow: hidden; }
+.gauge i { display: block; height: 100%; border-radius: 3px; }
+.strip-key { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); margin: 4px 0 8px; flex-wrap: wrap; }
+.strip-key i { display: inline-block; width: 14px; height: 8px; margin-right: 5px; vertical-align: 0; border-radius: 2px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Home Twin <span>· Lahore Twin, phase 2</span></h1>
+  <div class="clock num" id="clock">00:00</div>
+  <button class="btn" id="play" aria-label="Play">▶ Play</button>
+  <select id="speed" aria-label="Playback speed">
+    <option value="60">60×</option>
+    <option value="300" selected>300×</option>
+    <option value="900">900×</option>
+    <option value="1800">1800×</option>
+  </select>
+  <div class="seg" id="modes" role="group" aria-label="Controller">
+    <button data-mode="default" aria-pressed="false" title="Every circuit on the inverter, fixed settings, no planning">Inverter default</button>
+    <button data-mode="ups" aria-pressed="false" title="Only fans, lights, fridge, router and TV on the inverter">UPS circuit</button>
+    <button data-mode="gridsense" aria-pressed="true" title="Plans around the published load-shedding and the solar forecast">GridSense</button>
+  </div>
+  <div class="spacer"></div>
+  <a class="btn" href="index.html" style="text-decoration:none">Office</a>
+  <button class="btn" id="theme" aria-label="Toggle colour theme">Light</button>
+</header>
+<main>
+  <section id="stage">
+    <div class="layers seg" id="layers" role="group" aria-label="Map layer">
+      <button data-layer="state" aria-pressed="true">Devices</button>
+      <button data-layer="temp" aria-pressed="false">Temperature</button>
+      <button data-layer="occ" aria-pressed="false">Occupancy</button>
+    </div>
+    <canvas id="plan" aria-label="House floor plan"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="tip" id="tip"></div>
+  </section>
+  <aside>
+    <div class="flow"><svg id="flow" viewBox="0 0 360 190" role="img" aria-label="Power flow between solar, battery, grid and the house"></svg></div>
+    <div class="kpis k3">
+      <div class="kpi"><div class="v num" id="k-soc">–</div><div class="l">Battery</div><div class="gauge"><i id="g-soc" style="background:var(--battery)"></i></div></div>
+      <div class="kpi"><div class="v num" id="k-tank">–</div><div class="l">Roof tank</div><div class="gauge"><i id="g-tank" style="background:var(--water)"></i></div></div>
+      <div class="kpi"><div class="v num" id="k-grid">–</div><div class="l" id="k-grid-l">Grid</div></div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="events" aria-selected="true">Events</button>
+      <button role="tab" data-tab="inspect" aria-selected="false">Inspector</button>
+      <button role="tab" data-tab="day" aria-selected="false">Day</button>
+      <button role="tab" data-tab="compare" aria-selected="false">Compare</button>
+    </div>
+    <div class="pane on" id="pane-events">
+      <div class="filter"><label><input type="checkbox" id="only-key"> Decisions and alerts only</label><span class="spacer"></span><span id="log-count" class="num"></span></div>
+      <ul class="log" id="log"></ul>
+    </div>
+    <div class="pane" id="pane-inspect">
+      <label class="find"><span class="muted">Find</span><select id="find" aria-label="Find a person, room or appliance"></select></label>
+      <div id="inspect-body"><p class="muted">Pick someone or something above, or click the plan or an event, to see its state and why.</p></div>
+    </div>
+    <div class="pane" id="pane-day"></div>
+    <div class="pane" id="pane-compare"></div>
+  </aside>
+</main>
+<footer>
+  <div class="timeline"><canvas id="tl"></canvas><input type="range" id="scrub" min="0" max="86399" step="1" value="0" aria-label="Time of day"></div>
+  <div class="ticks num" id="ticks"></div>
+</footer>
+<script src="home_replay.js"></script>
+<script src="core.js"></script>
+<script src="home.js"></script>
+</body>
+</html>
