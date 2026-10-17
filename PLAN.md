@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 7 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 8 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -262,3 +262,26 @@ could claim another person's badge pass.
 - *Found (UI):* cause chains ended in a raw topic ("office/prayer/temp").
   *Fixed:* temperature and queue readings are described in words.
 - Tests 34 → 35.
+
+**Round 8 — twenty days, not one.**
+- *Added:* `tools/sweep.py` checks invariants over 20 simulated days (every
+  arrival leaves; nobody inside at 21:00; the register misses only tailgaters;
+  Motion + CO₂ beats the schedule on energy and Motion on false-offs every day;
+  gate results identical across rule sets). 0 violations. Energy 146–158 kWh vs
+  the schedule's 179–184 on every day.
+- *Found:* the roll-call figure in the README (0.10 people off) came from a
+  lucky day: across 20 days it was 0.50, up to 1.04 on a bad day. Traced on
+  seed 3: from 16:50 the register over-counted by up to 6 — people who forget to
+  tap out on the way home stay "inside" on paper, exactly when an evening
+  evacuation would need the number. *Fixed:* exits get the same reconciliation
+  as entries: a counted exit with no badge-out lowers the estimate; tapping in
+  while registered inside settles one; tapping out while not registered settles
+  an unidentified entry (the guard's tailgated patrol had stayed +1 all day).
+- *Found on the next measurement:* no improvement on average (0.49), one day
+  worse (1.71). Traced on seed 20: the receptionist left her room untapped and
+  tapped in at the main gate 4 s later — the settle arrived before the exit was
+  reconciled and was dropped. *Fixed:* the settle may run the counter below
+  zero briefly. Now 0.23 people off on average across 20 days, never more than
+  1 at any moment (register 0.91, counters 0.58); the remaining error is
+  tailgaters the beam merged with the person ahead.
+- Tests 35 → 37; both new tests fail on the previous code.

@@ -321,6 +321,9 @@ class Attendance:
         self.counted_inside = 0               # door counters: ins minus outs
         self.mismatch_since: int | None = None
         self.unidentified = 0                 # tailgate entries whose person is not yet known
+        self.unexplained_out = 0              # counted exits with no badge-out
+        self.out_beams: list[list] = []
+        self.out_creds: list[list] = []
         bus.subscribe("office/gate/badge", self._on_badge)
         bus.subscribe("office/gate/beam", self._on_beam)
         bus.subscribe("office/reception/manual", self._on_manual)
@@ -342,11 +345,17 @@ class Attendance:
         pid, direction, gate = m.payload["person"], m.payload["dir"], m.payload["gate"]
         if direction == "in":
             self.creds.append([m.t, pid, False, gate])
+            if self.inside.get(pid):
+                # tapping in while "inside": they left untapped earlier. Their exit may not be
+                # reconciled yet (that waits a few seconds), so the count may dip below zero
+                # here and is settled when it is.
+                self.unexplained_out -= 1
             self.inside[pid] = True
             self._first_in(pid, m.t, "badge", m.id)
         else:
-            if pid not in self.checkin and self.unidentified > 0:
-                self.unidentified -= 1        # someone who never badged in leaves: the tailgater
+            self.out_creds.append([m.t, pid, False, gate])
+            if not self.inside.get(pid) and self.unidentified > 0:
+                self.unidentified -= 1        # tapping out while not "inside": the unbadged entry
             self.inside[pid] = False
             self.checkout[pid] = m.t
 
@@ -372,13 +381,15 @@ class Attendance:
             self.beams.append([m.t, m.id, False, m.payload["gate"]])
         else:
             self.counted_inside = max(0, self.counted_inside - 1)
+            self.out_beams.append([m.t, m.id, False, m.payload["gate"]])
 
     def register_inside(self) -> int:
         return sum(self.inside.values())
 
     def estimate_inside(self) -> int:
-        """Best evacuation count: the register plus entries nobody badged for."""
-        return self.register_inside() + self.unidentified
+        """Best evacuation count: the register, plus entries nobody badged for, minus
+        exits nobody badged for (people who forget to tap out on the way home)."""
+        return max(0, self.register_inside() + self.unidentified - self.unexplained_out)
 
     def rollcall_tick(self, t: int) -> None:
         """Door counters drift (every missed count accumulates), so when they have
@@ -397,7 +408,19 @@ class Attendance:
         else:
             self.mismatch_since = None
 
+    def _reconcile_exits(self, t: int) -> None:
+        for beam in self.out_beams:
+            if beam[2] or t < beam[0] + self.WINDOW:
+                continue
+            beam[2] = True
+            cands = [c for c in self.out_creds if not c[2] and c[3] == beam[3] and abs(c[0] - beam[0]) <= self.WINDOW]
+            if cands:
+                min(cands, key=lambda c: abs(c[0] - beam[0]))[2] = True
+            else:
+                self.unexplained_out += 1
+
     def tick(self, t: int) -> None:
+        self._reconcile_exits(t)
         for beam in self.beams:
             bt, bid, resolved, gate = beam
             if resolved or t < bt + self.WINDOW:

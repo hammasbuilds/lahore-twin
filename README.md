@@ -16,7 +16,8 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 35 tests, including the viewer's core under node
+python -m pytest -q          # 37 tests, including the viewer's core under node
+python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.
@@ -76,9 +77,13 @@ the Zuhr congregation walked in. Motion sensors alone switch lights off on
 people sitting still 76 times a day; requiring CO₂ to confirm a room is empty
 halves that for under 1% more energy.
 
-The attendance tab carries an evacuation roll-call: the badge register plus
-entries nobody badged for is off from the true headcount by 0.1 people on
-average, against 0.4 for door counters, which drift as missed counts pile up.
+The attendance tab carries an evacuation roll-call. Over 20 simulated days
+(08:30–18:30), the estimate — badge register, plus entries nobody badged for,
+minus exits nobody tapped out for — is off from the true headcount by 0.23
+people on average and never by more than 1. The register alone is off by 0.91
+(people forget to tap out on the way home: up to 6 too many by 17:30), the door
+counters by 0.58 (missed counts pile up). The remaining error is tailgaters the
+door beam merged with the person ahead.
 
 Over five days, the counter-vs-badge check caught all 9 tailgates with no false
 alarms. Its blind spot: a follower in the same second as the person ahead looks

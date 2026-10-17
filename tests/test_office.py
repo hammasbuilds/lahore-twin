@@ -387,3 +387,31 @@ def test_committed_replay_matches_the_current_code():
     text = (ROOT / "viewer" / "replay.js").read_text(encoding="utf-8")
     meta = json.loads(text[len("window.REPLAY = "):].rstrip().rstrip(";"))["meta"]
     assert meta.get("digest") == source_digest(), "run `python demo.py` to regenerate viewer/replay.js"
+
+
+def test_forgotten_tap_out_lowers_the_estimate():
+    bus = Bus()
+    att = Attendance(bus, {"a": _P("a")})
+    bus.now = 100
+    bus.publish("office/gate/badge", {"person": "a", "dir": "in", "gate": "corr1"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})
+    bus.now = 5000
+    bus.publish("office/gate/beam", {"dir": "out", "gate": "corr1"})    # walks out, no tap
+    att.tick(5100)
+    assert att.register_inside() == 1 and att.estimate_inside() == 0
+
+
+def test_tap_in_right_after_an_untapped_exit_settles_it_in_either_order():
+    bus = Bus()
+    att = Attendance(bus, {"r": _P("r", "receptionist")})
+    bus.now = 100
+    bus.publish("office/gate/badge", {"person": "r", "dir": "in", "gate": "reception"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "reception"})
+    att.tick(200)
+    bus.now = 1000
+    bus.publish("office/gate/beam", {"dir": "out", "gate": "reception"})   # leaves her room untapped
+    bus.now = 1004                                                         # taps in at the main gate
+    bus.publish("office/gate/badge", {"person": "r", "dir": "in", "gate": "corr1"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})
+    att.tick(1010)                                                         # the exit is reconciled now
+    assert att.estimate_inside() == 1 and att.unexplained_out == 0
