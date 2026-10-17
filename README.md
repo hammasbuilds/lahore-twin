@@ -20,6 +20,7 @@ python -m pytest -q          # 35 tests, including the viewer's core under node
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.
+`run.bat` serves it on http://127.0.0.1:8860 (the Launchpad entry "Lahore Twin — office" starts it).
 
 ## Phase 1 — Office tower
 
