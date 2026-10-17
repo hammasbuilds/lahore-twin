@@ -434,8 +434,23 @@ if (typeof document !== "undefined") (function () {
 
   function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
 
+  function fillFinder() {
+    const people = Object.values(IX.people).sort((a, b) => a.name.localeCompare(b.name));
+    const opt = (v, label) => `<option value="${v}">${esc(label)}</option>`;
+    $("find").innerHTML = opt("", "— choose a person or room —")
+      + `<optgroup label="People">${people.map((p) => opt("person:" + p.id, `${p.name} · ${ROLE_NAMES[p.role]}`)).join("")}</optgroup>`
+      + `<optgroup label="Rooms">${plan.rooms.filter((r) => r.kind !== "outdoor").map((r) => opt("room:" + r.id, r.name)).join("")}</optgroup>`;
+    $("find").onchange = (e) => {
+      const [type, id] = e.target.value.split(":");
+      state.sel = id ? { type, id } : null;
+      frame(true);
+    };
+  }
+
   function renderInspector() {
-    const pane = $("pane-inspect");
+    const pane = $("inspect-body");
+    const want = state.sel && state.sel.type !== "msg" ? state.sel.type + ":" + state.sel.id : "";
+    if ($("find").value !== want) $("find").value = want;
     const M = IX.modes[state.mode];
     const si = seriesIndex(R, state.t);
     if (!state.sel) return;
@@ -499,7 +514,10 @@ if (typeof document !== "undefined") (function () {
   function describe(m) {
     const parts = m.topic.split("/");
     if (parts[2] === "motion") return `Motion sensor triggered in ${rooms[parts[1]] ? rooms[parts[1]].name : parts[1]}`;
-    if (parts[2] === "co2") return `CO₂ sensor in ${rooms[parts[1]] ? rooms[parts[1]].name : parts[1]} reported ${Math.round(m.payload)} ppm`;
+    const where = rooms[parts[1]] ? rooms[parts[1]].name : parts[1];
+    if (parts[2] === "co2") return `CO₂ sensor in ${where} reported ${Math.round(m.payload)} ppm`;
+    if (parts[2] === "temp") return `Temperature sensor in ${where} read ${Number(m.payload).toFixed(1)} °C`;
+    if (parts[2] === "queue") return `Cafeteria queue counter: ${m.payload}`;
     return m.topic;
   }
   function roomAt(x, y) {
@@ -720,7 +738,7 @@ if (typeof document !== "undefined") (function () {
       lastPanel = now;
       renderKpis();
       renderLog(force);
-      if (state.sel && $("pane-inspect").classList.contains("on")) renderInspector();
+      if ($("pane-inspect").classList.contains("on")) renderInspector();
       if ($("pane-attendance").classList.contains("on")) { renderAttendance(); drawRollcall(); }
       if ($("pane-energy").classList.contains("on")) drawChart();
     }
@@ -835,6 +853,7 @@ if (typeof document !== "undefined") (function () {
   $("theme").textContent = document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
   readPalette();
   fit();
+  fillFinder();
   renderLegend();
   renderTicks();
   frame(true);

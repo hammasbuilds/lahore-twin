@@ -8,6 +8,8 @@ const out = process.argv[2] || "ui-shots";
 const page_ = process.argv[3] || path.join(__dirname, "..", "viewer", "index.html");
 fs.mkdirSync(out, { recursive: true });
 
+process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e && e.message ? e.message : e); process.exit(1); });
+
 (async () => {
   // the full Chromium build; the headless-shell build is often not downloaded
   const exe = process.env.CHROMIUM || path.join(process.env.LOCALAPPDATA || "", "ms-playwright", "chromium-1243", "chrome-win64", "chrome.exe");
@@ -17,8 +19,16 @@ fs.mkdirSync(out, { recursive: true });
   const errors = [];
   page.on("pageerror", (e) => errors.push("pageerror: " + e.message));
   page.on("console", (m) => { if (m.type() === "error" || m.type() === "warning") errors.push(m.type() + ": " + m.text()); });
-  await page.goto("file://" + path.resolve(page_));
-  await page.waitForTimeout(500);
+  // a replay.js written a moment ago can still be locked (antivirus scan): retry the load
+  for (let attempt = 1; ; attempt++) {
+    await page.goto("file://" + path.resolve(page_));
+    const ok = await page.waitForFunction(() => window.__twin, null, { timeout: 5000 }).then(() => true, () => false);
+    if (ok) break;
+    if (attempt === 3) throw new Error("viewer never initialised: " + errors.join(" | "));
+    errors.length = 0;
+    await page.waitForTimeout(1000);
+  }
+  await page.waitForTimeout(300);
   const shot = async (name) => { await page.screenshot({ path: path.join(out, name + ".png") }); console.log("shot", name); };
   const setT = async (hhmm) => {
     const [h, m] = hhmm.split(":").map(Number);
@@ -64,6 +74,13 @@ fs.mkdirSync(out, { recursive: true });
   await setT("07:35"); await page.click(".tabs button[data-tab=events]"); await shot("15-0735-morning");
   await setT("19:45"); await shot("16-1945-evening");
   await page.click(".tabs button[data-tab=energy]"); await page.waitForTimeout(200); await shot("17-light-compare");
+  // the Find picker: keyboard users cannot click the canvas
+  await page.click(".tabs button[data-tab=inspect]");
+  await setT("13:32");
+  await page.focus("#find"); await page.selectOption("#find", "room:prayer"); await page.waitForTimeout(250);
+  const ph = await page.textContent("#inspect-body h3");
+  if (!/Prayer room/.test(ph)) throw new Error("picker chose the prayer room, inspector shows " + ph);
+  await shot("18-find-prayer-1332");
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300); await shot("13-phone");
   console.log("ERRORS:", errors.length ? "\n" + errors.join("\n") : "none");
   await browser.close();

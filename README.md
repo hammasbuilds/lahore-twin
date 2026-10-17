@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 34 tests, including the viewer's core under node
+python -m pytest -q          # 35 tests, including the viewer's core under node
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.

@@ -112,6 +112,8 @@ td.flag { color: var(--alert); }
 .pill.warn { color: var(--warn); border-color: color-mix(in srgb, var(--warn) 40%, transparent); }
 h3 { font-size: 13px; margin: 14px 0 6px; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: .6px; }
 h3:first-child { margin-top: 2px; }
+.find { display: flex; gap: 8px; align-items: center; margin-bottom: 8px; font-size: 13px; }
+.find select { flex: 1; min-width: 0; }
 .why { border-left: 2px solid var(--accent); padding-left: 10px; margin: 6px 0; }
 .why div { padding: 3px 0; font-size: 13px; }
 .why div .t { color: var(--muted); margin-right: 6px; }
@@ -186,7 +188,10 @@ footer { border-top: 1px solid var(--line); background: var(--panel); padding: 8
       <div class="filter"><label><input type="checkbox" id="only-alerts"> Alerts only</label><span class="spacer"></span><span id="log-count" class="num"></span></div>
       <ul class="log" id="log"></ul>
     </div>
-    <div class="pane" id="pane-inspect"><p class="muted">Click a room or a person on the plan, or an event in the log, to see what it is doing and why.</p></div>
+    <div class="pane" id="pane-inspect">
+      <label class="find"><span class="muted">Find</span><select id="find" aria-label="Find a person or room"></select></label>
+      <div id="inspect-body"><p class="muted">Pick someone above, or click a room or a person on the plan, or an event in the log, to see what it is doing and why.</p></div>
+    </div>
     <div class="pane" id="pane-attendance"></div>
     <div class="pane" id="pane-energy"></div>
   </aside>

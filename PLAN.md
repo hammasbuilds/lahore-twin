@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 6 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 7 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -244,3 +244,21 @@ could claim another person's badge pass.
   command reaches the broker; outside commands are refused; 3-byte remaining
   lengths round-trip; live mode streams only from `--start`. Not yet run against
   a physical board — stated in the README.
+
+**Round 7 — a stale replay, keyboard users, a flaky check.**
+- *Found:* `viewer/replay.js` is committed so the viewer opens without Python,
+  and nothing noticed when it fell behind the code. *Fixed:* the replay carries
+  a digest of `lahore_twin/*.py` + `plans/*.json` (CRLF-normalised); a test fails
+  until `python demo.py` regenerates it. Verified to fail first, pass after.
+- *Found:* rooms and people could only be selected by clicking the canvas — no
+  way in for a keyboard user. *Added:* a "Find" picker (people by name and role,
+  rooms) at the top of the inspector, kept in sync with canvas clicks; the UI
+  check selects the prayer room with it and asserts the inspector follows.
+- *Found:* the UI check had crashed twice, both times right after `demo.py`
+  rewrote the 1.4 MB replay — the page loaded while the fresh file was still
+  locked and the viewer never initialised; the crash printed only "Node.js
+  v24". *Fixed:* it waits for the viewer to initialise, reloads up to 3 times,
+  and prints the real error on failure.
+- *Found (UI):* cause chains ended in a raw topic ("office/prayer/temp").
+  *Fixed:* temperature and queue readings are described in words.
+- Tests 34 → 35.

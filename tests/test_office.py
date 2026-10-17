@@ -379,3 +379,11 @@ def test_people_do_not_stand_on_each_other(day):
     assert sum(stacked.values()) <= 30, stacked.most_common(5)     # person-minutes in a day
     prayer = {tuple(x) for x in s.plan.spots["prayer_spot"]}
     assert not any(k in prayer for k in stacked)
+
+
+def test_committed_replay_matches_the_current_code():
+    """viewer/replay.js is committed so the viewer opens without Python; it must not go stale."""
+    from lahore_twin.export import source_digest
+    text = (ROOT / "viewer" / "replay.js").read_text(encoding="utf-8")
+    meta = json.loads(text[len("window.REPLAY = "):].rstrip().rstrip(";"))["meta"]
+    assert meta.get("digest") == source_digest(), "run `python demo.py` to regenerate viewer/replay.js"
