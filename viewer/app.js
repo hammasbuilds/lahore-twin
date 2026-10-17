@@ -839,5 +839,5 @@ if (typeof document !== "undefined") (function () {
   renderTicks();
   frame(true);
   requestAnimationFrame(loop);
-  window.__twin = { state, frame, showTab, IX };
+  window.__twin = { state, frame, showTab, IX, hits: () => hits };
 })();

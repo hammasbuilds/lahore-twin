@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 3 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 4 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -190,3 +190,22 @@ could claim another person's badge pass.
   left as a measured weakness of that baseline, not patched — it is what a
   fixed schedule does.
 - Tests 27 → 29.
+
+**Round 4 — parts of the UI nobody had clicked.**
+- *Found:* the person inspector had only ever been opened programmatically.
+  *Fixed:* the UI check now clicks a person's dot with the mouse (positions
+  exposed as `__twin.hits()`) and fails unless the inspector shows that name.
+- *Found:* the power chart stayed a comb after 15-minute smoothing. Two causes:
+  every room had identical thermal constants (started together, they cycled in
+  step), and the open workspace's single on/off AC cycled with a period longer
+  than the smoothing window. *Fixed:* per-room envelope and thermal mass
+  (±25%, from crc32 of the room id — stable across processes); AC modelled as
+  inverter units that modulate capacity across the 1 °C band, which is what
+  Lahore offices mostly fit. The chart now shows the schedule tracking the
+  afternoon heat, with occupancy control below it. Savings unchanged (15.8%).
+- *Found (script):* the mode selector in the UI check was mis-escaped, so the
+  evening screenshots silently stayed on the fixed schedule — a check that
+  passed while testing the wrong thing. *Fixed:* quoted attribute selector.
+- Evening review (19:45, schedule): after the 18:30 switch-off an overtime
+  worker re-switched the workspace lights by hand at 19:00 and sat with the AC
+  off — the schedule's documented weakness, visible in the replay.

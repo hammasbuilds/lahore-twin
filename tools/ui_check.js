@@ -46,6 +46,24 @@ fs.mkdirSync(out, { recursive: true });
   await page.click("#modes button[data-mode=schedule]"); await setT("12:00"); await page.click(".tabs button[data-tab=events]"); await shot("10-schedule-1200");
   await page.click("#theme"); await page.waitForTimeout(200); await shot("11-light-theme");
   await page.click("#play"); await page.waitForTimeout(1500); await page.click("#play"); await shot("12-after-play");
+  await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(200);
+  // a person, picked the way a user would: click their dot on the plan
+  await setT("10:40");
+  // a real mouse click on the office boy's dot, then check the inspector names him
+  const dot = await page.evaluate(() => {
+    const r = document.getElementById("plan").getBoundingClientRect();
+    const h = window.__twin.hits().find((x) => x.p.role === "office_boy");
+    return h ? { x: r.left + h.x, y: r.top + h.y, name: h.p.name } : null;
+  });
+  if (!dot) throw new Error("office boy not on the plan at 10:40");
+  await page.mouse.click(dot.x, dot.y); await page.waitForTimeout(250);
+  const title = await page.textContent("#pane-inspect h3");
+  if (!title.includes(dot.name)) throw new Error(`clicked ${dot.name}, inspector shows ${title}`);
+  await shot("14-person-officeboy-1040");
+  await page.click('#modes button[data-mode="pir+co2"]');
+  await setT("07:35"); await page.click(".tabs button[data-tab=events]"); await shot("15-0735-morning");
+  await setT("19:45"); await shot("16-1945-evening");
+  await page.click(".tabs button[data-tab=energy]"); await page.waitForTimeout(200); await shot("17-light-compare");
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300); await shot("13-phone");
   console.log("ERRORS:", errors.length ? "\n" + errors.join("\n") : "none");
   await browser.close();

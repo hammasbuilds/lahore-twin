@@ -13,6 +13,7 @@ which is what the rules react to.
 from __future__ import annotations
 
 import math
+import zlib
 from dataclasses import dataclass
 
 C_OUT = 420.0            # outdoor CO2, ppm
@@ -43,6 +44,15 @@ class RoomEnv:
     compressor: bool = False
     vent_boost: bool = False
 
+    def __post_init__(self):
+        # no two rooms are built alike: +-25% on envelope and thermal mass, fixed per
+        # room id (crc32, not hash(), which changes between processes). Identical
+        # rooms started together cycle their compressors in lockstep, which no real
+        # building does.
+        h = zlib.crc32(self.id.encode())
+        self.envelope = 0.75 + 0.5 * ((h & 0xFFFF) / 0xFFFF)
+        self.mass = 0.75 + 0.5 * ((h >> 16) / 0xFFFF)
+
     @property
     def volume(self) -> float:
         return self.area * CEIL
@@ -57,18 +67,18 @@ class RoomEnv:
 
     def step(self, dt: float, t: float, people: int, light_on: bool, ac_enabled: bool) -> float:
         """Advance dt seconds. Returns electrical watts drawn by the AC."""
-        ua = 6.0 * self.area
-        cap = 20e3 * self.area
+        ua = 6.0 * self.area * self.envelope
+        cap = 20e3 * self.area * self.mass
         gains = people * HEAT_PERSON + (self.light_watts if light_on else 0.0)
+        # inverter AC (what Lahore offices mostly fit): capacity modulates across the
+        # band instead of cycling on and off: 0% at setpoint - band, 100% at + band
         if self.has_ac and ac_enabled:
-            if self.temp > SETPOINT + BAND:
-                self.compressor = True
-            elif self.temp < SETPOINT - BAND:
-                self.compressor = False
+            frac = min(1.0, max(0.0, (self.temp - (SETPOINT - BAND)) / (2 * BAND)))
         else:
-            self.compressor = False
-        cooling = self.ac_capacity if self.compressor else 0.0
+            frac = 0.0
+        self.compressor = frac > 0
+        cooling = self.ac_capacity * frac
         self.temp += dt * (ua * (outdoor_temp(t) - self.temp) + gains - cooling) / cap
         ach = 3.0 if self.vent_boost else 1.0
         self.co2 += dt * (people * GEN / self.volume - ach / 3600.0 * (self.co2 - C_OUT))
-        return cooling / COP if self.compressor else 0.0
+        return cooling / COP
