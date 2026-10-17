@@ -6,11 +6,15 @@ nodes use for telemetry and commands on a LAN; no persistence, no retries.
 
 The bridge works in both directions:
 
-* every bus message is published to ``<prefix><topic>`` as JSON
+* every bus message is published to ``<prefix>state/<topic>`` as JSON
   (``{"t", "payload", "cause", "text"}``) — a dashboard sees the whole building;
-* messages a real device publishes under ``<prefix>`` on the topics listed in
-  ``inbound`` are injected into the bus, so a physical PIR on an ESP32 drives the
-  same rules as a simulated one.
+* messages a real device publishes to ``<prefix>device/<topic>`` on the topics
+  listed in ``inbound`` are injected into the bus, so a physical PIR on an ESP32
+  drives the same rules as a simulated one.
+
+The two prefixes never overlap. An MQTT 3.1.1 broker delivers a client's own
+publishes back to it when it is subscribed to them; sharing one prefix made every
+simulated reading come back as a "device" reading.
 """
 
 from __future__ import annotations
@@ -138,20 +142,22 @@ class Bridge:
         self.received = 0
         bus.subscribe("#", self._out)
         client.on_message = self._in
+        self.out_prefix = prefix + "state/"
+        self.in_prefix = prefix + "device/"
         for pattern in inbound:
-            client.subscribe(prefix + pattern)
+            client.subscribe(self.in_prefix + pattern)
 
     def _out(self, m: Message) -> None:
         if m.text.startswith(FROM_DEVICE):
             return              # it came from the broker; echo only what the rules do about it
         body = {"t": m.t, "payload": m.payload, "cause": m.cause, "text": m.text}
-        self.client.publish(self.prefix + m.topic, json.dumps(body, ensure_ascii=False, default=str))
+        self.client.publish(self.out_prefix + m.topic, json.dumps(body, ensure_ascii=False, default=str))
         self.sent += 1
 
     def _in(self, topic: str, raw: bytes) -> None:
-        if not topic.startswith(self.prefix):
+        if not topic.startswith(self.in_prefix):
             return
-        topic = topic[len(self.prefix):]
+        topic = topic[len(self.in_prefix):]
         if not any(topic_matches(p, topic) for p in self.inbound):
             return
         try:

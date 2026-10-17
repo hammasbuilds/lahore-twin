@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 38 tests, including the viewer's core under node
+python -m pytest -q          # 44 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 ```
 
@@ -38,8 +38,9 @@ morning round. Some people forget their badge, tailgate through the gate,
 forget to badge out, or sit so still a motion sensor stops seeing them.
 
 **Devices.** Per room: motion sensor (sees a walking person 90% of seconds, a
-still one about once in five minutes), CO₂ (mass balance, ±10 ppm noise),
-temperature (first-order thermal model, Lahore October outdoor curve), lights,
+still one about once in five minutes) and lights. In the 12 air-conditioned
+rooms also: CO₂ (mass balance, ±10 ppm noise), temperature (first-order thermal
+model with ventilation load, Lahore October outdoor curve), and
 inverter AC holding 24 °C, demand-controlled ventilation. At each badge door: a reader and a beam counter. A
 sensor in every parking bay.
 
@@ -62,28 +63,32 @@ so the viewer can answer "why is this light on?".
 
 ```
                                       Fixed schedule          Motion    Motion + CO2
-Lights + AC (kWh)                             198.35           169.4          168.63
+Lights + AC (kWh)                              202.7           169.4          168.63
   lights                                       75.03           53.62           53.02
-  AC                                          123.33          115.78          115.62
+  AC                                          127.68          115.78          115.62
 Person-minutes in the dark                        23               8               6
-Person-minutes too warm (>26 C)                  252              24              21
+Person-minutes too warm (>26 C)                  128              24              21
 Person-minutes stuffy (CO2 >1000)                 25              25              25
 Lights switched off on someone                     3              28              16
 Wall-switch presses                               23               2               2
+AC turned on by hand                               2               0               0
 Room-minutes lit while empty                    9044            2737            2643
 ```
 
-**Energy.** Occupancy control uses 15% less lighting and AC energy than the
-fixed schedule (15.0–16.3% across five days, `python demo.py --week`; ahead on
-every one of 20 days, `python tools/sweep.py`). The schedule is not a straw man:
+**Energy.** Occupancy control uses 17% less lighting and AC energy than the
+fixed schedule on this day (15.8–17.1% across five days, `python demo.py
+--week`; ahead on every one of 20 days, `python tools/sweep.py`). The schedule is not a straw man:
 everyone has wall switches, so early arrivals switch lights on by hand — which
 then burn all day.
 
-**Comfort.** Occupancy control is cooler for the people in the rooms (21 vs 252
-person-minutes above 26 °C) because pre-cooling starts from each room's measured
-temperature: with a fixed 15-minute lead, the heat-soaked prayer room was still
-27 °C when the Zuhr congregation walked in. The schedule's heat is overtime
-staff after the 18:30 switch-off.
+**Comfort.** Everyone has an AC remote under every rule set: someone settled in
+a room above 26.5 °C for five minutes turns the AC on. The schedule's remaining
+heat (128 person-minutes above 26 °C, against 21) is overtime staff after the
+18:30 switch-off — the workspace warms before anyone reaches for the remote, and
+the hourly after-hours sweep switches it off again. Occupancy control keeps the
+AC on while a room is occupied until 20:00, and pre-cools booked rooms and the
+prayer congregations from each room's measured temperature (with a fixed
+15-minute lead the heat-soaked prayer room was still 27 °C at Zuhr).
 
 **Lights going off on people.** Motion sensors alone switch lights off on
 someone sitting still 28 times a day; requiring CO₂ to confirm the room is
@@ -100,7 +105,10 @@ doors: the register, plus entries nobody badged for, minus exits nobody tapped
 out for. Over 20 days (08:30–18:30) it is off by 0.23 people on average and
 never by more than 1; the register alone is off by 0.91 (people forget to tap
 out going home — 6 too many by 17:30), door counters by 0.58 (missed counts pile
-up). The residual is tailgaters the door beam merged with the person ahead.
+up). The days split in two: on 15 the estimate is exact or nearly (median 0.01);
+on 5 it is about 0.8 off all day, each because one tailgater was merged by the
+door beam with the person ahead and never counted. Seed 7, the demo day, is one
+of those.
 
 **Tailgating.** Over five days the counter-vs-badge check caught 5 of 7
 tailgates (71%) with no false alarms. The two misses are followers the beam
@@ -126,22 +134,24 @@ python -m lahore_twin.live --broker 192.168.1.10 --speed 60          # whole day
 python -m lahore_twin.live --broker localhost --start 09:00 --hours 1 --speed 1
 ```
 
-Every bus message is published to `lahore-twin/<topic>` as JSON
+Every bus message is published to `lahore-twin/state/<topic>` as JSON
 `{"t", "payload", "cause", "text"}`, so Home Assistant or any MQTT dashboard sees
-the building. A real device publishes into the same rules on these topics
-(anything else — commands, alerts — is refused):
+the building. A real device publishes into the same rules under
+`lahore-twin/device/` (anything else — commands, alerts — is refused). The two
+prefixes never overlap: a broker echoes a client's own publishes back, and with
+one shared prefix every simulated reading returned as a "device" reading.
 
 | topic | payload | from |
 |---|---|---|
-| `lahore-twin/office/<room>/motion` | `1` | PIR |
-| `lahore-twin/office/<room>/co2` | ppm, e.g. `812.0` | CO₂ sensor (SCD40, MH-Z19) |
-| `lahore-twin/office/<room>/temp` | °C, e.g. `25.4` | temperature sensor |
-| `lahore-twin/office/<room>/switch` | `true` | wall switch |
-| `lahore-twin/office/gate/badge` | `{"person", "dir", "gate"}` | badge reader |
-| `lahore-twin/office/gate/beam` | `{"dir", "gate"}` | door beam counter |
+| `lahore-twin/device/office/<room>/motion` | `1` | PIR |
+| `lahore-twin/device/office/<room>/co2` | ppm, e.g. `812.0` | CO₂ sensor (SCD40, MH-Z19) |
+| `lahore-twin/device/office/<room>/temp` | °C, e.g. `25.4` | temperature sensor |
+| `lahore-twin/device/office/<room>/switch` | `true` | wall switch |
+| `lahore-twin/device/office/gate/badge` | `{"person", "dir", "gate"}` | badge reader |
+| `lahore-twin/device/office/gate/beam` | `{"dir", "gate"}` | door beam counter |
 
-The rules answer on `lahore-twin/office/<room>/light` and `.../ac` (`true` /
-`false`), which a relay node subscribes to. Tested against a fake broker that
+The rules answer on `lahore-twin/state/office/<room>/light` and `.../ac`
+(`true` / `false`), which a relay node subscribes to. Tested against a fake broker that
 speaks the wire protocol (`tests/test_mqtt.py`); not yet run against a physical
 board.
 

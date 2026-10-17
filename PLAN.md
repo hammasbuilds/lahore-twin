@@ -5,8 +5,8 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 9 of 10 done |
-| 2 | Home + GridSense — load-shedding energy manager | — |
+| 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
+| 2 | Home + GridSense — load-shedding energy manager | research and plan |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -305,3 +305,131 @@ could claim another person's badge pass.
 - Every README command run: `demo.py`, `demo.py --week`, `pytest` (38),
   `tools/sweep.py`, `run.bat` (served and stopped in round 8); `live` is covered
   by the fake-broker test. Tests 37 → 38.
+
+**Round 10 — an independent reviewer, cold (74/100), and every finding fixed.**
+The reviewer reproduced every README number, the 20-day roll-call figures and
+the tests, then found:
+1. *High — MQTT echo:* the bridge subscribed to the topics it published; a real
+   broker echoes a client's own publishes, so every simulated reading came back
+   as a device reading (roll-call 44 vs a true 29). The fake broker never echoed,
+   so the tests could not see it. *Fixed:* outbound `lahore-twin/state/...`,
+   inbound `lahore-twin/device/...`; the fake broker now echoes like mosquitto;
+   a test runs 2.5 h through an echoing broker and requires zero re-injections.
+2. *End-of-day alerts at 21:00, timeline ending 20:59* — never visible.
+   *Fixed:* the day is closed at 20:59:59 by `Sim.finish()`; UI check asserts
+   the badge-out alerts appear at the end of the timeline.
+3. *Comfort claim misattributed:* the schedule had wall switches for lights but
+   no AC remote, so "252 vs 21" measured AC hours, not pre-cooling. *Fixed:* an
+   AC remote for everyone (settled 5 min above 26.5 °C); the schedule's sweep
+   clears it hourly. Schedule heat 252 → 128 person-min (overtime after 18:30),
+   schedule energy 198.4 → 202.7 kWh; README rewritten with the real cause.
+4. *No-show bookings had empty invitee lists*, so the viewer showed "0 people"
+   hours early. *Fixed:* invitees kept; days skip the meeting; viewer shows
+   "N invited" until the rule releases it.
+5. *Keys:* ArrowRight in the Find picker also moved the clock; Space on a mode
+   button started playback. *Fixed:* form controls keep their keys; UI check
+   asserts both.
+6. *Live mode closed the day twice* (alerts at 09:00 and 21:00). *Fixed* with
+   (2); test: one set of badge-out alerts, stamped 20:59:59.
+7. *Plan specifics hard-coded* (optimum-start rooms, reception check-in gate,
+   patrol, cleaning order, furniture, short names, gate label). *Moved* into
+   `plans/office.json` under `operations` / `furniture` / `short_names` /
+   `labels`, validated on load; Attendance takes the manual gate explicitly.
+   Demo numbers unchanged to the decimal — the move changed no behaviour.
+8. *Roll-call average hid a split:* README now gives the median (0.01) and the
+   5 bad days (~0.8, a merged tailgater each), and says seed 7 is one of them.
+9. *A test name promised more than it checked* — renamed and documented.
+10. *Sensors overstated:* CO₂/temperature exist in the 12 AC rooms only — said.
+11. *Two energy figures* (headline summed minute samples, Compare used physics
+    totals): both read the physics totals now.
+12. *Readability:* light-theme chart lines told apart by dash, not colour;
+    labels shortened or dropped when they do not fit (phone: no overlaps);
+    reader labels hidden at small scale.
+13. *Text:* roll-call note now includes the exit subtraction; prayer bookings
+    named "Zuhr congregation 13:30"; dead 08:30/18:30 branch removed.
+14. *Noisy test:* a 6-vs-8 dark-minute margin on one seed replaced by the
+    false-off ratio (16 vs 28).
+- Tests 38 → 44. Phase 1 closed.
+
+---
+
+## Phase 2 — Home + GridSense
+
+### Research notes
+
+- **Outages are per feeder and published.** LESCO's load-management plan puts
+  2,282 feeders in loss-based categories: Category I up to 2 h/day (mostly late
+  night), III 4 h, IV 5 h, V 6 h, VI 7 h; 210 feeders (9.3%) have none (The
+  News). Reports in 2026 describe 3–6 h on high-loss feeders plus unscheduled
+  cuts (Business Recorder, 24News). → a published schedule per feeder category
+  *and* random unscheduled outages; the manager knows only the published part.
+- **Peak tariff window.** K-Electric: Apr–Oct 18:30–22:30, Nov–Mar 18:00–22:00
+  peak, the other 20 h off-peak; NEPRA says designated hours may change. Solar
+  buyback for new consumers is being cut (Rs 10–11.3/unit proposed vs Rs 22 for
+  existing contracts, gross metering proposed) → self-consumption is worth more
+  than export.
+- **Solar in Lahore.** NASA POWER via Profile Solar: ~6.3 kWh/day per kWp in
+  summer, 4.8 autumn, 3.6 winter, 6.5 spring. → a clear-sky curve scaled to the
+  season, with random cloud days.
+- **Hybrid inverters.** Growatt-style priority modes: SBU (solar → battery →
+  utility), "Load first" with a discharge-stop SOC; grid charging can be
+  limited. Forum reports show these settings are static and get stuck. → the
+  default inverter is a fixed SBU with a cutoff; GridSense changes the settings
+  through the day.
+- **Households.** Mirpur survey (523 dwellings): ~2,469 kWh/yr, family of 7,
+  AC homes use 44% more. No measured Pakistani appliance table found → nameplate
+  assumptions stated in the code (fan 80 W, inverter AC 1.5 t ~1.4 kW, fridge
+  ~150 W cycling, water motor 0.75 kW, iron 1 kW, washing machine 0.5 kW).
+- **Prior art.** Pretoria dissertation: scheduling + 9.6 kWh battery + 2.74 kWp
+  removed loss of power and cut inconvenience 92% in 2023 load-shedding cases.
+  Stellenbosch 2026 student HEMS: outage-preparation mode (shed non-essentials,
+  charge the battery fast) from inverter data + weather + published schedule.
+  IEEE Access 2018: heuristic scheduling of shiftable loads with PV and SOC.
+  None models pre-cooling or the roof-tank pump — both are everyday Lahore needs.
+- **Dashboard pattern.** Sunsynk/Enphase/Home Assistant power-flow cards: four
+  nodes (solar, battery, grid, home) with animated flow direction; daily totals
+  kept separate from live power; keep import and export on one grid node.
+
+### Simulation model
+
+- Plan: `plans/home.json` — a 10-marla Lahore house: car porch, drawing room,
+  lounge, kitchen, three bedrooms with baths, store, inverter corner; roof with
+  6 kWp of panels and a roof water tank fed from an underground tank.
+- Family of 6 (world-mix names) plus a part-time helper; routines over 24 h:
+  sleep, school/office, cooking, prayer, TV, laundry, ironing, showers.
+- Devices: hybrid inverter (6 kW, SBU, cutoff SOC), 10 kWh LFP battery (90%
+  usable), PV with season + clouds, grid with voltage swings (180–250 V),
+  appliances with nameplate power, roof tank level (use from routines, pump
+  fills), room temperature (reusing the office room physics).
+- Outages: a published schedule (feeder category, e.g. 3 × 2 h) plus random
+  unscheduled cuts; identical across rule sets.
+- Rule sets on the identical day:
+  1. **Inverter default** — fixed SBU; the family uses appliances whenever;
+     the battery runs until cutoff, then the house goes dark.
+  2. **UPS circuit** — the common Lahore wiring: only fans, lights, fridge and
+     router are on the inverter; ACs and the pump are grid-only.
+  3. **GridSense** — knows the published schedule and a solar forecast: keeps a
+     battery reserve sized for the next outage's essential load, pre-cools
+     bedrooms and fills the roof tank before an outage, moves laundry and
+     ironing into solar hours, avoids grid import in the peak window, sheds by
+     priority (AC → pump → iron/washer → … fans/lights/fridge/router last),
+     cuts AC and fridge below 190 V. Every action carries its cause.
+- Measures: essential-load blackout minutes, bedroom temperature through night
+  outages, tank-empty minutes, grid kWh peak/off-peak and the bill (stated
+  tariff assumptions), solar self-consumption, battery throughput, appliance
+  protection events; summer (June) and October; several days.
+
+### UI
+
+- `viewer/home.html`, same design system as the office: 2D house plan with
+  people and appliances, a power-flow card (solar / battery / grid / home,
+  animated direction), a 24 h outage strip (published vs unscheduled), battery
+  SOC and tank-level gauges, appliance list with state and "why", compare tab.
+- Colours added to the office palette: solar amber, battery green, grid violet,
+  outage red (hatched for unscheduled), water blue.
+- Served by the same `run.bat` at http://127.0.0.1:8860/home.html; its own
+  Launchpad entry.
+
+### Round log
+
+_(rounds start after the build)_

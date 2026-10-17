@@ -34,9 +34,6 @@ RETRIGGER = 60              # motion this soon after switching off means the roo
 CO2_EXTEND = 300            # a CO2 "still occupied" verdict holds for this long
 ROLLCALL_GAP, ROLLCALL_FOR = 2, 900
 HOLD_MULT_MAX = 4
-# optimum start: rooms used every day, and when their first occupant usually walks in
-# (in a real building this comes from weeks of badge history)
-OPTIMUM_START = {"work": hm("08:30"), "reception": hm("08:25"), "mgr1": hm("08:45"), "mgr2": hm("08:45")}
 PULLDOWN_S_PER_C = 330      # measured from the room model: seconds of full cooling per degree
 
 
@@ -55,6 +52,7 @@ class RoomState:
     hold_mult: int = 1                # adaptive hold: doubles each time someone was switched off
     relaxed: bool = True              # has the last switch-off been judged correct yet
     co2_hold_until: int = -10**9      # CO2 said "still occupied": no switch-off before this
+    manual_ac: bool = False           # someone used the AC remote; cleared when the room empties
 
 
 class Automation:
@@ -64,6 +62,9 @@ class Automation:
         self.bookings = bookings
         self.rooms = {rid: RoomState() for rid, r in plan.rooms.items() if r.kind != "outdoor"}
         self.released: set[str] = set()
+        # optimum start: rooms used every day and when their first occupant usually walks
+        # in — plan data (a real building learns it from weeks of badge history)
+        self.optimum = {rid: hm(v) for rid, v in plan.operations.get("optimum_start", {}).items()}
         self.booking_seen: dict[str, bool] = {b.id: False for b in bookings}
         self.fired: dict[str, set] = {}
         self.cafe_busy = False
@@ -72,6 +73,7 @@ class Automation:
         bus.subscribe("office/cafe/queue", self._on_queue)
         bus.subscribe("office/+/temp", self._on_temp)
         bus.subscribe("office/+/switch", self._on_switch)
+        bus.subscribe("office/+/ac_switch", self._on_ac_switch)
         self.temps: dict[str, float] = {}
         self.temp_msg: dict[str, int] = {}
         self.started: set[str] = set()
@@ -88,6 +90,18 @@ class Automation:
             if m.t - st.vacated_at <= 120 and st.hold_mult < HOLD_MULT_MAX:
                 st.hold_mult *= 2
         self._set(rid, "light", True, m.id, "wall switch")
+
+    def _on_ac_switch(self, m: Message) -> None:
+        """The AC remote always works too, whatever the rule set or the hour."""
+        rid = m.topic.split("/")[1]
+        st = self.rooms.get(rid)
+        if st is None or rid not in self.plan.ac_rooms:
+            return
+        st.manual_ac = True
+        if self.mode != "schedule":
+            st.occupied = True
+            st.last_motion, st.motion_msg = m.t, m.id
+        self._set(rid, "ac", True, m.id, "turned on by hand")
 
     def _on_temp(self, m: Message) -> None:
         rid = m.topic.split("/")[1]
@@ -154,12 +168,14 @@ class Automation:
 
     def _schedule_tick(self, t: int) -> None:
         if t > SCHEDULE_OFF and t % 3600 == 0:
-            # after-hours sweep: lights switched on by hand go off on the hour
-            lit = [rid for rid, st in self.rooms.items() if st.light]
-            if lit:
+            # after-hours sweep: lights and AC switched on by hand go off on the hour
+            on = [rid for rid, st in self.rooms.items() if st.light or st.ac]
+            if on:
                 m = self.bus.publish("office/schedule/sweep", None, None, f"After-hours sweep at {clock(t)}")
-                for rid in lit:
+                for rid in on:
                     self._set(rid, "light", False, m.id, "after-hours sweep")
+                    self._set(rid, "ac", False, m.id, "after-hours sweep")
+                    self.rooms[rid].manual_ac = False
         if t == SCHEDULE_ON:
             m = self.bus.publish("office/schedule/on", None, None, "Building schedule: 08:30 start")
             for rid in self.rooms:
@@ -174,7 +190,7 @@ class Automation:
 
     def _optimum_start(self, t: int) -> None:
         """Start the AC early enough to reach the setpoint when people usually arrive."""
-        for rid, due in OPTIMUM_START.items():
+        for rid, due in self.optimum.items():
             if rid in self.started or t >= due or t < AC_WINDOW[0]:
                 continue
             temp = self.temps.get(rid)
@@ -199,7 +215,7 @@ class Automation:
                 st.hold_mult //= 2
         for rid in list(self.started):
             st = self.rooms[rid]
-            if st.precool is not None and t >= OPTIMUM_START[rid] + 1800:
+            if st.precool is not None and t >= self.optimum[rid] + 1800:
                 st.precool = None          # the start window is over; occupancy rules take it from here
         for rid, st in self.rooms.items():
             kind = self.plan.rooms[rid].kind
@@ -218,6 +234,7 @@ class Automation:
                                          f"but CO₂ is steady at {st.co2[-1][1]:.0f} ppm — keeping it on")
                     continue
                 st.occupied = False
+                st.manual_ac = False
                 st.vacated_at = t
                 st.relaxed = False
                 m = self.bus.publish(f"office/{rid}/vacant", None, st.motion_msg,
@@ -227,7 +244,7 @@ class Automation:
                     self._set(rid, "ac", False, m.id, f"{self._name(rid)} empty")
             if st.occupied and not st.ac and self._ac_allowed(rid, t):
                 self._set(rid, "ac", True, st.motion_msg, "room occupied, AC window open")
-            if st.ac and not (AC_WINDOW[0] <= t < AC_WINDOW[1]) and st.precool is None:
+            if st.ac and not (AC_WINDOW[0] <= t < AC_WINDOW[1]) and st.precool is None and not st.manual_ac:
                 self._set(rid, "ac", False, None, "outside AC hours 07:30–20:00")
 
     def _co2_says_occupied(self, st: RoomState) -> bool:
@@ -307,9 +324,12 @@ class Attendance:
     WINDOW = 4          # seconds either side of a beam pass
     MANUAL_VALID = 240  # a manual check-in authorises one pass for this long
 
-    def __init__(self, bus: Bus, people_by_id: dict):
+    def __init__(self, bus: Bus, people_by_id: dict, manual_gate: str | None):
+        """``manual_gate``: the badge door a reception check-in lets someone through
+        (the secure side's room id); None if the building has no reception check-in."""
         self.bus = bus
         self.people = people_by_id
+        self.manual_gate = manual_gate
         self.checkin: dict[str, int] = {}
         self.checkout: dict[str, int] = {}
         self.creds: list[list] = []      # [t, person, used]
@@ -435,7 +455,7 @@ class Attendance:
                 manual = c[3] == "manual"
                 if not manual and c[3] != gate:
                     continue          # a badge read at another door explains nothing here
-                if manual and gate != "corr1":
+                if manual and gate != self.manual_gate:
                     continue
                 window = self.MANUAL_VALID if manual else self.WINDOW
                 if bt - window <= c[0] <= bt + self.WINDOW:

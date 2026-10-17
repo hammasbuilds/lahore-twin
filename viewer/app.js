@@ -256,12 +256,12 @@ if (typeof document !== "undefined") (function () {
         if (d.axis === "x") {
           ctx.fillRect(X(d.lo) - 8, Y(d.at) - 4, 6, 8);
           ctx.textAlign = "right";
-          ctx.fillText("badge reader", X(d.lo) - 11, Y(d.at) + fs + 4);
+          if (s >= 12) ctx.fillText("badge reader", X(d.lo) - 11, Y(d.at) + fs + 4);
         } else {
           const secureLeft = rooms[d.b].rect[2] <= d.at + 1e-6;
           ctx.fillRect(X(d.at) - 3, Y(d.hi) + 3, 6, 6);
           ctx.textAlign = secureLeft ? "right" : "left";
-          ctx.fillText("badge reader", X(d.at) + (secureLeft ? -6 : 6), Y(d.hi) + fs + 4);
+          if (s >= 12) ctx.fillText("badge reader", X(d.at) + (secureLeft ? -6 : 6), Y(d.hi) + fs + 4);
         }
       }
     }
@@ -288,7 +288,11 @@ if (typeof document !== "undefined") (function () {
         ctx.restore();
         continue;
       }
-      ctx.fillText(name, X((x0 + x1) / 2), Y(y0) + fs + 4);
+      const room = (x1 - x0) * s - 6;
+      let label = name;
+      if (ctx.measureText(label).width > room) label = shortName(r);
+      if (ctx.measureText(label).width > room) label = "";
+      if (label) ctx.fillText(label, X((x0 + x1) / 2), Y(y0) + fs + 4);
       if (state.layer === "temp" && M.series.temp[r.id] && r.kind !== "outdoor") {
         ctx.fillStyle = palette.text;
         ctx.fillText(M.series.temp[r.id][si].toFixed(1) + "°", X((x0 + x1) / 2), Y(y0) + fs * 2 + 7);
@@ -309,31 +313,27 @@ if (typeof document !== "undefined") (function () {
   }
 
   function shortName(r) {
-    return { booth1: "Booth 1", booth2: "Booth 2", booth3: "Booth 3", mgr1: "Cabin 1", mgr2: "Cabin 2", wc_m: "WC M", wc_f: "WC F", wc_a: "WC ♿", elec: "Electric", store: "Store", reception: "Reception", meet_s: "Meeting S" }[r.id] || r.name;
+    return (plan.short_names || {})[r.id] || r.name;
   }
 
   function drawFurniture() {
     const s = view.s;
     ctx.fillStyle = palette.desk;
     for (const [x, y] of plan.spots.desk) ctx.fillRect(X(x - 0.9), Y(y - 0.75), 1.8 * s, 0.6 * s);
-    for (const k of ["mgr1_desk", "mgr2_desk", "reception_desk"]) for (const [x, y] of plan.spots[k]) ctx.fillRect(X(x - 1), Y(y - 0.9), 2 * s, 0.6 * s);
-    // meeting tables
-    rr(X(19.4), Y(14.5), 5.2 * s, 1.1 * s, s * 0.3);
-    rr(X(27.6), Y(15.1), 2.8 * s, 0.8 * s, s * 0.25);
-    // cafeteria tables and counter
-    rr(X(3.1), Y(35.9), 4 * s, 0.7 * s, s * 0.2);
-    ctx.fillRect(X(0.3), Y(37.3), 3 * s, 0.5 * s);
+    for (const k of plan.big_desks || []) for (const [x, y] of plan.spots[k] || []) ctx.fillRect(X(x - 1), Y(y - 0.9), 2 * s, 0.6 * s);
+    for (const f of plan.furniture || []) { const [fx, fy, fw, fh] = f.rect; rr(X(fx), Y(fy), fw * s, fh * s, (f.radius || 0) * s); }
     // parking bays
     ctx.strokeStyle = rgba(palette.muted, 0.45);
     ctx.lineWidth = 1;
     for (const [x, y] of plan.parking.spots) ctx.strokeRect(X(x - 1.1), Y(y - 2.3), 2.2 * s, 4.6 * s);
     ctx.setLineDash([6, 6]);
-    ctx.beginPath(); ctx.moveTo(X(1), Y(plan.parking.lane_y)); ctx.lineTo(X(31), Y(plan.parking.lane_y)); ctx.stroke();
+    const lot = plan.rooms.find((r) => r.kind === "outdoor");
+    if (lot) { ctx.beginPath(); ctx.moveTo(X(lot.rect[0] + 1), Y(plan.parking.lane_y)); ctx.lineTo(X(lot.rect[2] - 1), Y(plan.parking.lane_y)); ctx.stroke(); }
     ctx.setLineDash([]);
     ctx.fillStyle = palette.muted;
     ctx.font = `600 ${Math.max(9, s * 0.34)}px Segoe UI, system-ui`;
     ctx.textAlign = "left";
-    ctx.fillText("Gate ▲", X(2.2), Y(11.6) - 0 );
+    for (const l of plan.labels || []) ctx.fillText(l.text, X(l.at[0]), Y(l.at[1]));
   }
   function rr(x, y, w, h, r) {
     ctx.beginPath();
@@ -393,9 +393,10 @@ if (typeof document !== "undefined") (function () {
   function renderKpis() {
     const M = IX.modes[state.mode];
     const si = seriesIndex(R, state.t);
-    const kwh = energyUpTo(M.series, si);
+    const kwh = M.series.kwh ? M.series.kwh[si] : energyUpTo(M.series, si);
     $("k-energy").textContent = kwh.toFixed(1) + " kWh";
-    const base = energyUpTo(IX.modes.schedule.series, si);
+    const SS = IX.modes.schedule.series;
+    const base = SS.kwh ? SS.kwh[si] : energyUpTo(SS, si);
     $("k-energy-l").textContent = state.mode === "schedule"
       ? "Lights + AC so far today"
       : `Lights + AC so far · ${base > 0.5 ? savingText(kwh, base) : "fixed schedule has not started yet"}`;
@@ -475,7 +476,7 @@ if (typeof document !== "undefined") (function () {
         html += `<h3>Bookings</h3><table><tr><th>Time</th><th>What</th><th>Status</th></tr>`;
         for (const b of bk) {
           const released = M.log.some((m) => m.topic === "office/alert/no_show" && m.text.includes(clock(b.start)) && m.t <= state.t && m.text.includes(r.name));
-          html += `<tr><td class="num">${clock(b.start)}–${clock(b.end)}</td><td>${esc(b.title)}</td><td>${released ? '<span class="pill bad">released</span>' : b.attendees.length + " people"}</td></tr>`;
+          html += `<tr><td class="num">${clock(b.start)}–${clock(b.end)}</td><td>${esc(b.title)}</td><td>${released ? '<span class="pill bad">released</span>' : b.attendees.length + " invited"}</td></tr>`;
         }
         html += `</table>`;
       }
@@ -557,7 +558,7 @@ if (typeof document !== "undefined") (function () {
       <div class="row"><span class="muted">Badge register says inside</span><span class="num">${S.roll_register[si]}</span></div>
       <div class="row"><span class="muted">Door counters say inside</span><span class="num">${S.roll_counter[si]}</span></div>
       <canvas class="chart" id="rc-chart" style="height:110px"></canvas>
-      <p class="muted" style="font-size:12px">Estimate = badge register + entries nobody badged for (tailgates). Door counters drift as missed counts pile up, so they are re-zeroed to the estimate after 15 minutes of disagreement.</p>
+      <p class="muted" style="font-size:12px">Estimate = badge register + entries nobody badged for (tailgates) − exits nobody tapped out for. Door counters drift as missed counts pile up, so they are re-zeroed to the estimate after 15 minutes of disagreement.</p>
       <h3>Today</h3>
       <div class="row"><span class="muted">Checked in (badge or reception)</span><span class="num">${inSys}</span></div>
       <div class="row"><span class="muted">Arrived (simulator truth)</span><span class="num">${onSite}</span></div>
@@ -672,6 +673,7 @@ if (typeof document !== "undefined") (function () {
     names.forEach((n, j) => {
       const s = series[j];
       g.strokeStyle = cols[n]; g.lineWidth = n === state.mode ? 2.4 : 1.4;
+      g.setLineDash(n === "schedule" ? [5, 4] : []);
       g.beginPath();
       s.t.forEach((t, i) => {
         const x = L + (w - L - 4) * ((t - R.meta.t0) / (R.meta.t1 - R.meta.t0));
@@ -679,12 +681,16 @@ if (typeof document !== "undefined") (function () {
         i ? g.lineTo(x, y) : g.moveTo(x, y);
       });
       g.stroke();
+      g.setLineDash([]);
     });
     const x = L + (w - L - 4) * ((state.t - R.meta.t0) / (R.meta.t1 - R.meta.t0));
     g.strokeStyle = palette.text; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, top); g.lineTo(x, h - B); g.stroke(); g.globalAlpha = 1;
     g.textAlign = "left";
     let lx = L + 6;
-    names.forEach((n) => { g.fillStyle = cols[n]; g.fillRect(lx, 6, 10, 3); g.fillStyle = palette.muted; g.fillText(MODE_NAMES[n], lx + 14, 11); lx += g.measureText(MODE_NAMES[n]).width + 26; });
+    names.forEach((n) => {
+      if (n === "schedule") { g.fillStyle = cols[n]; g.fillRect(lx, 6, 4, 3); g.fillRect(lx + 7, 6, 4, 3); }
+      else { g.fillStyle = cols[n]; g.fillRect(lx, 6, 11, 3); }
+      g.fillStyle = palette.muted; g.fillText(MODE_NAMES[n], lx + 14, 11); lx += g.measureText(MODE_NAMES[n]).width + 26; });
     g.fillText("kW", 2, 11);
   }
 
@@ -842,7 +848,8 @@ if (typeof document !== "undefined") (function () {
   });
   cv.addEventListener("mouseleave", () => { $("tip").style.display = "none"; });
   document.addEventListener("keydown", (e) => {
-    if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
+    // a focused control keeps its own keys: arrows move a select or slider, space presses a button
+    if (["INPUT", "SELECT", "BUTTON", "TEXTAREA"].includes(e.target.tagName)) return;
     if (e.code === "Space") { e.preventDefault(); $("play").click(); }
     if (e.key === "ArrowRight") { state.t = Math.min(R.meta.t1 - 1, state.t + 300); frame(true); }
     if (e.key === "ArrowLeft") { state.t = Math.max(R.meta.t0, state.t - 300); frame(true); }

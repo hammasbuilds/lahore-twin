@@ -81,6 +81,22 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   const ph = await page.textContent("#inspect-body h3");
   if (!/Prayer room/.test(ph)) throw new Error("picker chose the prayer room, inspector shows " + ph);
   await shot("18-find-prayer-1332");
+  // keys belong to the focused control: arrows in the picker must not move the clock
+  const t0 = await page.evaluate(() => window.__twin.state.t);
+  await page.focus("#find"); await page.keyboard.press("ArrowRight"); await page.waitForTimeout(150);
+  const t1 = await page.evaluate(() => window.__twin.state.t);
+  if (t1 !== t0) throw new Error(`ArrowRight in the Find picker moved the clock ${t0} -> ${t1}`);
+  // space on a focused mode button selects that mode and does not start playback
+  await page.focus('#modes button[data-mode="pir"]'); await page.keyboard.press("Space"); await page.waitForTimeout(150);
+  const st = await page.evaluate(() => ({ mode: window.__twin.state.mode, playing: window.__twin.state.playing }));
+  if (st.mode !== "pir" || st.playing) throw new Error("Space on the Motion button: " + JSON.stringify(st));
+  // the end-of-day alerts are reachable on the timeline
+  await page.click(".tabs button[data-tab=events]"); await page.check("#only-alerts");
+  await page.evaluate(() => { const tw = window.__twin; tw.state.t = 21 * 3600 - 1; tw.frame(true); });
+  await page.waitForTimeout(200);
+  const logText = await page.textContent("#log");
+  if (!/never badged out/.test(logText)) throw new Error("no badge-out alerts visible at the end of the timeline");
+  await shot("19-end-of-day-alerts");
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300); await shot("13-phone");
   console.log("ERRORS:", errors.length ? "\n" + errors.join("\n") : "none");
   await browser.close();

@@ -80,6 +80,7 @@ class Plan:
     parking_spots: list[tuple[float, float]]
     lane_y: float
     ac_rooms: list[str]
+    operations: dict = field(default_factory=dict)
     raw: dict = field(repr=False, default_factory=dict)
 
     # grid state, built lazily
@@ -122,6 +123,7 @@ class Plan:
             parking_spots=[tuple(map(float, p)) for p in raw["parking"]["spots"]],
             lane_y=float(raw["parking"]["lane_y"]),
             ac_rooms=list(raw.get("ac_rooms", [])),
+            operations=raw.get("operations", {}),
             raw=raw,
         )
         plan._build_grid()
@@ -129,6 +131,16 @@ class Plan:
             for p in pts:
                 if plan.room_at(*p) is None:
                     raise ValueError(f"spot {kind} {p} is not inside any room")
+        ops = plan.operations
+        for rid in list(ops.get("optimum_start", {})) + list(ops.get("cleaning_order", [])) + plan.ac_rooms:
+            if rid not in rooms:
+                raise ValueError(f"operations name room {rid!r}, which the plan does not have")
+        for x, y, _ in ops.get("patrol", []):
+            if plan.room_at(x, y) is None:
+                raise ValueError(f"patrol stop {(x, y)} is not inside any room")
+        gate = ops.get("manual_checkin_gate")
+        if gate is not None and not any(d.gate == "badge" and d.b == gate for d in doors):
+            raise ValueError(f"manual_checkin_gate {gate!r} is not the secure side of a badge door")
         return plan
 
     # ---- geometry -------------------------------------------------------
@@ -259,6 +271,10 @@ class Plan:
             ],
             "spots": self.spots,
             "parking": {"lane_y": self.lane_y, "spots": self.parking_spots},
+            "furniture": self.raw.get("furniture", []),
+            "big_desks": self.raw.get("big_desks", []),
+            "short_names": self.raw.get("short_names", {}),
+            "labels": self.raw.get("labels", []),
         }
 
 

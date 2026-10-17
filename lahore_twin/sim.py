@@ -24,6 +24,8 @@ P_MOVING = 0.9          # PIR detects a walking person in a given second
 P_STILL = 1 / 300       # ... a person sitting still (typing, reading)
 PIR_BLIND = 5           # seconds a PIR stays latched after a trigger
 PHYS_DT = 10
+MANUAL_AC_ABOVE = 26.5  # °C at which a settled person reaches for the AC remote
+MANUAL_AC_AFTER = 300   # ... after this long
 SAMPLE_DT = 60
 
 
@@ -52,7 +54,7 @@ class Sim:
             p.pos = p.entry
         self.bus = Bus()
         self.auto = Automation(self.bus, self.plan, mode, scenario.bookings)
-        self.att = Attendance(self.bus, self.by_id)
+        self.att = Attendance(self.bus, self.by_id, self.plan.operations.get("manual_checkin_gate"))
         self.env = {
             rid: RoomEnv(rid, r.kind, r.area, rid in self.plan.ac_rooms)
             for rid, r in self.plan.rooms.items() if r.kind != "outdoor"
@@ -70,11 +72,12 @@ class Sim:
         self.dev_changes: list[list] = []
         self.series = {"t": [], "light_kw": [], "ac_kw": [], "out_temp": [], "on_site": [],
                        "roll_truth": [], "roll_counter": [], "roll_register": [], "roll_estimate": [],
+                       "kwh": [],
                        "occ": {r: [] for r in self.env}, "temp": {r: [] for r in self.env},
                        "co2": {r: [] for r in self.env}}
         self.energy = {"light_kwh": 0.0, "ac_kwh": 0.0}
         self.metrics_acc = {"dark_person_s": 0, "hot_person_s": 0, "empty_lit_s": 0,
-                            "false_off": 0, "stuffy_person_s": 0, "manual_on": 0}
+                            "false_off": 0, "stuffy_person_s": 0, "manual_on": 0, "manual_ac": 0}
         self.queue: list[str] = []
         self.serving: tuple[str, int] | None = None
         self.seat_taken: dict[tuple, str] = {}
@@ -85,6 +88,7 @@ class Sim:
         self.last_beam = -10**9
         self.ac_w = {rid: 0.0 for rid in self.env}
         self.queue_reported = 0
+        self._finished = False
 
     # ---- actuator subscriptions ----------------------------------------
 
@@ -354,6 +358,29 @@ class Sim:
                 self.pir_latch[rid] = t + PIR_BLIND
                 self.bus.publish(f"office/{rid}/motion", 1)
 
+    def _people_too_warm(self, t: int) -> None:
+        """Someone settled in a warm room with the AC off reaches for the remote.
+
+        Every rule set gets the same remote, so the schedule's 18:30 AC switch-off
+        does not leave overtime staff sweltering by construction.
+        """
+        for p in self.people:
+            rid = p.room
+            if not (p.on_site and rid in self.plan.ac_rooms) or p.path or self.ac.get(rid):
+                p.warm_since = None
+                continue
+            if self.env[rid].temp <= MANUAL_AC_ABOVE:
+                p.warm_since = None
+                continue
+            if getattr(p, "warm_since", None) is None:
+                p.warm_since = t
+            elif t - p.warm_since >= MANUAL_AC_AFTER:
+                p.warm_since = None
+                self.metrics_acc["manual_ac"] += 1
+                self.bus.publish(f"office/{rid}/ac_switch", True, None,
+                                 f"{p.name} turned the AC on by hand in {self.plan.rooms[rid].name} "
+                                 f"({self.env[rid].temp:.1f} °C)")
+
     def _people_in_the_dark(self, t: int) -> None:
         """Someone settled in a dark room waves first, then uses the wall switch.
 
@@ -408,6 +435,7 @@ class Sim:
         s["ac_kw"].append(round(sum(self.ac_w.values()) / 1000, 3))
         s["out_temp"].append(round(outdoor_temp(t), 2))
         s["on_site"].append(sum(1 for p in self.people if p.on_site))
+        s["kwh"].append(round(self.energy["light_kwh"] + self.energy["ac_kwh"], 3))
         for rid, env in self.env.items():
             s["occ"][rid].append(occ.get(rid, 0))
             s["temp"][rid].append(round(env.temp, 2))
@@ -439,16 +467,27 @@ class Sim:
                 self._report(t)
             if t % 5 == 0:
                 self._people_in_the_dark(t)
+                self._people_too_warm(t)
                 self.auto.tick(t)
                 self.att.tick(t)
-            elif t in (hm("08:30"), hm("18:30")):
-                self.auto.tick(t)
             if on_tick is not None:
                 on_tick(t)
-        self.bus.now = t1
-        self.att.tick(t1 + 10)
-        self.att.finish(t1)
+        if t1 >= T1:
+            self.finish()
         return self
+
+    def finish(self) -> None:
+        """Close the day: reconcile the last gate passes and flag missing badge-outs.
+
+        Stamped at the last second of the day so the viewer's timeline can show it;
+        live mode, which runs the day in pieces, closes it only once.
+        """
+        if self._finished:
+            return
+        self._finished = True
+        self.bus.now = T1 - 1
+        self.att.tick(T1 + 10)
+        self.att.finish(T1 - 1)
 
     # ---- results --------------------------------------------------------
 
@@ -476,6 +515,7 @@ class Sim:
             "room_min_lit_empty": round(m["empty_lit_s"] / 60),
             "false_offs": m["false_off"],
             "manual_switch_ons": m["manual_on"],
+            "manual_ac_ons": m["manual_ac"],
             "people_on_site": len(truly_in),
             "register_count": len(register),
             "missing_from_register": sorted(truly_in - register),

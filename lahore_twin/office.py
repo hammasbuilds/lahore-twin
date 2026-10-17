@@ -158,7 +158,7 @@ def build(plan: Plan, seed: int = 7, n_staff: int = 24, n_visitors: int = 4) -> 
     # congregational prayers are fixed in time, so the building can treat them as bookings
     for name, t in prayer.items():
         who = [p.id for p in people if any(s.label == f"{name} prayer" for s in p.day)]
-        bookings.append(Booking(f"pr-{name.lower()}", "prayer", f"{name} congregation", t - 240, t + 660, who))
+        bookings.append(Booking(f"pr-{name.lower()}", "prayer", f"{name} congregation {clock(t)}", t - 240, t + 660, who))
     bookings.sort(key=lambda b: b.start)
     return Scenario(plan, people, bookings, seed, prayer)
 
@@ -179,9 +179,9 @@ def _calendar(plan, rng, people, busy, n_visitors, person_factory):
         b = Booking(f"bk{len(bookings) + 1}", room, title, start, end)
         b.no_show = rng.random() < 0.12
         for p in chosen:
+            b.attendees.append(p.id)            # invited, whether or not they turn up
             if not b.no_show:
                 busy.add(p.id, start, end)
-                b.attendees.append(p.id)
         for _ in range(visitors if not b.no_show else 0):
             g = rng.choice("fm")
             vid = f"v{sum(1 for x in people if x.role == 'visitor') + 1}"
@@ -233,7 +233,7 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
 
     # meetings (highest priority)
     for b in bookings:
-        if p.id in b.attendees:
+        if p.id in b.attendees and not b.no_show:
             i = b.attendees.index(p.id)
             lead = rng.randint(-60, 240) if p.role != "visitor" else 180
             add(b.start - lead, b.end, Stay(b.start - lead, _seat(plan, b, i), f"{b.title} ({plan.rooms[b.room].name})"),
@@ -251,8 +251,7 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
 
     if p.role == "guard":
         for t in ("10:00", "12:30", "15:00", "18:00"):
-            stops = [(plan.spots["lobby_seat"][0], 20), ((16, 19), 10), ((11, 25), 20), ((23, 25), 10),
-                     ((16, 31), 10), ((4, 35), 20), ((25, 31), 10), ((12.5, 15), 10)]
+            stops = [((x, y), dwell) for x, y, dwell in plan.operations.get("patrol", [])]
             add(hm(t), hm(t) + 420, Stay(hm(t), home, "Patrol", kind="round", stops=stops))
 
     if p.role == "office_boy":
@@ -263,8 +262,7 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
         add(hm("12:50"), hm("14:05"), Stay(hm("12:50"), plan.spots["pantry"][0], "Serving lunch"))
 
     if p.role == "cleaner":
-        order = ["lobby", "reception", "meet_l", "meet_s", "work", "mgr1", "mgr2", "booth1", "booth2",
-                 "booth3", "cafe", "wc_m", "wc_f", "wc_a", "prayer", "corr1", "corr2"]
+        order = plan.operations.get("cleaning_order", [])
         stops = []
         for rid in order:
             r = plan.rooms[rid]

@@ -3,91 +3,535 @@
   "units": "metres, origin top-left, y grows downward",
   "size": [32, 38],
   "rooms": [
-    {"id": "parking",   "name": "Parking",          "kind": "outdoor",   "rect": [0, 0, 32, 12]},
-    {"id": "reception", "name": "Reception",        "kind": "reception", "rect": [0, 12, 7, 18]},
-    {"id": "lobby",     "name": "Lobby",            "kind": "lobby",     "rect": [7, 12, 18, 18]},
-    {"id": "meet_l",    "name": "Meeting room L",   "kind": "meeting",   "rect": [18, 12, 26, 18]},
-    {"id": "meet_s",    "name": "Meeting room S",   "kind": "meeting",   "rect": [26, 12, 32, 18]},
-    {"id": "corr1",     "name": "Front corridor",   "kind": "corridor",  "rect": [0, 18, 32, 20]},
-    {"id": "work",      "name": "Open workspace",   "kind": "workspace", "rect": [0, 20, 22, 30]},
-    {"id": "vcorr",     "name": "Side corridor",    "kind": "corridor",  "rect": [22, 20, 24, 30]},
-    {"id": "booth1",    "name": "Phone booth 1",    "kind": "booth",     "rect": [24, 20, 26.5, 23.4]},
-    {"id": "booth2",    "name": "Phone booth 2",    "kind": "booth",     "rect": [24, 23.4, 26.5, 26.7]},
-    {"id": "booth3",    "name": "Phone booth 3",    "kind": "booth",     "rect": [24, 26.7, 26.5, 30]},
-    {"id": "mgr1",      "name": "Manager cabin 1",  "kind": "cabin",     "rect": [26.5, 20, 32, 25]},
-    {"id": "mgr2",      "name": "Manager cabin 2",  "kind": "cabin",     "rect": [26.5, 25, 32, 30]},
-    {"id": "corr2",     "name": "Back corridor",    "kind": "corridor",  "rect": [0, 30, 32, 32]},
-    {"id": "cafe",      "name": "Cafeteria",        "kind": "cafeteria", "rect": [0, 32, 8, 38]},
-    {"id": "wc_m",      "name": "WC men",           "kind": "washroom",  "rect": [8, 32, 11, 38]},
-    {"id": "wc_f",      "name": "WC women",         "kind": "washroom",  "rect": [11, 32, 14, 38]},
-    {"id": "wc_a",      "name": "WC accessible",    "kind": "washroom",  "rect": [14, 32, 16, 38]},
-    {"id": "elec",      "name": "Electrical room",  "kind": "electrical","rect": [16, 32, 22, 38]},
-    {"id": "prayer",    "name": "Prayer room",      "kind": "prayer",    "rect": [22, 32, 28, 38]},
-    {"id": "store",     "name": "Storage",          "kind": "storage",   "rect": [28, 32, 32, 38]}
+    {
+      "id": "parking",
+      "name": "Parking",
+      "kind": "outdoor",
+      "rect": [0, 0, 32, 12]
+    },
+    {
+      "id": "reception",
+      "name": "Reception",
+      "kind": "reception",
+      "rect": [0, 12, 7, 18]
+    },
+    {
+      "id": "lobby",
+      "name": "Lobby",
+      "kind": "lobby",
+      "rect": [7, 12, 18, 18]
+    },
+    {
+      "id": "meet_l",
+      "name": "Meeting room L",
+      "kind": "meeting",
+      "rect": [18, 12, 26, 18]
+    },
+    {
+      "id": "meet_s",
+      "name": "Meeting room S",
+      "kind": "meeting",
+      "rect": [26, 12, 32, 18]
+    },
+    {
+      "id": "corr1",
+      "name": "Front corridor",
+      "kind": "corridor",
+      "rect": [0, 18, 32, 20]
+    },
+    {
+      "id": "work",
+      "name": "Open workspace",
+      "kind": "workspace",
+      "rect": [0, 20, 22, 30]
+    },
+    {
+      "id": "vcorr",
+      "name": "Side corridor",
+      "kind": "corridor",
+      "rect": [22, 20, 24, 30]
+    },
+    {
+      "id": "booth1",
+      "name": "Phone booth 1",
+      "kind": "booth",
+      "rect": [24, 20, 26.5, 23.4]
+    },
+    {
+      "id": "booth2",
+      "name": "Phone booth 2",
+      "kind": "booth",
+      "rect": [24, 23.4, 26.5, 26.7]
+    },
+    {
+      "id": "booth3",
+      "name": "Phone booth 3",
+      "kind": "booth",
+      "rect": [24, 26.7, 26.5, 30]
+    },
+    {
+      "id": "mgr1",
+      "name": "Manager cabin 1",
+      "kind": "cabin",
+      "rect": [26.5, 20, 32, 25]
+    },
+    {
+      "id": "mgr2",
+      "name": "Manager cabin 2",
+      "kind": "cabin",
+      "rect": [26.5, 25, 32, 30]
+    },
+    {
+      "id": "corr2",
+      "name": "Back corridor",
+      "kind": "corridor",
+      "rect": [0, 30, 32, 32]
+    },
+    {
+      "id": "cafe",
+      "name": "Cafeteria",
+      "kind": "cafeteria",
+      "rect": [0, 32, 8, 38]
+    },
+    {
+      "id": "wc_m",
+      "name": "WC men",
+      "kind": "washroom",
+      "rect": [8, 32, 11, 38]
+    },
+    {
+      "id": "wc_f",
+      "name": "WC women",
+      "kind": "washroom",
+      "rect": [11, 32, 14, 38]
+    },
+    {
+      "id": "wc_a",
+      "name": "WC accessible",
+      "kind": "washroom",
+      "rect": [14, 32, 16, 38]
+    },
+    {
+      "id": "elec",
+      "name": "Electrical room",
+      "kind": "electrical",
+      "rect": [16, 32, 22, 38]
+    },
+    {
+      "id": "prayer",
+      "name": "Prayer room",
+      "kind": "prayer",
+      "rect": [22, 32, 28, 38]
+    },
+    {
+      "id": "store",
+      "name": "Storage",
+      "kind": "storage",
+      "rect": [28, 32, 32, 38]
+    }
   ],
   "doors": [
-    {"a": "parking",   "b": "lobby",  "span": [11, 13.5], "gate": "entrance"},
-    {"a": "lobby",     "b": "reception", "span": [14.5, 16], "gate": "badge", "name": "Reception staff door"},
-    {"a": "lobby",     "b": "corr1",  "span": [12, 14], "gate": "badge", "name": "Main badge gate"},
-    {"a": "meet_l",    "b": "corr1",  "span": [21, 22.5]},
-    {"a": "meet_s",    "b": "corr1",  "span": [28, 29.5]},
-    {"a": "work",      "b": "corr1",  "span": [3, 5]},
-    {"a": "work",      "b": "corr1",  "span": [15, 17]},
-    {"a": "vcorr",     "b": "corr1",  "span": [22, 24]},
-    {"a": "mgr1",      "b": "corr1",  "span": [28, 29.2]},
-    {"a": "work",      "b": "vcorr",  "span": [24, 26]},
-    {"a": "booth1",    "b": "vcorr",  "span": [21.2, 22.2]},
-    {"a": "booth2",    "b": "vcorr",  "span": [24.5, 25.5]},
-    {"a": "booth3",    "b": "vcorr",  "span": [27.9, 28.9]},
-    {"a": "work",      "b": "corr2",  "span": [3, 5]},
-    {"a": "vcorr",     "b": "corr2",  "span": [22, 24]},
-    {"a": "mgr2",      "b": "corr2",  "span": [28, 29.2]},
-    {"a": "cafe",      "b": "corr2",  "span": [3, 5]},
-    {"a": "wc_m",      "b": "corr2",  "span": [9, 10]},
-    {"a": "wc_f",      "b": "corr2",  "span": [12, 13]},
-    {"a": "wc_a",      "b": "corr2",  "span": [14.5, 15.5]},
-    {"a": "elec",      "b": "corr2",  "span": [18, 19]},
-    {"a": "prayer",    "b": "corr2",  "span": [24, 26]},
-    {"a": "store",     "b": "corr2",  "span": [29.5, 30.5]}
+    {
+      "a": "parking",
+      "b": "lobby",
+      "span": [11, 13.5],
+      "gate": "entrance"
+    },
+    {
+      "a": "lobby",
+      "b": "reception",
+      "span": [14.5, 16],
+      "gate": "badge",
+      "name": "Reception staff door"
+    },
+    {
+      "a": "lobby",
+      "b": "corr1",
+      "span": [12, 14],
+      "gate": "badge",
+      "name": "Main badge gate"
+    },
+    {
+      "a": "meet_l",
+      "b": "corr1",
+      "span": [21, 22.5]
+    },
+    {
+      "a": "meet_s",
+      "b": "corr1",
+      "span": [28, 29.5]
+    },
+    {
+      "a": "work",
+      "b": "corr1",
+      "span": [3, 5]
+    },
+    {
+      "a": "work",
+      "b": "corr1",
+      "span": [15, 17]
+    },
+    {
+      "a": "vcorr",
+      "b": "corr1",
+      "span": [22, 24]
+    },
+    {
+      "a": "mgr1",
+      "b": "corr1",
+      "span": [28, 29.2]
+    },
+    {
+      "a": "work",
+      "b": "vcorr",
+      "span": [24, 26]
+    },
+    {
+      "a": "booth1",
+      "b": "vcorr",
+      "span": [21.2, 22.2]
+    },
+    {
+      "a": "booth2",
+      "b": "vcorr",
+      "span": [24.5, 25.5]
+    },
+    {
+      "a": "booth3",
+      "b": "vcorr",
+      "span": [27.9, 28.9]
+    },
+    {
+      "a": "work",
+      "b": "corr2",
+      "span": [3, 5]
+    },
+    {
+      "a": "vcorr",
+      "b": "corr2",
+      "span": [22, 24]
+    },
+    {
+      "a": "mgr2",
+      "b": "corr2",
+      "span": [28, 29.2]
+    },
+    {
+      "a": "cafe",
+      "b": "corr2",
+      "span": [3, 5]
+    },
+    {
+      "a": "wc_m",
+      "b": "corr2",
+      "span": [9, 10]
+    },
+    {
+      "a": "wc_f",
+      "b": "corr2",
+      "span": [12, 13]
+    },
+    {
+      "a": "wc_a",
+      "b": "corr2",
+      "span": [14.5, 15.5]
+    },
+    {
+      "a": "elec",
+      "b": "corr2",
+      "span": [18, 19]
+    },
+    {
+      "a": "prayer",
+      "b": "corr2",
+      "span": [24, 26]
+    },
+    {
+      "a": "store",
+      "b": "corr2",
+      "span": [29.5, 30.5]
+    }
   ],
   "spots": {
-    "gate":           [[3, 0.5]],
-    "guard_post":     [[5, 10.5]],
-    "reception_desk": [[3.5, 14.5]],
-    "kiosk":          [[9, 13.5]],
-    "reception_counter": [[7.8, 15.2]],
-    "lobby_seat":     [[9, 16.5], [10.5, 16.5], [15, 16.5], [16.5, 16.5], [16.5, 14]],
-    "desk":           [[2.5, 22], [6, 22], [9.5, 22], [13, 22], [16.5, 22], [20, 22],
-                       [2.5, 24.5], [6, 24.5], [9.5, 24.5], [13, 24.5], [16.5, 24.5], [20, 24.5],
-                       [2.5, 26.5], [6, 26.5], [9.5, 26.5], [13, 26.5], [16.5, 26.5], [20, 26.5],
-                       [2.5, 28.5], [6, 28.5], [9.5, 28.5], [13, 28.5], [16.5, 28.5], [20, 28.5]],
-    "mgr1_desk":      [[30, 22.5]],
-    "mgr2_desk":      [[30, 27.5]],
-    "meet_l_seat":    [[19.5, 14], [21, 14], [22.5, 14], [24, 14], [19.5, 16], [21, 16],
-                       [22.5, 16], [24, 16], [25, 15], [18.8, 15], [21.8, 13], [23.2, 17]],
-    "meet_s_seat":    [[28, 14.5], [30, 14.5], [28, 16.5], [30, 16.5]],
-    "booth1_seat":    [[25.5, 21.7]],
-    "booth2_seat":    [[25.5, 25]],
-    "booth3_seat":    [[25.5, 28.3]],
-    "counter":        [[1.5, 37]],
-    "queue":          [[1.5, 36], [1.5, 35], [1.5, 34], [2.5, 33.5], [3.5, 33.5], [4.5, 33.5],
-                       [5.5, 33.5], [6.5, 33.5], [7.5, 33.5]],
-    "cafe_seat":      [[3.5, 35.5], [4.5, 35.5], [5.5, 35.5], [6.5, 35.5],
-                       [3.5, 37], [4.5, 37], [5.5, 37], [6.5, 37], [7.5, 36.5], [7.5, 35]],
-    "pantry":         [[7.3, 37.4]],
-    "wc_m_spot":      [[9.5, 36], [9.5, 34.5]],
-    "wc_f_spot":      [[12.5, 36], [12.5, 34.5]],
-    "wc_a_spot":      [[15, 36]],
-    "prayer_spot":    [[22.6, 34.0], [23.4, 34.0], [24.2, 34.0], [25.0, 34.0], [25.8, 34.0], [26.6, 34.0], [27.4, 34.0], [22.6, 35.0], [23.4, 35.0], [24.2, 35.0], [25.0, 35.0], [25.8, 35.0], [26.6, 35.0], [27.4, 35.0], [22.6, 36.0], [23.4, 36.0], [24.2, 36.0], [25.0, 36.0], [25.8, 36.0], [26.6, 36.0], [27.4, 36.0], [22.6, 37.0], [23.4, 37.0], [24.2, 37.0], [25.0, 37.0], [25.8, 37.0], [26.6, 37.0], [27.4, 37.0]],
-    "coffee_spot":    [[6.8, 37.6], [7.7, 36.9]],
-    "store_spot":     [[30, 35]],
-    "elec_spot":      [[19, 35]]
+    "gate": [
+      [3, 0.5]
+    ],
+    "guard_post": [
+      [5, 10.5]
+    ],
+    "reception_desk": [
+      [3.5, 14.5]
+    ],
+    "kiosk": [
+      [9, 13.5]
+    ],
+    "reception_counter": [
+      [7.8, 15.2]
+    ],
+    "lobby_seat": [
+      [9, 16.5],
+      [10.5, 16.5],
+      [15, 16.5],
+      [16.5, 16.5],
+      [16.5, 14]
+    ],
+    "desk": [
+      [2.5, 22],
+      [6, 22],
+      [9.5, 22],
+      [13, 22],
+      [16.5, 22],
+      [20, 22],
+      [2.5, 24.5],
+      [6, 24.5],
+      [9.5, 24.5],
+      [13, 24.5],
+      [16.5, 24.5],
+      [20, 24.5],
+      [2.5, 26.5],
+      [6, 26.5],
+      [9.5, 26.5],
+      [13, 26.5],
+      [16.5, 26.5],
+      [20, 26.5],
+      [2.5, 28.5],
+      [6, 28.5],
+      [9.5, 28.5],
+      [13, 28.5],
+      [16.5, 28.5],
+      [20, 28.5]
+    ],
+    "mgr1_desk": [
+      [30, 22.5]
+    ],
+    "mgr2_desk": [
+      [30, 27.5]
+    ],
+    "meet_l_seat": [
+      [19.5, 14],
+      [21, 14],
+      [22.5, 14],
+      [24, 14],
+      [19.5, 16],
+      [21, 16],
+      [22.5, 16],
+      [24, 16],
+      [25, 15],
+      [18.8, 15],
+      [21.8, 13],
+      [23.2, 17]
+    ],
+    "meet_s_seat": [
+      [28, 14.5],
+      [30, 14.5],
+      [28, 16.5],
+      [30, 16.5]
+    ],
+    "booth1_seat": [
+      [25.5, 21.7]
+    ],
+    "booth2_seat": [
+      [25.5, 25]
+    ],
+    "booth3_seat": [
+      [25.5, 28.3]
+    ],
+    "counter": [
+      [1.5, 37]
+    ],
+    "queue": [
+      [1.5, 36],
+      [1.5, 35],
+      [1.5, 34],
+      [2.5, 33.5],
+      [3.5, 33.5],
+      [4.5, 33.5],
+      [5.5, 33.5],
+      [6.5, 33.5],
+      [7.5, 33.5]
+    ],
+    "cafe_seat": [
+      [3.5, 35.5],
+      [4.5, 35.5],
+      [5.5, 35.5],
+      [6.5, 35.5],
+      [3.5, 37],
+      [4.5, 37],
+      [5.5, 37],
+      [6.5, 37],
+      [7.5, 36.5],
+      [7.5, 35]
+    ],
+    "pantry": [
+      [7.3, 37.4]
+    ],
+    "wc_m_spot": [
+      [9.5, 36],
+      [9.5, 34.5]
+    ],
+    "wc_f_spot": [
+      [12.5, 36],
+      [12.5, 34.5]
+    ],
+    "wc_a_spot": [
+      [15, 36]
+    ],
+    "prayer_spot": [
+      [22.6, 34.0],
+      [23.4, 34.0],
+      [24.2, 34.0],
+      [25.0, 34.0],
+      [25.8, 34.0],
+      [26.6, 34.0],
+      [27.4, 34.0],
+      [22.6, 35.0],
+      [23.4, 35.0],
+      [24.2, 35.0],
+      [25.0, 35.0],
+      [25.8, 35.0],
+      [26.6, 35.0],
+      [27.4, 35.0],
+      [22.6, 36.0],
+      [23.4, 36.0],
+      [24.2, 36.0],
+      [25.0, 36.0],
+      [25.8, 36.0],
+      [26.6, 36.0],
+      [27.4, 36.0],
+      [22.6, 37.0],
+      [23.4, 37.0],
+      [24.2, 37.0],
+      [25.0, 37.0],
+      [25.8, 37.0],
+      [26.6, 37.0],
+      [27.4, 37.0]
+    ],
+    "coffee_spot": [
+      [6.8, 37.6],
+      [7.7, 36.9]
+    ],
+    "store_spot": [
+      [30, 35]
+    ],
+    "elec_spot": [
+      [19, 35]
+    ]
   },
   "parking": {
     "lane_y": 8.5,
-    "spots": [[2, 3.5], [4.5, 3.5], [7, 3.5], [9.5, 3.5], [12, 3.5], [14.5, 3.5],
-              [17, 3.5], [19.5, 3.5], [22, 3.5], [24.5, 3.5], [27, 3.5], [29.5, 3.5]]
+    "spots": [
+      [2, 3.5],
+      [4.5, 3.5],
+      [7, 3.5],
+      [9.5, 3.5],
+      [12, 3.5],
+      [14.5, 3.5],
+      [17, 3.5],
+      [19.5, 3.5],
+      [22, 3.5],
+      [24.5, 3.5],
+      [27, 3.5],
+      [29.5, 3.5]
+    ]
   },
-  "ac_rooms": ["reception", "lobby", "meet_l", "meet_s", "work", "booth1", "booth2", "booth3",
-               "mgr1", "mgr2", "cafe", "prayer"]
+  "ac_rooms": [
+    "reception",
+    "lobby",
+    "meet_l",
+    "meet_s",
+    "work",
+    "booth1",
+    "booth2",
+    "booth3",
+    "mgr1",
+    "mgr2",
+    "cafe",
+    "prayer"
+  ],
+  "operations": {
+    "optimum_start": {
+      "work": "08:30",
+      "reception": "08:25",
+      "mgr1": "08:45",
+      "mgr2": "08:45"
+    },
+    "manual_checkin_gate": "corr1",
+    "patrol": [
+      [9, 16.5, 20],
+      [16, 19, 10],
+      [11, 25, 20],
+      [23, 25, 10],
+      [16, 31, 10],
+      [4, 35, 20],
+      [25, 31, 10],
+      [12.5, 15, 10]
+    ],
+    "cleaning_order": [
+      "lobby",
+      "reception",
+      "meet_l",
+      "meet_s",
+      "work",
+      "mgr1",
+      "mgr2",
+      "booth1",
+      "booth2",
+      "booth3",
+      "cafe",
+      "wc_m",
+      "wc_f",
+      "wc_a",
+      "prayer",
+      "corr1",
+      "corr2"
+    ]
+  },
+  "furniture": [
+    {
+      "rect": [19.4, 14.5, 5.2, 1.1],
+      "radius": 0.3,
+      "what": "meeting table L"
+    },
+    {
+      "rect": [27.6, 15.1, 2.8, 0.8],
+      "radius": 0.25,
+      "what": "meeting table S"
+    },
+    {
+      "rect": [3.1, 35.9, 4.0, 0.7],
+      "radius": 0.2,
+      "what": "cafeteria table"
+    },
+    {
+      "rect": [0.3, 37.3, 3.0, 0.5],
+      "radius": 0,
+      "what": "serving counter"
+    }
+  ],
+  "big_desks": [
+    "mgr1_desk",
+    "mgr2_desk",
+    "reception_desk"
+  ],
+  "short_names": {
+    "booth1": "Booth 1",
+    "booth2": "Booth 2",
+    "booth3": "Booth 3",
+    "mgr1": "Cabin 1",
+    "mgr2": "Cabin 2",
+    "wc_m": "WC M",
+    "wc_f": "WC F",
+    "wc_a": "Acc.",
+    "elec": "Electric",
+    "store": "Store",
+    "reception": "Reception",
+    "meet_s": "Meeting S",
+    "prayer": "Prayer"
+  },
+  "labels": [
+    {
+      "text": "Gate ▲",
+      "at": [2.2, 11.6]
+    }
+  ]
 }
