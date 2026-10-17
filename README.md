@@ -1,0 +1,100 @@
+# lahore-twin
+
+A 2D simulated world for building and testing IoT automation without owning a
+single sensor. Every device is simulated behind an MQTT-style topic, so a real
+ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
+
+| # | Phase | What it simulates | Status |
+|---|---|---|---|
+| 1 | [Office tower](#phase-1--office-tower) | 33 people, badge gate, meeting rooms, lights, AC, CO₂, attendance | built, in review |
+| 2 | Home + GridSense | load-shedding-aware home energy manager | planned |
+| 3 | Hospital | staff, patients, IoT devices, management panel | planned |
+| 4 | Lahore traffic | OpenStreetMap road network, smart signals, hotspot finder | planned |
+| 5 | Junction fix planner | test underpass / U-turn / flyover options; ambulance green wave | planned |
+| 6 | City systems | smog, underpass flooding, streetlights | planned |
+
+```bash
+python demo.py               # simulate the office day three ways, write the replay
+# then open viewer/index.html in a browser — no server, no network
+python -m pytest -q          # 19 tests, including the viewer's core under node
+```
+
+Python 3.10+, standard library only. The viewer is one offline HTML page.
+
+## Phase 1 — Office tower
+
+A ground floor of 21 rooms: reception, lobby, two meeting rooms, an open
+workspace with 24 desks, three phone booths, two manager cabins, cafeteria,
+washrooms, prayer room, electrical room, storage, and a 12-bay car park.
+
+**People.** 24 staff, 2 managers, a receptionist, an office boy, a guard, a
+cleaner and visitors. Each gets a generated day: arrive (60% drive; the car
+park fills and the rest walk in from the gate), badge in, desk work, meetings
+from a booking calendar, the lunch queue, congregational prayer, washroom and
+coffee breaks, the office boy's tea rounds, the guard's patrols, the cleaner's
+morning round. Some people forget their badge, tailgate through the gate,
+forget to badge out, or sit so still a motion sensor stops seeing them.
+
+**Devices.** Per room: motion sensor (sees a walking person 90% of seconds, a
+still one about once in five minutes), CO₂ (mass balance, ±10 ppm noise),
+temperature (first-order thermal model, Lahore October outdoor curve), lights,
+AC with a thermostat. At the gate: a badge reader and a door beam counter. A
+sensor in every parking bay.
+
+**Rules.** The same day runs three times with identical people:
+
+| rule set | what it does |
+|---|---|
+| Fixed schedule | lights and AC on 08:30–18:30 everywhere — what most offices do |
+| Motion | rooms follow motion sensors, 10 minute hold, AC pre-cools booked meeting rooms |
+| Motion + CO₂ | as Motion, but a room is declared empty only when its CO₂ is falling or near outdoor level |
+
+Plus: tailgate detection (door counter vs badge reads), late arrivals, meeting
+no-shows released after 10 minutes, cafeteria queue alerts, CO₂ ventilation
+boost, missing badge-outs. Every command records the message that caused it,
+so the viewer can answer "why is this light on?".
+
+### Output
+
+`python demo.py`, seed 7 (simulated building, not a measurement):
+
+```
+                                      Fixed schedule          Motion    Motion + CO2
+Lights + AC (kWh)                             171.67          146.93          148.81
+Person-minutes in the dark                       485             435             244
+Person-minutes too warm (>26 C)                  246             506             486
+Lights switched off on someone                     3              66              37
+Room-minutes lit while empty                    7897            2240            2249
+```
+
+Occupancy control saves about 13% of lighting and AC energy here, but it costs
+comfort: rooms that only switch on when someone walks in are warm for the first
+minutes. Motion alone switches lights off on people sitting still 66 times a
+day; requiring CO₂ to confirm a room is empty halves that for 1% more energy.
+
+### The viewer
+
+`viewer/index.html` replays the day: people walking, cars parking, rooms lit
+and cooled, a timeline with alerts, and four map layers (devices, occupancy,
+temperature, CO₂). Switch the rule set mid-replay. Click a room for its
+sensors and the cause chain behind each device; click a person for their day;
+the attendance tab compares the badge register with who was really there; the
+compare tab puts the three rule sets side by side.
+
+### Swapping in hardware
+
+Rules subscribe to topics such as `office/meet_l/motion` and publish
+`office/meet_l/light`. Replace `Bus.publish` with an MQTT client and point an
+ESP32 running a PIR + relay at the same topics.
+
+## Layout
+
+```
+lahore_twin/   plan.py (rooms, doors, A* routing) · bus.py (MQTT-style bus with cause ids)
+               office.py (people, calendar, schedules) · people.py · devices.py (room physics)
+               rules.py (automation, attendance) · sim.py (1 s loop) · export.py (replay)
+plans/         office.json — the floor plan as data
+viewer/        index.html, app.js — offline replay viewer; replay.js is generated
+tools/         ui_check.js — drives the viewer in headless Chromium for review rounds
+PLAN.md        research notes, design, and the review-round log
+```

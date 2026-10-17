@@ -1,0 +1,794 @@
+/* Office Twin viewer: replays one simulated day from window.REPLAY.
+ *
+ * The page only draws what the simulator recorded. Positions come from routed
+ * trips (start time, speed, polyline), devices from their change log, and the
+ * "why" panel from each message's cause id. Nothing here re-simulates.
+ */
+"use strict";
+
+// ---------- core (no DOM; also loaded by tests under node) ----------
+
+function bisectRight(arr, x, key) {
+  let lo = 0, hi = arr.length;
+  while (lo < hi) {
+    const mid = (lo + hi) >> 1;
+    if (key(arr[mid]) <= x) lo = mid + 1; else hi = mid;
+  }
+  return lo;
+}
+
+function pointAlong(pts, dist) {
+  for (let i = 0; i < pts.length - 1; i++) {
+    const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
+    const seg = Math.hypot(bx - ax, by - ay);
+    if (dist <= seg) {
+      const f = seg ? dist / seg : 0;
+      return [ax + (bx - ax) * f, ay + (by - ay) * f, true];
+    }
+    dist -= seg;
+  }
+  const last = pts[pts.length - 1];
+  return [last[0], last[1], false];
+}
+
+function buildIndex(R) {
+  const people = {};
+  for (const p of R.people) {
+    people[p.id] = { ...p, trips: [], labels: [], gone: Infinity, entry: null };
+  }
+  for (const tr of R.trips) people[tr.p].trips.push(tr);
+  for (const [t, pid, label] of R.labels) {
+    people[pid].labels.push([t, label]);
+    if (label === "Gone home") people[pid].gone = t;
+  }
+  for (const p of Object.values(people)) {
+    p.trips.sort((a, b) => a.t - b.t);
+    if (p.trips.length) p.entry = p.trips[0].pts[0];
+  }
+  const modes = {};
+  for (const [name, M] of Object.entries(R.modes)) {
+    const dev = {};
+    for (const ch of M.devices) {
+      const [t, room, kind, val, id] = ch;
+      const k = room + "/" + kind;
+      (dev[k] = dev[k] || []).push([t, val, id]);
+    }
+    const byId = {};
+    for (const m of M.log) byId[m.id] = m;
+    modes[name] = { ...M, dev, byId };
+  }
+  return { people, modes };
+}
+
+function personAt(p, t) {
+  if (t < p.arrive || t >= p.gone) return null;
+  const i = bisectRight(p.trips, t, (tr) => tr.t) - 1;
+  if (i < 0) return p.entry ? { x: p.entry[0], y: p.entry[1], moving: false } : null;
+  const tr = p.trips[i];
+  const [x, y, moving] = pointAlong(tr.pts, (t - tr.t) * tr.v);
+  return { x, y, moving };
+}
+
+function labelAt(p, t) {
+  const i = bisectRight(p.labels, t, (l) => l[0]) - 1;
+  return i >= 0 ? p.labels[i][1] : "Not here yet";
+}
+
+function deviceAt(mode, room, kind, t) {
+  const arr = mode.dev[room + "/" + kind];
+  if (!arr) return { on: false, id: null };
+  const i = bisectRight(arr, t, (c) => c[0]) - 1;
+  return i >= 0 ? { on: !!arr[i][1], id: arr[i][2], since: arr[i][0] } : { on: false, id: null };
+}
+
+function whyChain(mode, id) {
+  const out = [];
+  const seen = new Set();
+  while (id != null && mode.byId[id] && !seen.has(id)) {
+    seen.add(id);
+    out.push(mode.byId[id]);
+    id = mode.byId[id].cause;
+  }
+  return out;
+}
+
+function clock(t) {
+  t = Math.max(0, Math.floor(t));
+  return String(Math.floor(t / 3600)).padStart(2, "0") + ":" + String(Math.floor((t % 3600) / 60)).padStart(2, "0");
+}
+
+function seriesIndex(R, t) {
+  return Math.max(0, Math.min(R.modes[Object.keys(R.modes)[0]].series.t.length - 1, Math.floor((t - R.meta.t0) / 60)));
+}
+
+function energyUpTo(series, idx) {
+  let kwh = 0;
+  for (let i = 0; i < idx && i < series.t.length; i++) kwh += (series.light_kw[i] + series.ac_kw[i]) / 60;
+  return kwh;
+}
+
+if (typeof module !== "undefined") {
+  module.exports = { bisectRight, pointAlong, buildIndex, personAt, labelAt, deviceAt, whyChain, clock, energyUpTo, seriesIndex };
+}
+
+// ---------- UI ----------
+
+if (typeof document !== "undefined") (function () {
+  const R = window.REPLAY;
+  const IX = buildIndex(R);
+  const plan = R.plan;
+  const rooms = Object.fromEntries(plan.rooms.map((r) => [r.id, r]));
+  const MODE_NAMES = { schedule: "Fixed schedule", pir: "Motion", "pir+co2": "Motion + CO₂" };
+  const ROLE_NAMES = { staff: "Staff", manager: "Manager", receptionist: "Receptionist", office_boy: "Office boy", guard: "Guard", cleaner: "Cleaner", visitor: "Visitor" };
+
+  const state = {
+    t: R.meta.t0 + 3600 * 2.5, mode: "pir+co2", layer: "state", playing: false, speed: 60,
+    sel: null, // {type:'room'|'person'|'msg', id}
+    hover: null,
+  };
+  try {
+    const saved = JSON.parse(localStorage.getItem("office-twin") || "{}");
+    if (saved.theme) document.documentElement.dataset.theme = saved.theme;
+    if (saved.mode && R.modes[saved.mode]) state.mode = saved.mode;
+  } catch (e) { /* storage blocked: defaults are fine */ }
+
+  const $ = (id) => document.getElementById(id);
+  const cv = $("plan"), ctx = cv.getContext("2d");
+  const tl = $("tl"), tctx = tl.getContext("2d");
+  const scrub = $("scrub");
+  scrub.min = R.meta.t0; scrub.max = R.meta.t1 - 1;
+
+  const css = (name) => getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+  let palette = {};
+  function readPalette() {
+    for (const k of ["bg", "panel", "floor", "floor-out", "wall", "desk", "light", "ac", "ok", "alert", "warn", "text", "muted", "line", "people", "accent"]) palette[k] = css("--" + k);
+  }
+
+  // ---- geometry ----
+  let view = { s: 10, ox: 0, oy: 0 };
+  function fit() {
+    const dpr = window.devicePixelRatio || 1;
+    const w = cv.clientWidth, h = cv.clientHeight;
+    cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const [W, H] = plan.size;
+    const pad = 56;
+    const s = Math.min((w - pad * 2) / W, (h - pad * 2 - 30) / H);
+    view = { s, ox: (w - W * s) / 2, oy: (h - H * s) / 2 + 10 };
+    const tw = tl.clientWidth, th = tl.clientHeight;
+    tl.width = Math.round(tw * dpr); tl.height = Math.round(th * dpr);
+    tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+  const X = (x) => view.ox + x * view.s;
+  const Y = (y) => view.oy + y * view.s;
+
+  // ---- colour scales ----
+  function mix(a, b, f) {
+    const pa = hex(a), pb = hex(b);
+    return `rgb(${pa.map((v, i) => Math.round(v + (pb[i] - v) * f)).join(",")})`;
+  }
+  function hex(c) {
+    if (c.startsWith("rgb")) return c.match(/\d+/g).slice(0, 3).map(Number);
+    c = c.replace("#", "");
+    if (c.length === 3) c = c.split("").map((x) => x + x).join("");
+    return [0, 2, 4].map((i) => parseInt(c.slice(i, i + 2), 16));
+  }
+  function rgba(c, a) { const [r, g, b] = hex(c); return `rgba(${r},${g},${b},${a})`; }
+  function tempColour(T) {
+    const f = Math.max(0, Math.min(1, (T - 22) / 8));
+    return f < 0.5 ? mix("#38bdf8", "#a3e635", f * 2) : mix("#a3e635", "#f87171", (f - 0.5) * 2);
+  }
+  function co2Colour(c) {
+    const f = Math.max(0, Math.min(1, (c - 420) / 900));
+    return f < 0.5 ? mix("#34d399", "#fbbf24", f * 2) : mix("#fbbf24", "#f87171", (f - 0.5) * 2);
+  }
+
+  // ---- drawing ----
+  function draw() {
+    const M = IX.modes[state.mode];
+    const w = cv.clientWidth, h = cv.clientHeight;
+    ctx.clearRect(0, 0, w, h);
+    const si = seriesIndex(R, state.t);
+    const s = view.s;
+
+    for (const r of plan.rooms) {
+      const [x0, y0, x1, y1] = r.rect;
+      let fill = r.kind === "outdoor" ? palette["floor-out"] : palette.floor;
+      if (r.kind !== "outdoor") {
+        if (state.layer === "state") {
+          /* lit rooms get a glow drawn after the fill */
+        } else if (state.layer === "occ") {
+          const n = M.series.occ[r.id] ? M.series.occ[r.id][si] : 0;
+          const cap = Math.max(1, r.kind === "workspace" ? 24 : r.kind === "meeting" ? 10 : 4);
+          if (n > 0) fill = mix(palette.floor, palette.people, Math.min(0.75, 0.2 + 0.55 * n / cap));
+        } else if (state.layer === "temp" && M.series.temp[r.id]) {
+          fill = mix(palette.floor, tempColour(M.series.temp[r.id][si]), 0.55);
+        } else if (state.layer === "co2" && M.series.co2[r.id] && plan.ac_rooms.includes(r.id)) {
+          fill = mix(palette.floor, co2Colour(M.series.co2[r.id][si]), 0.55);
+        }
+      }
+      ctx.fillStyle = fill;
+      ctx.fillRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s);
+      if (state.layer === "state" && r.kind !== "outdoor" && deviceAt(M, r.id, "light", state.t).on) {
+        const cx = X((x0 + x1) / 2), cy = Y((y0 + y1) / 2);
+        const rad = Math.hypot(x1 - x0, y1 - y0) * s * 0.6;
+        const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, rad);
+        g.addColorStop(0, rgba(palette.light, 0.30));
+        g.addColorStop(1, rgba(palette.light, 0.10));
+        ctx.fillStyle = g;
+        ctx.fillRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s);
+      }
+      if (state.layer === "state" && r.kind !== "outdoor" && deviceAt(M, r.id, "ac", state.t).on) {
+        ctx.strokeStyle = rgba(palette.ac, 0.9);
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 4]);
+        ctx.strokeRect(X(x0) + 4, Y(y0) + 4, (x1 - x0) * s - 8, (y1 - y0) * s - 8);
+        ctx.setLineDash([]);
+      }
+    }
+    drawFurniture();
+    // walls
+    ctx.strokeStyle = palette.wall;
+    ctx.lineWidth = Math.max(2, s * 0.14);
+    ctx.lineCap = "square";
+    for (const r of plan.rooms) {
+      if (r.kind === "outdoor") continue;
+      const [x0, y0, x1, y1] = r.rect;
+      ctx.strokeRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s);
+    }
+    // door gaps
+    for (const d of plan.doors) {
+      const a = rooms[d.a], b = rooms[d.b];
+      const outdoor = a.kind === "outdoor" || b.kind === "outdoor";
+      ctx.strokeStyle = outdoor ? palette["floor-out"] : palette.floor;
+      ctx.lineWidth = Math.max(3, s * 0.18);
+      ctx.lineCap = "butt";
+      ctx.beginPath();
+      if (d.axis === "x") { ctx.moveTo(X(d.lo), Y(d.at)); ctx.lineTo(X(d.hi), Y(d.at)); }
+      else { ctx.moveTo(X(d.at), Y(d.lo)); ctx.lineTo(X(d.at), Y(d.hi)); }
+      ctx.stroke();
+      if (d.gate === "badge") {
+        ctx.fillStyle = palette.accent;
+        const [mx, my] = d.axis === "x" ? [(d.lo + d.hi) / 2, d.at] : [d.at, (d.lo + d.hi) / 2];
+        ctx.fillRect(X(d.lo) - 8, Y(my) - 4, 6, 8);
+        ctx.font = `600 ${Math.max(9, s * 0.32)}px Segoe UI, system-ui`;
+        ctx.fillStyle = palette.accent;
+        ctx.textAlign = "right";
+        ctx.fillText("badge gate", X(d.lo) - 11, Y(my) + Math.max(9, s * 0.32) + 4);
+        void mx;
+      }
+    }
+    // room labels
+    ctx.textAlign = "center";
+    for (const r of plan.rooms) {
+      const [x0, y0, x1, y1] = r.rect;
+      const fs = Math.max(9, Math.min(13, s * 0.42));
+      ctx.font = `600 ${fs}px Segoe UI, system-ui`;
+      ctx.fillStyle = palette.muted;
+      const name = (x1 - x0) * s < 70 ? shortName(r) : r.name;
+      if (r.kind === "corridor") {
+        const vertical = (y1 - y0) > (x1 - x0);
+        ctx.save();
+        if (vertical) {
+          ctx.translate(X((x0 + x1) / 2) + fs * 0.35, Y((y0 + y1) / 2));
+          ctx.rotate(-Math.PI / 2);
+          ctx.fillText(name, 0, 0);
+        } else {
+          ctx.textAlign = "left";
+          ctx.fillText(name, X(x0) + 8, Y((y0 + y1) / 2) + fs * 0.35);
+        }
+        ctx.restore();
+        continue;
+      }
+      ctx.fillText(name, X((x0 + x1) / 2), Y(y0) + fs + 4);
+      if (state.layer === "temp" && M.series.temp[r.id] && r.kind !== "outdoor") {
+        ctx.fillStyle = palette.text;
+        ctx.fillText(M.series.temp[r.id][si].toFixed(1) + "°", X((x0 + x1) / 2), Y(y0) + fs * 2 + 7);
+      } else if (state.layer === "co2" && plan.ac_rooms.includes(r.id)) {
+        ctx.fillStyle = palette.text;
+        ctx.fillText(M.series.co2[r.id][si] + " ppm", X((x0 + x1) / 2), Y(y0) + fs * 2 + 7);
+      } else if (state.layer === "occ" && M.series.occ[r.id] && M.series.occ[r.id][si] > 0) {
+        ctx.fillStyle = palette.text;
+        ctx.fillText(M.series.occ[r.id][si] + " in", X((x0 + x1) / 2), Y(y0) + fs * 2 + 7);
+      }
+      if (state.sel && state.sel.type === "room" && state.sel.id === r.id) {
+        ctx.strokeStyle = palette.accent; ctx.lineWidth = 3;
+        ctx.strokeRect(X(x0) + 1.5, Y(y0) + 1.5, (x1 - x0) * s - 3, (y1 - y0) * s - 3);
+      }
+    }
+    drawCars();
+    drawPeople();
+  }
+
+  function shortName(r) {
+    return { booth1: "Booth 1", booth2: "Booth 2", booth3: "Booth 3", mgr1: "Cabin 1", mgr2: "Cabin 2", wc_m: "WC M", wc_f: "WC F", wc_a: "WC ♿", elec: "Electric", store: "Store", reception: "Reception", meet_s: "Meeting S" }[r.id] || r.name;
+  }
+
+  function drawFurniture() {
+    const s = view.s;
+    ctx.fillStyle = palette.desk;
+    for (const [x, y] of plan.spots.desk) ctx.fillRect(X(x - 0.9), Y(y - 0.75), 1.8 * s, 0.6 * s);
+    for (const k of ["mgr1_desk", "mgr2_desk", "reception_desk"]) for (const [x, y] of plan.spots[k]) ctx.fillRect(X(x - 1), Y(y - 0.9), 2 * s, 0.6 * s);
+    // meeting tables
+    rr(X(19.4), Y(14.5), 5.2 * s, 1.1 * s, s * 0.3);
+    rr(X(27.6), Y(15.1), 2.8 * s, 0.8 * s, s * 0.25);
+    // cafeteria tables and counter
+    rr(X(3.1), Y(35.9), 4 * s, 0.7 * s, s * 0.2);
+    ctx.fillRect(X(0.3), Y(37.3), 3 * s, 0.5 * s);
+    // parking bays
+    ctx.strokeStyle = rgba(palette.muted, 0.45);
+    ctx.lineWidth = 1;
+    for (const [x, y] of plan.parking.spots) ctx.strokeRect(X(x - 1.1), Y(y - 2.3), 2.2 * s, 4.6 * s);
+    ctx.setLineDash([6, 6]);
+    ctx.beginPath(); ctx.moveTo(X(1), Y(plan.parking.lane_y)); ctx.lineTo(X(31), Y(plan.parking.lane_y)); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = palette.muted;
+    ctx.font = `600 ${Math.max(9, s * 0.34)}px Segoe UI, system-ui`;
+    ctx.textAlign = "left";
+    ctx.fillText("Gate ▲", X(2.2), Y(11.6) - 0 );
+  }
+  function rr(x, y, w, h, r) {
+    ctx.beginPath();
+    ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h);
+    ctx.fill();
+  }
+
+  function drawCars() {
+    const s = view.s, t = state.t;
+    const gate = plan.spots.gate[0];
+    for (const c of R.cars) {
+      const out = c.out == null ? Infinity : c.out;
+      if (t < c.in || t >= out + 25) continue;
+      const bay = plan.parking.spots[c.bay];
+      let x = bay[0], y = bay[1];
+      const lane = plan.parking.lane_y;
+      const path = [[gate[0], gate[1]], [gate[0], lane], [bay[0], lane], [bay[0], bay[1]]];
+      if (t < c.in + 25) {
+        const len = Math.abs(lane - gate[1]) + Math.abs(bay[0] - gate[0]) + Math.abs(lane - bay[1]);
+        [x, y] = pointAlong(path, len * (t - c.in) / 25);
+      } else if (t >= out) {
+        const rev = path.slice().reverse();
+        const len = Math.abs(lane - gate[1]) + Math.abs(bay[0] - gate[0]) + Math.abs(lane - bay[1]);
+        [x, y] = pointAlong(rev, len * (t - out) / 25);
+      }
+      const p = IX.people[c.p];
+      ctx.fillStyle = rgba(p.colour, 0.28);
+      ctx.strokeStyle = rgba(p.colour, 0.9);
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.roundRect ? ctx.roundRect(X(x - 0.85), Y(y - 1.9), 1.7 * s, 3.8 * s, s * 0.35) : ctx.rect(X(x - 0.85), Y(y - 1.9), 1.7 * s, 3.8 * s);
+      ctx.fill(); ctx.stroke();
+    }
+  }
+
+  function drawPeople() {
+    const s = view.s, t = state.t;
+    const r = Math.max(3.5, s * 0.34);
+    hits = [];
+    for (const p of Object.values(IX.people)) {
+      const at = personAt(p, t);
+      if (!at) continue;
+      hits.push({ p, x: X(at.x), y: Y(at.y) });
+      const sel = state.sel && state.sel.type === "person" && state.sel.id === p.id;
+      ctx.beginPath();
+      ctx.arc(X(at.x), Y(at.y), sel ? r * 1.35 : r, 0, Math.PI * 2);
+      ctx.fillStyle = p.colour;
+      ctx.fill();
+      ctx.lineWidth = sel ? 3 : 1.5;
+      ctx.strokeStyle = sel ? palette.text : palette.bg;
+      ctx.stroke();
+    }
+  }
+  let hits = [];
+
+  // ---- side panels ----
+  function renderKpis() {
+    const M = IX.modes[state.mode];
+    const si = seriesIndex(R, state.t);
+    const kwh = energyUpTo(M.series, si);
+    $("k-energy").textContent = kwh.toFixed(1) + " kWh";
+    const base = energyUpTo(IX.modes.schedule.series, si);
+    $("k-energy-l").textContent = state.mode === "schedule"
+      ? "Lights + AC so far today"
+      : `Lights + AC so far · ${base > 0.5 ? savingText(kwh, base) : "fixed schedule has not started yet"}`;
+    $("k-onsite").textContent = Object.values(IX.people).filter((p) => personAt(p, state.t)).length;
+    $("k-alerts").textContent = M.log.filter((m) => m.t <= state.t && m.topic.startsWith("office/alert/")).length;
+  }
+
+  function savingText(kwh, base) {
+    const d = (1 - kwh / base) * 100;
+    if (Math.abs(d) < 0.5) return "same as the fixed schedule";
+    return d > 0 ? `${d.toFixed(0)}% less than the fixed schedule` : `${(-d).toFixed(0)}% more than the fixed schedule`;
+  }
+
+  let lastLogKey = "";
+  function renderLog(force) {
+    const M = IX.modes[state.mode];
+    const only = $("only-alerts").checked;
+    const n = bisectRight(M.log, state.t, (m) => m.t);
+    const key = state.mode + n + only;
+    if (!force && key === lastLogKey) return;
+    lastLogKey = key;
+    const items = [];
+    for (let i = n - 1; i >= 0 && items.length < 150; i--) {
+      const m = M.log[i];
+      if (!m.text) continue;
+      const alert = m.topic.startsWith("office/alert/");
+      if (only && !alert) continue;
+      const kind = m.topic.split("/").pop();
+      const act = kind === "light" || kind === "ac";
+      const on = act && /\bon\b/.test(m.text.split("—")[0]);
+      items.push(`<li data-msg="${m.id}" class="${alert ? "alert" : ""} ${act ? "act" : ""} ${on ? "on-" + kind : ""}"><span class="t num">${clock(m.t)}</span><span class="x">${esc(m.text)}</span></li>`);
+    }
+    $("log").innerHTML = items.join("") || `<li><span></span><span class="muted">Nothing yet — press play.</span></li>`;
+    $("log-count").textContent = `${items.length}${items.length === 150 ? "+" : ""} shown`;
+  }
+
+  function esc(s) { return String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c])); }
+
+  function renderInspector() {
+    const pane = $("pane-inspect");
+    const M = IX.modes[state.mode];
+    const si = seriesIndex(R, state.t);
+    if (!state.sel) return;
+    if (state.sel.type === "room") {
+      const r = rooms[state.sel.id];
+      const occ = M.series.occ[r.id] ? M.series.occ[r.id][si] : 0;
+      let html = `<h3>${esc(r.name)}</h3>`;
+      html += row("People inside (true count)", occ);
+      if (M.series.temp[r.id]) html += row("Temperature", M.series.temp[r.id][si].toFixed(1) + " °C");
+      if (plan.ac_rooms.includes(r.id)) html += row("CO₂", M.series.co2[r.id][si] + " ppm");
+      html += row("Area", ((r.rect[2] - r.rect[0]) * (r.rect[3] - r.rect[1])).toFixed(0) + " m²");
+      for (const kind of ["light", "ac", "vent"]) {
+        if (kind === "ac" && !plan.ac_rooms.includes(r.id)) continue;
+        const d = deviceAt(M, r.id, kind, state.t);
+        if (kind === "vent" && d.id == null) continue;
+        const name = { light: "Lights", ac: "AC", vent: "Ventilation boost" }[kind];
+        html += `<h3>${name}: <span class="pill ${d.on ? "ok" : ""}">${d.on ? "ON" : "OFF"}</span>${d.since != null ? ` <span class="muted num">since ${clock(d.since)}</span>` : ""}</h3>`;
+        html += d.id != null ? whyHtml(M, d.id) : `<p class="muted">Never switched today under this rule set.</p>`;
+      }
+      const bk = R.bookings.filter((b) => b.room === r.id);
+      if (bk.length) {
+        html += `<h3>Bookings</h3><table><tr><th>Time</th><th>What</th><th>Status</th></tr>`;
+        for (const b of bk) {
+          const released = M.log.some((m) => m.topic === "office/alert/no_show" && m.text.includes(clock(b.start)) && m.t <= state.t && m.text.includes(r.name));
+          html += `<tr><td class="num">${clock(b.start)}–${clock(b.end)}</td><td>${esc(b.title)}</td><td>${released ? '<span class="pill bad">released</span>' : b.attendees.length + " people"}</td></tr>`;
+        }
+        html += `</table>`;
+      }
+      pane.innerHTML = html;
+    } else if (state.sel.type === "person") {
+      const p = IX.people[state.sel.id];
+      const reg = M.register[p.id] || {};
+      const at = personAt(p, state.t);
+      let html = `<h3 style="color:${p.colour}">${esc(p.name)}</h3>`;
+      html += row("Role", ROLE_NAMES[p.role]);
+      html += row("Now", esc(labelAt(p, state.t)));
+      html += row("Where", at ? roomAt(at.x, at.y) : "Off site");
+      html += row("Scheduled", `${clock(p.arrive)} – ${clock(p.leave)}`);
+      html += row("Badge in (system)", reg.in != null && reg.in <= state.t ? clock(reg.in) : "—");
+      html += row("Badge out (system)", reg.out != null && reg.out <= state.t ? clock(reg.out) : "—");
+      html += row("Car", p.car != null ? `Bay ${p.car + 1}` : "No bay");
+      if (!p.badge) html += `<p><span class="pill warn">Forgot badge today</span></p>`;
+      const tg = R.tailgates.filter(([t, pid]) => pid === p.id && t <= state.t);
+      if (tg.length) html += `<p><span class="pill bad">Tailgated at ${tg.map(([t]) => clock(t)).join(", ")}</span></p>`;
+      html += `<h3>Day so far</h3><table>`;
+      for (const [t, l] of p.labels) if (t <= state.t) html += `<tr><td class="num muted">${clock(t)}</td><td>${esc(l)}</td></tr>`;
+      html += `</table>`;
+      pane.innerHTML = html;
+    } else if (state.sel.type === "msg") {
+      const m = M.byId[state.sel.id];
+      if (!m) { pane.innerHTML = `<p class="muted">That event does not exist under this rule set.</p>`; return; }
+      pane.innerHTML = `<h3>Event at ${clock(m.t)}</h3><p>${esc(m.text)}</p><p class="muted num">topic <code>${esc(m.topic)}</code></p><h3>Why it happened</h3>${whyHtml(M, m.id)}`;
+    }
+  }
+  function row(k, v) { return `<div class="row"><span class="muted">${k}</span><span class="num">${v}</span></div>`; }
+  function whyHtml(M, id) {
+    const chain = whyChain(M, id);
+    if (!chain.length) return `<p class="muted">No recorded cause.</p>`;
+    return `<div class="why">${chain.map((m, i) => `<div>${i ? "↳ because " : ""}<span class="t num">${clock(m.t)}</span>${esc(m.text || describe(m))}</div>`).join("")}</div>`;
+  }
+  function describe(m) {
+    const parts = m.topic.split("/");
+    if (parts[2] === "motion") return `Motion sensor triggered in ${rooms[parts[1]] ? rooms[parts[1]].name : parts[1]}`;
+    if (parts[2] === "co2") return `CO₂ sensor in ${rooms[parts[1]] ? rooms[parts[1]].name : parts[1]} reported ${Math.round(m.payload)} ppm`;
+    return m.topic;
+  }
+  function roomAt(x, y) {
+    for (const r of plan.rooms) { const [x0, y0, x1, y1] = r.rect; if (x > x0 && x < x1 && y > y0 && y < y1) return r.name; }
+    return "Doorway";
+  }
+
+  function renderAttendance() {
+    const M = IX.modes[state.mode];
+    const t = state.t;
+    const list = Object.values(IX.people).filter((p) => p.role !== "visitor").sort((a, b) => a.arrive - b.arrive);
+    let inSys = 0, onSite = 0, mismatch = 0;
+    const rows = list.map((p) => {
+      const reg = M.register[p.id] || {};
+      const sysIn = reg.in != null && reg.in <= t;
+      const here = !!personAt(p, t);
+      const arrived = t >= p.arrive;
+      if (sysIn) inSys++;
+      if (arrived) onSite++;
+      let status;
+      if (arrived && !sysIn && here) { status = `<span class="pill bad">on site, not in register</span>`; mismatch++; }
+      else if (!arrived) status = `<span class="pill">not arrived</span>`;
+      else if (!here) status = reg.out != null && reg.out <= t ? `<span class="pill">left</span>` : `<span class="pill warn">left, no badge-out</span>`;
+      else status = `<span class="pill ok">present</span>`;
+      const late = p.role in { staff: 1, manager: 1 } && reg.in != null && reg.in > 9 * 3600 + 15 * 60 && sysIn;
+      return `<tr><td>${esc(p.name)}<div class="muted" style="font-size:11.5px">${ROLE_NAMES[p.role]}</div></td><td class="num ${late ? "flag" : ""}">${sysIn ? clock(reg.in) : "—"}</td><td class="num">${reg.out != null && reg.out <= t ? clock(reg.out) : "—"}</td><td>${status}</td></tr>`;
+    });
+    $("pane-attendance").innerHTML = `
+      <div class="row"><span class="muted">Checked in (badge or reception)</span><span class="num">${inSys}</span></div>
+      <div class="row"><span class="muted">Arrived (simulator truth)</span><span class="num">${onSite}</span></div>
+      <div class="row"><span class="muted">On site but missing from the register</span><span class="num ${mismatch ? "flag" : ""}">${mismatch}</span></div>
+      <h3>Register</h3>
+      <table><tr><th>Person</th><th>In</th><th>Out</th><th>Status</th></tr>${rows.join("")}</table>
+      <p class="muted" style="font-size:12px">Late (red) = staff checking in after 09:15. The register is built only from badge reads and reception check-ins; the truth column comes from the simulator, which a real building would not have.</p>`;
+  }
+
+  function renderCompare() {
+    const names = Object.keys(R.modes);
+    const ms = names.map((n) => R.modes[n].metrics);
+    const rowsDef = [
+      ["Lights + AC, kWh", "total_kwh", "", "min"],
+      ["Lights, kWh", "light_kwh", "", "min"],
+      ["AC, kWh", "ac_kwh", "", "min"],
+      ["Person-minutes in the dark", "person_min_in_dark", "", "min"],
+      ["Person-minutes too warm (>26 °C)", "person_min_too_warm", "", "min"],
+      ["Person-minutes stuffy (CO₂ >1000)", "person_min_stuffy", "", "min"],
+      ["Lights off on someone (false-offs)", "false_offs", "", "min"],
+      ["Room-minutes lit while empty", "room_min_lit_empty", "", "min"],
+    ];
+    let html = `<h3>Power through the day</h3><canvas class="chart" id="chart"></canvas>
+      <h3>Whole day, same people, three rule sets</h3>
+      <table class="cmp"><tr><th></th>${names.map((n) => `<th>${MODE_NAMES[n]}</th>`).join("")}</tr>`;
+    for (const [label, key, unit] of rowsDef) {
+      const vals = ms.map((m) => m[key]);
+      const best = Math.min(...vals);
+      html += `<tr><td>${label}</td>${vals.map((v) => `<td class="num ${v === best ? "best" : ""}">${fmt(v)}${unit}</td>`).join("")}</tr>`;
+    }
+    html += `</table>`;
+    const m0 = ms[0];
+    html += `<h3>Gate and attendance</h3>
+      ${row("Tailgates that happened", m0.tailgates_true)}
+      ${row("Tailgates caught by counter-vs-badge check", m0.tailgates_caught)}
+      ${row("False tailgate alarms", m0.tailgate_false_alarms)}
+      ${row("Door-counter misses", m0.beam_misses)}
+      <p class="muted" style="font-size:12px">All numbers are from the simulator, not a real building. The people, meetings and arrivals are identical in every column; only the rules differ.</p>`;
+    $("pane-energy").innerHTML = html;
+    drawChart();
+  }
+
+  function fmt(v) { return Number.isInteger(v) ? v.toLocaleString("en") : v.toFixed(1); }
+  function smooth(a, k) {
+    const out = new Array(a.length);
+    let sum = 0;
+    for (let i = 0; i < a.length; i++) {
+      sum += a[i];
+      if (i >= k) sum -= a[i - k];
+      out[i] = sum / Math.min(i + 1, k);
+    }
+    return out;
+  }
+
+  function drawChart() {
+    const c = document.getElementById("chart");
+    if (!c) return;
+    const dpr = window.devicePixelRatio || 1;
+    const w = c.clientWidth, h = c.clientHeight;
+    c.width = w * dpr; c.height = h * dpr;
+    const g = c.getContext("2d");
+    g.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const names = Object.keys(R.modes);
+    const cols = { schedule: palette.muted, pir: palette.warn, "pir+co2": palette.accent };
+    const series = names.map((n) => R.modes[n].series);
+    // AC compressors cycle on a thermostat, so raw kW is a comb; show 15-minute means
+    const totals = series.map((s) => smooth(s.light_kw.map((v, i) => v + s.ac_kw[i]), 15));
+    const max = Math.max(...totals.flat()) * 1.15 || 1;
+    const L = 34, B = 18, top = 22;
+    g.font = "11px Segoe UI, system-ui";
+    g.fillStyle = palette.muted;
+    g.strokeStyle = palette.line;
+    g.lineWidth = 1;
+    for (let k = 0; k <= 4; k++) {
+      const y = top + (h - B - top) * (1 - k / 4);
+      g.beginPath(); g.moveTo(L, y); g.lineTo(w - 4, y); g.stroke();
+      g.textAlign = "right"; g.fillText((max * k / 4).toFixed(0), L - 5, y + 4);
+    }
+    g.textAlign = "center";
+    for (let hr = 8; hr <= 20; hr += 2) {
+      const x = L + (w - L - 4) * ((hr * 3600 - R.meta.t0) / (R.meta.t1 - R.meta.t0));
+      g.fillText(String(hr).padStart(2, "0"), x, h - 4);
+    }
+    names.forEach((n, j) => {
+      const s = series[j];
+      g.strokeStyle = cols[n]; g.lineWidth = n === state.mode ? 2.4 : 1.4;
+      g.beginPath();
+      s.t.forEach((t, i) => {
+        const x = L + (w - L - 4) * ((t - R.meta.t0) / (R.meta.t1 - R.meta.t0));
+        const y = top + (h - B - top) * (1 - totals[j][i] / max);
+        i ? g.lineTo(x, y) : g.moveTo(x, y);
+      });
+      g.stroke();
+    });
+    const x = L + (w - L - 4) * ((state.t - R.meta.t0) / (R.meta.t1 - R.meta.t0));
+    g.strokeStyle = palette.text; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, top); g.lineTo(x, h - B); g.stroke(); g.globalAlpha = 1;
+    g.textAlign = "left";
+    let lx = L + 6;
+    names.forEach((n) => { g.fillStyle = cols[n]; g.fillRect(lx, 6, 10, 3); g.fillStyle = palette.muted; g.fillText(MODE_NAMES[n], lx + 14, 11); lx += g.measureText(MODE_NAMES[n]).width + 26; });
+    g.fillText("kW", 2, 11);
+  }
+
+  function renderTimeline() {
+    const w = tl.clientWidth, h = tl.clientHeight;
+    tctx.clearRect(0, 0, w, h);
+    const M = IX.modes[state.mode];
+    const s = M.series;
+    const max = Math.max(...s.on_site, 1);
+    const xs = (t) => (w * (t - R.meta.t0)) / (R.meta.t1 - R.meta.t0);
+    tctx.fillStyle = rgba(palette.people, 0.25);
+    tctx.beginPath(); tctx.moveTo(0, h);
+    s.t.forEach((t, i) => tctx.lineTo(xs(t), h - (h - 10) * (s.on_site[i] / max)));
+    tctx.lineTo(w, h); tctx.closePath(); tctx.fill();
+    for (const m of M.log) {
+      if (!m.topic.startsWith("office/alert/")) continue;
+      tctx.fillStyle = palette.alert;
+      tctx.fillRect(xs(m.t) - 1, 0, 2, 7);
+    }
+    const x = xs(state.t);
+    tctx.fillStyle = palette.accent;
+    tctx.fillRect(x - 1.5, 0, 3, h);
+  }
+
+  function renderLegend() {
+    const L = {
+      state: `<span><i style="background:${palette.light}" class="sq"></i>Lights on</span><span><i style="border:2px dashed ${palette.ac};background:transparent" class="sq"></i>AC on</span>`,
+      occ: `<span><i style="background:${palette.people}" class="sq"></i>More people = darker</span>`,
+      temp: `<span><i style="background:#38bdf8" class="sq"></i>22°</span><span><i style="background:#a3e635" class="sq"></i>26°</span><span><i style="background:#f87171" class="sq"></i>30°+</span>`,
+      co2: `<span><i style="background:#34d399" class="sq"></i>420</span><span><i style="background:#fbbf24" class="sq"></i>870</span><span><i style="background:#f87171" class="sq"></i>1320+ ppm</span>`,
+    }[state.layer];
+    const roles = [...new Set(Object.values(IX.people).map((p) => p.role))];
+    $("legend").innerHTML = L + roles.map((r) => `<span><i style="background:${R.people.find((p) => p.role === r).colour}"></i>${ROLE_NAMES[r]}</span>`).join("");
+  }
+
+  function renderTicks() {
+    const out = [];
+    for (let hr = 7; hr <= 21; hr++) out.push(`<span>${String(hr).padStart(2, "0")}</span>`);
+    $("ticks").innerHTML = out.join("");
+  }
+
+  // ---- frame loop ----
+  let lastPanel = 0;
+  function frame(force) {
+    $("clock").textContent = clock(state.t);
+    scrub.value = state.t;
+    draw();
+    renderTimeline();
+    const now = performance.now();
+    if (force || now - lastPanel > 250) {
+      lastPanel = now;
+      renderKpis();
+      renderLog(force);
+      if (state.sel && $("pane-inspect").classList.contains("on")) renderInspector();
+      if ($("pane-attendance").classList.contains("on")) renderAttendance();
+      if ($("pane-energy").classList.contains("on")) drawChart();
+    }
+  }
+  let prev = null;
+  function loop(ts) {
+    if (state.playing) {
+      if (prev != null) state.t = Math.min(R.meta.t1 - 1, state.t + ((ts - prev) / 1000) * state.speed);
+      if (state.t >= R.meta.t1 - 1) setPlaying(false);
+      frame(false);
+    }
+    prev = ts;
+    requestAnimationFrame(loop);
+  }
+
+  function setPlaying(on) {
+    state.playing = on;
+    $("play").textContent = on ? "❚❚ Pause" : "▶ Play";
+    $("play").setAttribute("aria-label", on ? "Pause" : "Play");
+  }
+  function save() {
+    try { localStorage.setItem("office-twin", JSON.stringify({ theme: document.documentElement.dataset.theme, mode: state.mode })); } catch (e) { /* ignore */ }
+  }
+
+  // ---- events ----
+  $("play").onclick = () => { if (state.t >= R.meta.t1 - 1) state.t = R.meta.t0; setPlaying(!state.playing); };
+  $("speed").onchange = (e) => { state.speed = +e.target.value; };
+  scrub.oninput = () => { state.t = +scrub.value; frame(true); };
+  for (const b of document.querySelectorAll("#modes button")) {
+    b.onclick = () => {
+      state.mode = b.dataset.mode;
+      for (const x of document.querySelectorAll("#modes button")) x.setAttribute("aria-pressed", x === b);
+      save();
+      if ($("pane-energy").classList.contains("on")) renderCompare();
+      frame(true);
+    };
+    b.setAttribute("aria-pressed", b.dataset.mode === state.mode);
+  }
+  for (const b of document.querySelectorAll("#layers button")) {
+    b.onclick = () => {
+      state.layer = b.dataset.layer;
+      for (const x of document.querySelectorAll("#layers button")) x.setAttribute("aria-pressed", x === b);
+      renderLegend();
+      frame(true);
+    };
+  }
+  function showTab(name) {
+    for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.tab === name);
+    for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === "pane-" + name);
+    if (name === "attendance") renderAttendance();
+    if (name === "energy") renderCompare();
+    if (name === "inspect") renderInspector();
+  }
+  for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
+  $("only-alerts").onchange = () => renderLog(true);
+  $("log").onclick = (e) => {
+    const li = e.target.closest("li[data-msg]");
+    if (!li) return;
+    state.sel = { type: "msg", id: +li.dataset.msg };
+    showTab("inspect");
+    frame(true);
+  };
+  $("theme").onclick = () => {
+    const dark = document.documentElement.dataset.theme !== "light";
+    document.documentElement.dataset.theme = dark ? "light" : "dark";
+    $("theme").textContent = dark ? "Dark" : "Light";
+    readPalette(); renderLegend(); save();
+    if ($("pane-energy").classList.contains("on")) renderCompare();
+    frame(true);
+  };
+
+  function pick(ev) {
+    const rect = cv.getBoundingClientRect();
+    const mx = ev.clientX - rect.left, my = ev.clientY - rect.top;
+    let best = null, bd = Math.max(9, view.s * 0.6);
+    for (const h of hits) { const d = Math.hypot(h.x - mx, h.y - my); if (d < bd) { bd = d; best = h; } }
+    if (best) return { type: "person", id: best.p.id };
+    const wx = (mx - view.ox) / view.s, wy = (my - view.oy) / view.s;
+    for (const r of plan.rooms) { const [x0, y0, x1, y1] = r.rect; if (wx > x0 && wx < x1 && wy > y0 && wy < y1) return { type: "room", id: r.id }; }
+    return null;
+  }
+  cv.addEventListener("click", (ev) => {
+    const p = pick(ev);
+    state.sel = p;
+    if (p) showTab("inspect");
+    frame(true);
+  });
+  cv.addEventListener("mousemove", (ev) => {
+    const p = pick(ev);
+    const tip = $("tip");
+    if (!p) { tip.style.display = "none"; return; }
+    const rect = cv.getBoundingClientRect();
+    let html;
+    if (p.type === "person") { const q = IX.people[p.id]; html = `<b>${esc(q.name)}</b> · ${ROLE_NAMES[q.role]}<br><span class="muted">${esc(labelAt(q, state.t))}</span>`; }
+    else { const r = rooms[p.id]; const M = IX.modes[state.mode]; const si = seriesIndex(R, state.t); html = `<b>${esc(r.name)}</b>` + (M.series.occ[r.id] ? `<br><span class="muted">${M.series.occ[r.id][si]} inside · ${M.series.temp[r.id][si].toFixed(1)} °C</span>` : ""); }
+    tip.innerHTML = html;
+    tip.style.display = "block";
+    const x = ev.clientX - rect.left + 14, y = ev.clientY - rect.top + 14;
+    tip.style.left = Math.min(x, rect.width - tip.offsetWidth - 6) + "px";
+    tip.style.top = Math.min(y, rect.height - tip.offsetHeight - 6) + "px";
+  });
+  cv.addEventListener("mouseleave", () => { $("tip").style.display = "none"; });
+  document.addEventListener("keydown", (e) => {
+    if (e.target.tagName === "INPUT" && e.target.type !== "range") return;
+    if (e.code === "Space") { e.preventDefault(); $("play").click(); }
+    if (e.key === "ArrowRight") { state.t = Math.min(R.meta.t1 - 1, state.t + 300); frame(true); }
+    if (e.key === "ArrowLeft") { state.t = Math.max(R.meta.t0, state.t - 300); frame(true); }
+  });
+  window.addEventListener("resize", () => { fit(); frame(true); });
+
+  // ---- start ----
+  $("theme").textContent = document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
+  readPalette();
+  fit();
+  renderLegend();
+  renderTicks();
+  frame(true);
+  requestAnimationFrame(loop);
+  window.__twin = { state, frame, showTab, IX };
+})();
