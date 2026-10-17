@@ -39,7 +39,10 @@ fs.mkdirSync(out, { recursive: true });
   await page.click(".tabs button[data-tab=events]"); await page.check("#only-alerts"); await setT("18:00"); await shot("08-1800-alerts");
   // click first log entry -> why chain
   await page.uncheck("#only-alerts");
-  await page.click("#log li[data-msg] >> nth=0"); await page.waitForTimeout(200); await shot("09-why");
+  // the log re-renders on a timer; wait for an entry, then click it by locator (re-resolved on retry)
+  const first = page.locator("#log li[data-msg]").first();
+  await first.waitFor({ state: "visible" });
+  await first.click({ timeout: 5000 }); await page.waitForTimeout(200); await shot("09-why");
   await page.click("#modes button[data-mode=schedule]"); await setT("12:00"); await page.click(".tabs button[data-tab=events]"); await shot("10-schedule-1200");
   await page.click("#theme"); await page.waitForTimeout(200); await shot("11-light-theme");
   await page.click("#play"); await page.waitForTimeout(1500); await page.click("#play"); await shot("12-after-play");

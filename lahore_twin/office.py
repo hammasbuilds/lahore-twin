@@ -114,10 +114,22 @@ def build(plan: Plan, seed: int = 7, n_staff: int = 24, n_visitors: int = 4) -> 
         return a, lv
 
     desks = plan.spots["desk"]
+    staff_list = []
     for i in range(n_staff):
         a, lv = staff_times()
         p = person(f"s{i + 1:02d}", "staff", a, lv, desk=desks[i % len(desks)], drives=rng.random() < 0.6)
         p.has_badge = rng.random() > 0.05
+        staff_list.append(p)
+    # about a quarter of staff arrive with a colleague (carpool, same bus, met at the gate):
+    # the follower is a few seconds behind, which is where real tailgating comes from
+    pairs = []
+    pool = staff_list[:]
+    rng.shuffle(pool)
+    while len(pool) >= 2 and len(pairs) < n_staff // 8:
+        lead, follow = pool.pop(), pool.pop()
+        follow.arrive = lead.arrive + rng.randint(2, 6)
+        follow.car_bay = None
+        pairs.append((lead, follow))
     for i, key in enumerate(("mgr1_desk", "mgr2_desk")):
         a = int(rng.gauss(hm("08:50"), 480))
         lv = int(rng.gauss(hm("18:30"), 1200))
@@ -135,12 +147,19 @@ def build(plan: Plan, seed: int = 7, n_staff: int = 24, n_visitors: int = 4) -> 
             p.entry = plan.parking_spots[i]
         else:
             p.car_bay = None
+    for lead, follow in pairs:
+        follow.entry = lead.entry          # they walk in together from the leader's car or the gate
 
     busy = _Busy()
     bookings = _calendar(plan, rng, people, busy, n_visitors, person)
     prayer = {"Zuhr": ZUHR, "Asr": ASR}
     for p in people:
         p.day = _day_for(plan, rng, p, bookings, busy)
+    # congregational prayers are fixed in time, so the building can treat them as bookings
+    for name, t in prayer.items():
+        who = [p.id for p in people if any(s.label == f"{name} prayer" for s in p.day)]
+        bookings.append(Booking(f"pr-{name.lower()}", "prayer", f"{name} congregation", t - 240, t + 660, who))
+    bookings.sort(key=lambda b: b.start)
     return Scenario(plan, people, bookings, seed, prayer)
 
 
@@ -287,7 +306,8 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
                         on_arrive="manual_checkin"))
         day.append(Stay(p.arrive + 75, home, "At desk"))
     else:
-        day.append(Stay(p.arrive, home, _home_label(p)))
+        # the guard works outside the badge line, so clocks in at the guard-post terminal
+        day.append(Stay(p.arrive, home, _home_label(p), on_arrive="clock_in" if p.role == "guard" else ""))
     for a, b, stay in events:
         if a < p.arrive or b > p.leave:
             continue

@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 19 tests, including the viewer's core under node
+python -m pytest -q          # 24 tests, including the viewer's core under node
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.
@@ -60,17 +60,25 @@ so the viewer can answer "why is this light on?".
 
 ```
                                       Fixed schedule          Motion    Motion + CO2
-Lights + AC (kWh)                             171.67          146.93          148.81
-Person-minutes in the dark                       485             435             244
-Person-minutes too warm (>26 C)                  246             506             486
-Lights switched off on someone                     3              66              37
-Room-minutes lit while empty                    7897            2240            2249
+Lights + AC (kWh)                              171.8          148.33          149.57
+Person-minutes in the dark                       476             302             116
+Person-minutes too warm (>26 C)                  234              28              28
+Lights switched off on someone                     2              76              38
+Room-minutes lit while empty                    7972            2195            2204
 ```
 
-Occupancy control saves about 13% of lighting and AC energy here, but it costs
-comfort: rooms that only switch on when someone walks in are warm for the first
-minutes. Motion alone switches lights off on people sitting still 66 times a
-day; requiring CO₂ to confirm a room is empty halves that for 1% more energy.
+Occupancy control saves about 13% of lighting and AC energy on this day (14–16%
+across five days, `python demo.py --week`). It only matches the schedule on
+comfort because pre-cooling starts from each room's measured temperature: with
+a fixed 15-minute pre-cool, the heat-soaked prayer room was still 27 °C when
+the Zuhr congregation walked in. Motion sensors alone switch lights off on
+people sitting still 76 times a day; requiring CO₂ to confirm a room is empty
+halves that for under 1% more energy.
+
+Over five days, the counter-vs-badge check caught all 9 tailgates with no false
+alarms. Its blind spot: a follower in the same second as the person ahead looks
+exactly like someone lingering in the beam, so that case is flagged "check the
+camera" instead of being called a tailgate.
 
 ### The viewer
 

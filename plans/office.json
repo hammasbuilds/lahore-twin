@@ -27,7 +27,7 @@
   ],
   "doors": [
     {"a": "parking",   "b": "lobby",  "span": [11, 13.5], "gate": "entrance"},
-    {"a": "reception", "b": "lobby",  "span": [14.5, 16]},
+    {"a": "lobby",     "b": "reception", "span": [14.5, 16], "gate": "badge"},
     {"a": "lobby",     "b": "corr1",  "span": [12, 14], "gate": "badge"},
     {"a": "meet_l",    "b": "corr1",  "span": [21, 22.5]},
     {"a": "meet_s",    "b": "corr1",  "span": [28, 29.5]},

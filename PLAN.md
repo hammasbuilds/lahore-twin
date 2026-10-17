@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | building |
+| 1 | Office tower — people, attendance, IoT, energy | review round 1 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -102,4 +102,37 @@ above it has finished its build **and** ten review rounds.
 
 ### Round log
 
-_(rounds start after the build)_
+**Build (718e3cf).** Engine, viewer, demo, 19 tests. Found during the build's own
+checks: rules ticked every 5 s but compared booking times with `==`, so most
+no-shows and pre-cools never fired; the PIR loop iterated a `set`, making the
+same seed give different days in different processes; an old manual check-in
+could claim another person's badge pass.
+
+**Round 1 — the gate and comfort.**
+- *Found:* the one real tailgate went uncaught (a genuine beam miss) and both
+  alarms were the modelled doorway double count — one day holds too few events
+  to judge a detector. *Fixed:* a quarter of staff now arrive in pairs (where
+  real tailgating comes from); `demo.py --week` reports five days. A count in
+  the same second as an explained one is now a "check the camera" door-count
+  alert, not a tailgate. Five days: 9/9 tailgates caught, 0 false alarms, 1
+  same-second double count flagged. Known blind spot, documented: a follower in
+  the same second is indistinguishable from a double count.
+- *Found (UI, attendance tab):* the receptionist was "on site, not in register"
+  — her desk is in front of the badge line; she was registered at lunch. The
+  guard was registered at his 10:00 patrol, not 07:00. *Fixed:* a badge reader
+  on the staff-only reception door and a guard-post clock-in terminal; every
+  badge door reconciles its own counter against its own reader.
+- *Found:* occupancy control left people far warmer than the schedule (474 vs
+  232 person-min). Measured where: the prayer room heat-soaks to 31 °C and a
+  fixed 15-min pre-cool reached only 27 °C by Zuhr. *Fixed:* congregations are
+  calendar bookings; pre-cool lead and optimum start come from the room's own
+  temperature (330 s/°C). Too warm: 474 → 28 person-min, below the schedule's
+  234, for ~1 kWh.
+- *Found:* "checked in late at 09:15" — late was `> 09:15:00` but the clock
+  shows minutes. *Fixed:* late from 09:16, with minutes late in the text.
+- *Found:* UI check crashed once clicking a log row mid re-render. *Fixed:*
+  locator-based click with a wait.
+- Tests 19 → 24 (process-hash determinism, hot-room pre-cool lead, double count
+  vs tailgate, per-door badge matching, receptionist/guard registered on arrival).
+- *Open for round 2:* 38 false-offs/day remain under Motion + CO₂ (reception,
+  store room, cabin 2); nobody reacts when a light goes off on them.

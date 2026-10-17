@@ -180,12 +180,12 @@ def test_unexplained_beam_is_a_tailgate_and_nearest_badge_wins():
     bus.now = 100
     bus.publish("office/reception/manual", "a")        # manual check-in, valid for 4 min
     bus.now = 200
-    bus.publish("office/gate/badge", {"person": "b", "dir": "in"})
-    bus.publish("office/gate/beam", "in")              # b, explained by b's badge
+    bus.publish("office/gate/badge", {"person": "b", "dir": "in", "gate": "corr1"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})              # b, explained by b's badge
     bus.now = 230
-    bus.publish("office/gate/beam", "in")              # a walks through on the manual check-in
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})              # a walks through on the manual check-in
     bus.now = 300
-    bus.publish("office/gate/beam", "in")              # nobody's credential
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})              # nobody's credential
     att.tick(400)
     assert att.tailgate_alerts == [300]
 
@@ -237,3 +237,64 @@ def test_replay_is_valid_js_object(day, tmp_path):
 def test_viewer_core_under_node():
     r = subprocess.run(["node", str(ROOT / "tests" / "viewer_core.test.js")], capture_output=True, text=True)
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+def test_results_do_not_depend_on_the_process_hash_seed():
+    import os
+    import sys
+    code = ("from lahore_twin.office import build; from lahore_twin.plan import Plan; "
+            "from lahore_twin.sim import Sim; import json; "
+            "print(json.dumps(Sim(build(Plan.load('office.json'), seed=3), 'pir+co2').run().metrics()))")
+    outs = []
+    for h in ("1", "2"):
+        env = dict(os.environ, PYTHONHASHSEED=h, PYTHONUTF8="1")
+        r = subprocess.run([sys.executable, "-c", code], capture_output=True, text=True, cwd=ROOT, env=env)
+        assert r.returncode == 0, r.stderr
+        outs.append(r.stdout)
+    assert outs[0] == outs[1]
+
+
+def test_hot_room_gets_a_longer_precool(plan):
+    from lahore_twin.office import Booking
+    b = Booking("x", "prayer", "Zuhr congregation", hm("13:26"), hm("13:41"))
+    bus, auto = _auto(plan, "pir", [b])
+    bus.now = hm("12:00")
+    bus.publish("office/prayer/temp", 31.0)
+    fired_at = None
+    for t in range(hm("12:00"), hm("13:30"), 5):
+        bus.now = t
+        auto.tick(t)
+        if fired_at is None and auto.rooms["prayer"].ac:
+            fired_at = t
+    # 7 degrees above setpoint needs well over the 10-minute minimum
+    assert hm("13:26") - fired_at >= 30 * 60
+
+
+def test_same_second_double_count_is_not_called_a_tailgate():
+    bus = Bus()
+    att = Attendance(bus, {"a": _P("a")})
+    bus.now = 500
+    bus.publish("office/gate/badge", {"person": "a", "dir": "in", "gate": "corr1"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})      # lingering, or a follower in the same second
+    att.tick(600)
+    assert att.tailgate_alerts == [] and att.double_counts == [500]
+    assert any(m.topic == "office/alert/door_count" for m in bus.log)
+
+
+def test_a_badge_at_another_door_explains_nothing():
+    bus = Bus()
+    att = Attendance(bus, {"a": _P("a")})
+    bus.now = 700
+    bus.publish("office/gate/badge", {"person": "a", "dir": "in", "gate": "reception"})
+    bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})
+    att.tick(800)
+    assert att.tailgate_alerts == [700]
+
+
+def test_staff_outside_the_badge_line_are_registered_on_arrival(day):
+    _, sims = day
+    s = sims["schedule"]
+    for role in ("receptionist", "guard"):
+        p = next(x for x in s.people if x.role == role)
+        assert abs(s.att.checkin[p.id] - p.arrive) < 120, (role, s.att.checkin.get(p.id), p.arrive)

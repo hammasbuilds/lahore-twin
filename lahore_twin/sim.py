@@ -74,7 +74,8 @@ class Sim:
         self.serving: tuple[str, int] | None = None
         self.seat_taken: dict[tuple, str] = {}
         self.pir_latch: dict[str, int] = {}
-        self.last_in_pass = -10**9
+        self.last_in_pass: dict[str, int] = {}
+        self.badge_doors = {frozenset((d.a, d.b)): d for d in self.plan.doors if d.gate == "badge"}
         self.last_beam = -10**9
         self.ac_w = {rid: 0.0 for rid in self.env}
         self.queue_reported = 0
@@ -177,6 +178,9 @@ class Sim:
         if s is None:
             return
         if s.kind == "leave":
+            if p.role == "guard":
+                self.bus.publish("office/guard_post/clock", {"person": p.id, "dir": "out"}, None,
+                                 f"{p.name} clocked out at the guard post")
             p.on_site = False
             p.gone = True
             p.room = None
@@ -187,7 +191,10 @@ class Sim:
                     self.bus.publish(f"office/parking/bay{c['bay'] + 1}", False, None,
                                      f"Bay {c['bay'] + 1} free")
             return
-        if s.on_arrive == "manual_checkin":
+        if s.on_arrive == "clock_in":
+            self.bus.publish("office/guard_post/clock", {"person": p.id, "dir": "in"}, None,
+                             f"{p.name} clocked in at the guard post")
+        elif s.on_arrive == "manual_checkin":
             self.bus.publish("office/reception/manual", p.id, None,
                              f"Reception checked in {p.name} by hand (forgot badge)")
         elif s.on_arrive == "kiosk_checkin":
@@ -227,34 +234,44 @@ class Sim:
             self._walk(p, p.desk, t, _home(p))
 
     def _room_change(self, p: Person, old: str | None, new: str, t: int) -> None:
-        if {old, new} != {"lobby", "corr1"}:
+        """Badge readers and beam counters sit on every door marked gate=badge.
+
+        A door's ``a`` side is public and ``b`` is secure, so a->b is "in".
+        """
+        door = self.badge_doors.get(frozenset((old, new)))
+        if door is None:
             return
-        direction = "in" if old == "lobby" else "out"
-        if direction == "in":
+        gate = door.b
+        where = self.plan.rooms[gate].name
+        if old == door.a:
             self.truth.passes_in += 1
+            last = self.last_in_pass.get(gate, -10**9)
             tailgate = False
-            if p.has_badge and t - self.last_in_pass <= 4 and self.rng_people.random() < 0.3:
+            if p.has_badge and t - last <= 4 and self.rng_people.random() < 0.3:
                 tailgate = True
                 self.truth.tailgates.append((t, p.id))
-            close = t - self.last_in_pass <= 1
-            self.last_in_pass = t
+            close = t - last <= 1
+            self.last_in_pass[gate] = t
             if p.has_badge and not tailgate:
-                self.bus.publish("office/gate/badge", {"person": p.id, "dir": "in"}, None,
-                                 f"{p.name} badged in")
+                self.bus.publish("office/gate/badge", {"person": p.id, "dir": "in", "gate": gate}, None,
+                                 f"{p.name} badged in ({where})")
             # the beam: misses ~1%, and merges two people passing within a second half the time
             missed = self.rng_sense.random() < 0.01 or (close and self.rng_sense.random() < 0.5)
             if missed:
                 self.truth.beam_misses += 1
             else:
-                self.bus.publish("office/gate/beam", "in", None, "Door counter: 1 in")
+                self.bus.publish("office/gate/beam", {"dir": "in", "gate": gate}, None,
+                                 f"Door counter ({where}): 1 in")
             if self.rng_sense.random() < 0.004:      # someone lingers in the doorway
-                self.bus.publish("office/gate/beam", "in", None, "Door counter: 1 in")
+                self.bus.publish("office/gate/beam", {"dir": "in", "gate": gate}, None,
+                                 f"Door counter ({where}): 1 in")
         else:
             if self.rng_people.random() < p.badge_out_habit and p.has_badge:
-                self.bus.publish("office/gate/badge", {"person": p.id, "dir": "out"}, None,
-                                 f"{p.name} badged out")
+                self.bus.publish("office/gate/badge", {"person": p.id, "dir": "out", "gate": gate}, None,
+                                 f"{p.name} badged out ({where})")
             if self.rng_sense.random() > 0.01:
-                self.bus.publish("office/gate/beam", "out", None, "Door counter: 1 out")
+                self.bus.publish("office/gate/beam", {"dir": "out", "gate": gate}, None,
+                                 f"Door counter ({where}): 1 out")
 
     def _step_queue(self, t: int) -> None:
         spots = self.plan.spots["queue"]
@@ -407,6 +424,7 @@ class Sim:
             "tailgates_true": len(tg_true),
             "tailgates_caught": caught,
             "tailgate_false_alarms": false_alarms,
+            "door_count_alerts": len(self.att.double_counts),
             "beam_misses": self.truth.beam_misses,
             "staff": len(staff),
             "alerts": alerts,

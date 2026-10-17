@@ -22,6 +22,7 @@ def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--seed", type=int, default=7)
     ap.add_argument("--no-write", action="store_true", help="do not write viewer/replay.js")
+    ap.add_argument("--week", action="store_true", help="also run five days (seeds 1-5) and report the spread")
     args = ap.parse_args()
 
     t = time.perf_counter()
@@ -66,9 +67,41 @@ def main() -> None:
         if msg.topic.startswith("office/alert/"):
             print(f"  {clock(msg.t)}  {msg.text}")
 
+    if args.week:
+        week()
+
     if not args.no_write:
         path = write(replay)
         print(f"\nwrote {path} ({path.stat().st_size / 1e6:.2f} MB) - open viewer/index.html")
+
+
+def week(seeds=range(1, 6)) -> None:
+    """Five different days. One day holds too few tailgates or no-shows to judge a detector."""
+    from lahore_twin.office import build
+    from lahore_twin.plan import Plan
+    from lahore_twin.sim import Sim
+    plan = Plan.load("office.json")
+    rows = []
+    for seed in seeds:
+        sc = build(plan, seed=seed)
+        m = {k: Sim(sc, k).run().metrics() for k in MODES}
+        rows.append(m)
+    print(f"\nFive days (seeds {seeds.start}-{seeds.stop - 1})")
+    def spread(vals, fmt="{:.1f}"):
+        return f"{fmt.format(sum(vals) / len(vals))} (range {fmt.format(min(vals))}-{fmt.format(max(vals))})"
+    for k in MODES[1:]:
+        sav = [100 * (1 - r[k]["total_kwh"] / r["schedule"]["total_kwh"]) for r in rows]
+        print(f"  {NAMES[k]:<14} energy saved vs schedule  {spread(sav)} %")
+    for key, label in (("false_offs", "lights off on someone"), ("person_min_too_warm", "person-min too warm"),
+                       ("person_min_in_dark", "person-min in dark")):
+        print(f"  {label:<26}" + "".join(f"{NAMES[k]} {spread([r[k][key] for r in rows], '{:.0f}')}   " for k in MODES))
+    g = [r["pir+co2"] for r in rows]
+    tg, caught, fa = sum(x["tailgates_true"] for x in g), sum(x["tailgates_caught"] for x in g), sum(x["tailgate_false_alarms"] for x in g)
+    print(f"  tailgates: {tg} happened, {caught} caught ({100 * caught / max(tg, 1):.0f}%), {fa} false alarms; "
+          f"{sum(x['door_count_alerts'] for x in g)} same-second double counts flagged for the camera; "
+          f"{sum(x['beam_misses'] for x in g)} door-counter misses")
+    missing = sum(len(x["missing_from_register"]) for x in g)
+    print(f"  people missing from the register at day's end: {missing} of {sum(x['people_on_site'] for x in g)}")
 
 
 if __name__ == "__main__":
