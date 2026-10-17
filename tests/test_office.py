@@ -415,3 +415,14 @@ def test_tap_in_right_after_an_untapped_exit_settles_it_in_either_order():
     bus.publish("office/gate/beam", {"dir": "in", "gate": "corr1"})
     att.tick(1010)                                                         # the exit is reconciled now
     assert att.estimate_inside() == 1 and att.unexplained_out == 0
+
+
+def test_more_outdoor_air_costs_cooling_on_a_hot_afternoon():
+    plain = RoomEnv("m", "meeting", 48.0, True, temp=24.0)
+    boosted = RoomEnv("m", "meeting", 48.0, True, temp=24.0, vent_boost=True)
+    w_plain = w_boost = 0.0
+    for _ in range(360):                       # an hour at 15:00, about 33 C outside
+        w_plain += plain.step(10, hm("15:00"), 8, True, True)
+        w_boost += boosted.step(10, hm("15:00"), 8, True, True)
+    assert w_boost > w_plain * 1.1
+    assert boosted.co2 < plain.co2

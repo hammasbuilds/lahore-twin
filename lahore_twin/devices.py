@@ -78,7 +78,10 @@ class RoomEnv:
             frac = 0.0
         self.compressor = frac > 0
         cooling = self.ac_capacity * frac
-        self.temp += dt * (ua * (outdoor_temp(t) - self.temp) + gains - cooling) / cap
         ach = 3.0 if self.vent_boost else 1.0
+        # outdoor air brings outdoor heat: rho*cp/3600 = 0.335 W per (m3/h)·K. In a Lahore
+        # afternoon more ventilation means more cooling, so a vent boost is never free.
+        vent = 0.335 * self.volume * ach * (outdoor_temp(t) - self.temp)
+        self.temp += dt * (ua * (outdoor_temp(t) - self.temp) + vent + gains - cooling) / cap
         self.co2 += dt * (people * GEN / self.volume - ach / 3600.0 * (self.co2 - C_OUT))
         return cooling / COP

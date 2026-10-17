@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 8 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 9 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -285,3 +285,23 @@ could claim another person's badge pass.
   1 at any moment (register 0.91, counters 0.58); the remaining error is
   tailgaters the beam merged with the person ahead.
 - Tests 35 → 37; both new tests fail on the previous code.
+
+**Round 9 — the README against fresh output.**
+- *Found:* the README's output table was from round 1 (171.8 kWh; the fair
+  wall-switch baseline and inverter AC came later); "caught all 9 tailgates" was
+  now 5 of 7 (71%) — when the gate got its own RNG, beam merges started landing
+  on real tailgaters, so the old line was a lucky draw; "33 people" was 34; the
+  rules table still said a fixed 10-minute hold; devices said "AC with a
+  thermostat". *Fixed:* output section rewritten from a fresh run, every claim
+  re-measured; the 71% and its cause are stated.
+- *Found:* a weakness the README never mentioned — 333 person-minutes a day
+  above 1000 ppm CO₂ (full meeting rooms); the boost only began at 1000. Before
+  fixing it, the model was missing the cost: outdoor air in a Lahore afternoon
+  must be cooled, and ventilation carried no heat. *Fixed:* ventilation heat load
+  (0.335 W per m³/h·K) for every room and rule set (AC energy +12 kWh, all three
+  columns — the honest baseline); then demand-controlled ventilation from 800
+  ppm. Stuffy 333 → 25 person-minutes for +3.4 kWh. Test: a boosted room draws
+  more AC on a hot afternoon and holds lower CO₂.
+- Every README command run: `demo.py`, `demo.py --week`, `pytest` (38),
+  `tools/sweep.py`, `run.bat` (served and stopped in round 8); `live` is covered
+  by the fake-broker test. Tests 37 → 38.

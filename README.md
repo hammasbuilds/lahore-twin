@@ -6,7 +6,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 
 | # | Phase | What it simulates | Status |
 |---|---|---|---|
-| 1 | [Office tower](#phase-1--office-tower) | 33 people, badge gate, meeting rooms, lights, AC, CO₂, attendance | built, in review |
+| 1 | [Office tower](#phase-1--office-tower) | 34 people, badge gate, meeting rooms, lights, AC, CO₂, attendance | built, in review |
 | 2 | Home + GridSense | load-shedding-aware home energy manager | planned |
 | 3 | Hospital | staff, patients, IoT devices, management panel | planned |
 | 4 | Lahore traffic | OpenStreetMap road network, smart signals, hotspot finder | planned |
@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 37 tests, including the viewer's core under node
+python -m pytest -q          # 38 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 ```
 
@@ -40,7 +40,7 @@ forget to badge out, or sit so still a motion sensor stops seeing them.
 **Devices.** Per room: motion sensor (sees a walking person 90% of seconds, a
 still one about once in five minutes), CO₂ (mass balance, ±10 ppm noise),
 temperature (first-order thermal model, Lahore October outdoor curve), lights,
-AC with a thermostat. At the gate: a badge reader and a door beam counter. A
+inverter AC holding 24 °C, demand-controlled ventilation. At each badge door: a reader and a beam counter. A
 sensor in every parking bay.
 
 **Rules.** The same day runs three times with identical people:
@@ -48,7 +48,7 @@ sensor in every parking bay.
 | rule set | what it does |
 |---|---|
 | Fixed schedule | lights and AC on 08:30–18:30 everywhere — what most offices do |
-| Motion | rooms follow motion sensors, 10 minute hold, AC pre-cools booked meeting rooms |
+| Motion | rooms follow motion sensors (10 minute hold that adapts per room), AC pre-cools booked rooms and prayer times from their measured temperature |
 | Motion + CO₂ | as Motion, but a room is declared empty only when its CO₂ is falling or near outdoor level |
 
 Plus: tailgate detection (door counter vs badge reads), late arrivals, meeting
@@ -58,37 +58,55 @@ so the viewer can answer "why is this light on?".
 
 ### Output
 
-`python demo.py`, seed 7 (simulated building, not a measurement):
+`python demo.py`, seed 7 (a simulated building, not a measurement):
 
 ```
                                       Fixed schedule          Motion    Motion + CO2
-Lights + AC (kWh)                              171.8          148.33          149.57
-Person-minutes in the dark                       476             302             116
-Person-minutes too warm (>26 C)                  234              28              28
-Lights switched off on someone                     2              76              38
-Room-minutes lit while empty                    7972            2195            2204
+Lights + AC (kWh)                             198.35           169.4          168.63
+  lights                                       75.03           53.62           53.02
+  AC                                          123.33          115.78          115.62
+Person-minutes in the dark                        23               8               6
+Person-minutes too warm (>26 C)                  252              24              21
+Person-minutes stuffy (CO2 >1000)                 25              25              25
+Lights switched off on someone                     3              28              16
+Wall-switch presses                               23               2               2
+Room-minutes lit while empty                    9044            2737            2643
 ```
 
-Occupancy control saves about 13% of lighting and AC energy on this day (14–16%
-across five days, `python demo.py --week`). It only matches the schedule on
-comfort because pre-cooling starts from each room's measured temperature: with
-a fixed 15-minute pre-cool, the heat-soaked prayer room was still 27 °C when
-the Zuhr congregation walked in. Motion sensors alone switch lights off on
-people sitting still 76 times a day; requiring CO₂ to confirm a room is empty
-halves that for under 1% more energy.
+**Energy.** Occupancy control uses 15% less lighting and AC energy than the
+fixed schedule (15.0–16.3% across five days, `python demo.py --week`; ahead on
+every one of 20 days, `python tools/sweep.py`). The schedule is not a straw man:
+everyone has wall switches, so early arrivals switch lights on by hand — which
+then burn all day.
 
-The attendance tab carries an evacuation roll-call. Over 20 simulated days
-(08:30–18:30), the estimate — badge register, plus entries nobody badged for,
-minus exits nobody tapped out for — is off from the true headcount by 0.23
-people on average and never by more than 1. The register alone is off by 0.91
-(people forget to tap out on the way home: up to 6 too many by 17:30), the door
-counters by 0.58 (missed counts pile up). The remaining error is tailgaters the
-door beam merged with the person ahead.
+**Comfort.** Occupancy control is cooler for the people in the rooms (21 vs 252
+person-minutes above 26 °C) because pre-cooling starts from each room's measured
+temperature: with a fixed 15-minute lead, the heat-soaked prayer room was still
+27 °C when the Zuhr congregation walked in. The schedule's heat is overtime
+staff after the 18:30 switch-off.
 
-Over five days, the counter-vs-badge check caught all 9 tailgates with no false
-alarms. Its blind spot: a follower in the same second as the person ahead looks
-exactly like someone lingering in the beam, so that case is flagged "check the
-camera" instead of being called a tailgate.
+**Lights going off on people.** Motion sensors alone switch lights off on
+someone sitting still 28 times a day; requiring CO₂ to confirm the room is
+empty brings it to 16, and an adaptive hold (motion within a minute of a
+switch-off doubles that room's hold; a switch-off nobody contradicts halves it)
+keeps the energy saving.
+
+**Air.** Ventilation boosts from 800 ppm CO₂ (demand-controlled), not 1000:
+stuffy person-minutes fall from 333 to 25 for 3.4 kWh more, because outdoor air
+in a Lahore afternoon has to be cooled — the model charges that load.
+
+**Evacuation roll-call.** The attendance tab estimates who is behind the badge
+doors: the register, plus entries nobody badged for, minus exits nobody tapped
+out for. Over 20 days (08:30–18:30) it is off by 0.23 people on average and
+never by more than 1; the register alone is off by 0.91 (people forget to tap
+out going home — 6 too many by 17:30), door counters by 0.58 (missed counts pile
+up). The residual is tailgaters the door beam merged with the person ahead.
+
+**Tailgating.** Over five days the counter-vs-badge check caught 5 of 7
+tailgates (71%) with no false alarms. The two misses are followers the beam
+counted as one with the person in front; a follower in the very same second as
+an explained pass is flagged "check the camera" rather than called a tailgate,
+because someone lingering in the beam looks identical.
 
 ### The viewer
 
