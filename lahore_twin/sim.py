@@ -41,9 +41,11 @@ class Sim:
         self.plan = scenario.plan
         self.mode = mode
         seed = scenario.seed if seed is None else seed
-        # one stream for people (identical across modes), one for sensors
+        # separate streams so a rule set can never change what happens elsewhere:
+        # people and the gate are identical across rule sets; room sensors may differ
         self.rng_people = random.Random(seed * 1000 + 1)
         self.rng_sense = random.Random(seed * 1000 + 2)
+        self.rng_gate = random.Random(seed * 1000 + 3)
         self.people: list[Person] = copy.deepcopy(scenario.people)
         self.by_id = {p.id: p for p in self.people}
         self.bus = Bus()
@@ -69,7 +71,7 @@ class Sim:
                        "co2": {r: [] for r in self.env}}
         self.energy = {"light_kwh": 0.0, "ac_kwh": 0.0}
         self.metrics_acc = {"dark_person_s": 0, "hot_person_s": 0, "empty_lit_s": 0,
-                            "false_off": 0, "stuffy_person_s": 0}
+                            "false_off": 0, "stuffy_person_s": 0, "manual_on": 0}
         self.queue: list[str] = []
         self.serving: tuple[str, int] | None = None
         self.seat_taken: dict[tuple, str] = {}
@@ -242,7 +244,7 @@ class Sim:
         if door is None:
             return
         gate = door.b
-        where = self.plan.rooms[gate].name
+        where = door.name
         if old == door.a:
             self.truth.passes_in += 1
             last = self.last_in_pass.get(gate, -10**9)
@@ -256,20 +258,20 @@ class Sim:
                 self.bus.publish("office/gate/badge", {"person": p.id, "dir": "in", "gate": gate}, None,
                                  f"{p.name} badged in ({where})")
             # the beam: misses ~1%, and merges two people passing within a second half the time
-            missed = self.rng_sense.random() < 0.01 or (close and self.rng_sense.random() < 0.5)
+            missed = self.rng_gate.random() < 0.01 or (close and self.rng_gate.random() < 0.5)
             if missed:
                 self.truth.beam_misses += 1
             else:
                 self.bus.publish("office/gate/beam", {"dir": "in", "gate": gate}, None,
                                  f"Door counter ({where}): 1 in")
-            if self.rng_sense.random() < 0.004:      # someone lingers in the doorway
+            if self.rng_gate.random() < 0.004:      # someone lingers in the doorway
                 self.bus.publish("office/gate/beam", {"dir": "in", "gate": gate}, None,
                                  f"Door counter ({where}): 1 in")
         else:
             if self.rng_people.random() < p.badge_out_habit and p.has_badge:
                 self.bus.publish("office/gate/badge", {"person": p.id, "dir": "out", "gate": gate}, None,
                                  f"{p.name} badged out ({where})")
-            if self.rng_sense.random() > 0.01:
+            if self.rng_gate.random() > 0.01:
                 self.bus.publish("office/gate/beam", {"dir": "out", "gate": gate}, None,
                                  f"Door counter ({where}): 1 out")
 
@@ -314,7 +316,7 @@ class Sim:
         for p in self.people:
             if not (p.on_site and p.room):
                 continue
-            if p.path:
+            if p.path or getattr(p, "wave_at", -1) == t:
                 moving[p.room] = moving.get(p.room, 0) + 1
             else:
                 still[p.room] = still.get(p.room, 0.0) + 1.0 / p.still_bias
@@ -328,6 +330,28 @@ class Sim:
             if self.rng_sense.random() > miss:
                 self.pir_latch[rid] = t + PIR_BLIND
                 self.bus.publish(f"office/{rid}/motion", 1)
+
+    def _people_in_the_dark(self, t: int) -> None:
+        """Someone settled in a dark room waves first, then uses the wall switch.
+
+        Every rule set gets the same wall switches, so the fixed schedule is not a
+        straw man where early arrivals sit in the dark until 08:30.
+        """
+        for p in self.people:
+            if not (p.on_site and p.room in self.light) or p.path:
+                p.dark_since = None
+                continue
+            if self.light[p.room]:
+                p.dark_since = None
+                continue
+            if getattr(p, "dark_since", None) is None:
+                p.dark_since = t
+                p.wave_at = t + self.rng_sense.randint(5, 20)
+            elif t - p.dark_since >= 30:
+                p.dark_since = None
+                self.metrics_acc["manual_on"] += 1
+                self.bus.publish(f"office/{p.room}/switch", True, None,
+                                 f"{p.name} switched the lights on by hand in {self.plan.rooms[p.room].name}")
 
     def _physics(self, t: int) -> None:
         occ = self._occupancy()
@@ -384,6 +408,7 @@ class Sim:
             if t % SAMPLE_DT == 0:
                 self._report(t)
             if t % 5 == 0:
+                self._people_in_the_dark(t)
                 self.auto.tick(t)
                 self.att.tick(t)
             elif t in (hm("08:30"), hm("18:30")):
@@ -418,6 +443,7 @@ class Sim:
             "person_min_stuffy": round(m["stuffy_person_s"] / 60),
             "room_min_lit_empty": round(m["empty_lit_s"] / 60),
             "false_offs": m["false_off"],
+            "manual_switch_ons": m["manual_on"],
             "people_on_site": len(truly_in),
             "register_count": len(register),
             "missing_from_register": sorted(truly_in - register),

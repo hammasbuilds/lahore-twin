@@ -47,7 +47,7 @@ class Bus:
     _next: int = 1
     _recent: OrderedDict = field(default_factory=OrderedDict)  # quiet messages not yet logged
     # high-rate telemetry is delivered but not kept, or a day would hold millions
-    quiet: tuple[str, ...] = ("motion", "co2", "temp")
+    quiet: tuple[str, ...] = ("motion", "co2", "temp", "queue")
 
     def subscribe(self, pattern: str, fn: Callable[[Message], None]) -> None:
         self._subs.append((pattern, fn))

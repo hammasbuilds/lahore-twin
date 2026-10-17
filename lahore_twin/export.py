@@ -37,8 +37,9 @@ def run_all(seed: int = 7, plan_file: str = "office.json") -> tuple[dict, dict[s
 def write(replay: dict, out: Path | None = None) -> Path:
     out = out or ROOT / "viewer" / "replay.js"
     out.parent.mkdir(parents=True, exist_ok=True)
-    out.write_text("window.REPLAY = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False) + ";\n",
-                   encoding="utf-8")
+    # bytes, not write_text: Windows text mode would turn the newline into CRLF
+    out.write_bytes(("window.REPLAY = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False)
+                     + ";\n").encode("utf-8"))
     return out
 
 

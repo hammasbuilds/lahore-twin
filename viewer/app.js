@@ -248,14 +248,20 @@ if (typeof document !== "undefined") (function () {
       else { ctx.moveTo(X(d.at), Y(d.lo)); ctx.lineTo(X(d.at), Y(d.hi)); }
       ctx.stroke();
       if (d.gate === "badge") {
+        // a reader beside the door, on the secure side, labelled from there
+        const fs = Math.max(9, s * 0.3);
+        ctx.font = `600 ${fs}px Segoe UI, system-ui`;
         ctx.fillStyle = palette.accent;
-        const [mx, my] = d.axis === "x" ? [(d.lo + d.hi) / 2, d.at] : [d.at, (d.lo + d.hi) / 2];
-        ctx.fillRect(X(d.lo) - 8, Y(my) - 4, 6, 8);
-        ctx.font = `600 ${Math.max(9, s * 0.32)}px Segoe UI, system-ui`;
-        ctx.fillStyle = palette.accent;
-        ctx.textAlign = "right";
-        ctx.fillText("badge gate", X(d.lo) - 11, Y(my) + Math.max(9, s * 0.32) + 4);
-        void mx;
+        if (d.axis === "x") {
+          ctx.fillRect(X(d.lo) - 8, Y(d.at) - 4, 6, 8);
+          ctx.textAlign = "right";
+          ctx.fillText("badge reader", X(d.lo) - 11, Y(d.at) + fs + 4);
+        } else {
+          const secureLeft = rooms[d.b].rect[2] <= d.at + 1e-6;
+          ctx.fillRect(X(d.at) - 3, Y(d.hi) + 3, 6, 6);
+          ctx.textAlign = secureLeft ? "right" : "left";
+          ctx.fillText("badge reader", X(d.at) + (secureLeft ? -6 : 6), Y(d.hi) + fs + 4);
+        }
       }
     }
     // room labels
@@ -264,7 +270,8 @@ if (typeof document !== "undefined") (function () {
       const [x0, y0, x1, y1] = r.rect;
       const fs = Math.max(9, Math.min(13, s * 0.42));
       ctx.font = `600 ${fs}px Segoe UI, system-ui`;
-      ctx.fillStyle = palette.muted;
+      // data layers fill rooms with colour, where muted grey stops being readable
+      ctx.fillStyle = state.layer === "state" || r.kind === "outdoor" ? palette.muted : palette.text;
       const name = (x1 - x0) * s < 70 ? shortName(r) : r.name;
       if (r.kind === "corridor") {
         const vertical = (y1 - y0) > (x1 - x0);

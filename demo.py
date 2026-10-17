@@ -44,6 +44,7 @@ def main() -> None:
             ("Person-minutes too warm (>26 C)", "person_min_too_warm"),
             ("Person-minutes stuffy (CO2 >1000)", "person_min_stuffy"),
             ("Lights switched off on someone", "false_offs"),
+            ("Wall-switch presses", "manual_switch_ons"),
             ("Room-minutes lit while empty", "room_min_lit_empty")]
     w = 36
     print(f"{'':{w}}" + "".join(f"{NAMES[k]:>16}" for k in MODES))

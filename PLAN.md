@@ -5,7 +5,7 @@ above it has finished its build **and** ten review rounds.
 
 | # | Phase | Status |
 |---|---|---|
-| 1 | Office tower — people, attendance, IoT, energy | review round 1 of 10 done |
+| 1 | Office tower — people, attendance, IoT, energy | review round 2 of 10 done |
 | 2 | Home + GridSense — load-shedding energy manager | — |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
@@ -136,3 +136,36 @@ could claim another person's badge pass.
   vs tailgate, per-door badge matching, receptionist/guard registered on arrival).
 - *Open for round 2:* 38 false-offs/day remain under Motion + CO₂ (reception,
   store room, cabin 2); nobody reacts when a light goes off on them.
+
+**Round 2 — lights going off on people, and a fair baseline.**
+- *Found:* people left in the dark sat there for hours (116 person-min/day in
+  CO₂ mode); the fixed schedule's 476 dark minutes were early arrivals waiting
+  for 08:30 — a straw man. *Fixed:* everyone settled in a dark room waves within
+  5–20 s, then presses the wall switch after 30 s; wall switches work under every
+  rule set; on the schedule, hand-switched lights stay on until 18:30 and an
+  hourly after-hours sweep turns them off. Schedule energy rose 171.8 → 182.6 kWh
+  (lights switched on at 07:30 now burn all day — what really happens).
+- *Added:* adaptive hold — motion within 60 s of a switch-off doubles that
+  room's hold (max 4×), an uncontradicted switch-off halves it again. The
+  trade-off, five days, Motion + CO₂:
+  | hold rule | energy saved | switch-offs on someone/day |
+  |---|---|---|
+  | fixed 10 min | 14% (old baseline) | 43 |
+  | grow only | 8.5% | 11 |
+  | grow + relax (kept) | 16.0% (fair baseline) | 14 |
+- *Found:* the wave delay drew from the same RNG as the door beam, so gate
+  results changed with the rule set — the "identical in every rule set" claim
+  was false. *Fixed:* a separate gate RNG; a test asserts gate metrics are equal
+  across rule sets.
+- *Found (UI):* the vertical reception door drew its reader marker using a y
+  coordinate as x (mid-lobby); room names unreadable on data layers; the log
+  said "CO₂ steady — keeping it on" then switched off a minute later (the CO₂
+  verdict flipped on noise each tick); cafeteria queue counts flooded the log;
+  gates were named after the corridor behind them. *Fixed:* per-axis reader
+  placement; text colour on filled layers; a CO₂ verdict buys a fixed 5 min;
+  queue telemetry is quiet unless it causes an alert; doors carry names ("Main
+  badge gate", "Reception staff door").
+- Export wrote CRLF on Windows; now bytes + LF. Tests 24 → 27.
+- *Open for round 3:* the schedule leaves overtime staff warm after 18:30
+  (251 person-min); evacuation headcount (door counter vs register) not shown;
+  plan view leaves wide empty margins.

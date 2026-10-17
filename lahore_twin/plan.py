@@ -46,6 +46,7 @@ class Door:
     lo: float
     hi: float
     gate: str | None = None
+    name: str = ""
 
     @property
     def mid(self) -> tuple[float, float]:
@@ -108,7 +109,8 @@ class Plan:
             dlo, dhi = map(float, d["span"])
             if dlo < lo - 1e-9 or dhi > hi + 1e-9:
                 raise ValueError(f"door {d['a']}-{d['b']} span {d['span']} outside edge {lo}-{hi}")
-            doors.append(Door(d["a"], d["b"], axis, at, dlo, dhi, d.get("gate")))
+            doors.append(Door(d["a"], d["b"], axis, at, dlo, dhi, d.get("gate"),
+                              d.get("name") or f"{ra.name} / {rb.name} door"))
         spots = {k: [tuple(map(float, p)) for p in v] for k, v in raw["spots"].items()}
         plan = cls(
             name=raw["name"],
@@ -251,7 +253,8 @@ class Plan:
                 for r in self.rooms.values()
             ],
             "doors": [
-                {"a": d.a, "b": d.b, "axis": d.axis, "at": d.at, "lo": d.lo, "hi": d.hi, "gate": d.gate}
+                {"a": d.a, "b": d.b, "axis": d.axis, "at": d.at, "lo": d.lo, "hi": d.hi, "gate": d.gate,
+                 "name": d.name}
                 for d in self.doors
             ],
             "spots": self.spots,

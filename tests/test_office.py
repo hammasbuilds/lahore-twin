@@ -298,3 +298,34 @@ def test_staff_outside_the_badge_line_are_registered_on_arrival(day):
     for role in ("receptionist", "guard"):
         p = next(x for x in s.people if x.role == role)
         assert abs(s.att.checkin[p.id] - p.arrive) < 120, (role, s.att.checkin.get(p.id), p.arrive)
+
+
+def test_hold_grows_after_a_wrong_switch_off_and_relaxes_after_a_right_one(plan):
+    bus, auto = _auto(plan, "pir")
+    st = auto.rooms["mgr1"]
+    bus.now = hm("10:00")
+    bus.publish("office/mgr1/motion", 1)
+    auto.tick(hm("10:10"))                      # 10 min silence -> off
+    assert not st.light and st.hold_mult == 1
+    bus.now = hm("10:10") + 15
+    bus.publish("office/mgr1/motion", 1)        # someone was there all along
+    assert st.light and st.hold_mult == 2
+    auto.tick(hm("10:31"))                      # now needs 20 min of silence (last motion 10:10:15)
+    assert not st.light
+    auto.tick(hm("10:32"))                      # nobody contradicted it: relax
+    assert st.hold_mult == 1
+
+
+def test_wall_switch_works_under_every_rule_set(plan):
+    for mode in ("schedule", "pir", "pir+co2"):
+        bus, auto = _auto(plan, mode)
+        bus.now = hm("07:40")
+        bus.publish("office/work/switch", True)
+        assert auto.rooms["work"].light, mode
+
+
+def test_gate_results_do_not_depend_on_the_rule_set(day):
+    _, sims = day
+    keys = ("tailgates_true", "tailgates_caught", "tailgate_false_alarms", "beam_misses", "door_count_alerts")
+    got = [{k: s.metrics()[k] for k in keys} for s in sims.values()]
+    assert got[0] == got[1] == got[2]

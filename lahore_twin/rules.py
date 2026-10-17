@@ -30,6 +30,9 @@ PRECOOL = 600               # minimum pre-cool lead; hotter rooms get longer (se
 NO_SHOW_GRACE = 600
 CO2_HIGH, CO2_OK = 1000, 800
 LATE_FROM = hm("09:16")
+RETRIGGER = 60              # motion this soon after switching off means the room was not empty
+CO2_EXTEND = 300            # a CO2 "still occupied" verdict holds for this long
+HOLD_MULT_MAX = 4
 # optimum start: rooms used every day, and when their first occupant usually walks in
 # (in a real building this comes from weeks of badge history)
 OPTIMUM_START = {"work": hm("08:30"), "reception": hm("08:25"), "mgr1": hm("08:45"), "mgr2": hm("08:45")}
@@ -47,6 +50,10 @@ class RoomState:
     vent: bool = False
     co2: deque = field(default_factory=lambda: deque(maxlen=12))   # (t, ppm) at 60 s
     kept_note: int = -10**9
+    vacated_at: int = -10**9          # when the rules last declared the room empty
+    hold_mult: int = 1                # adaptive hold: doubles each time someone was switched off
+    relaxed: bool = True              # has the last switch-off been judged correct yet
+    co2_hold_until: int = -10**9      # CO2 said "still occupied": no switch-off before this
 
 
 class Automation:
@@ -63,9 +70,23 @@ class Automation:
         bus.subscribe("office/+/co2", self._on_co2)
         bus.subscribe("office/cafe/queue", self._on_queue)
         bus.subscribe("office/+/temp", self._on_temp)
+        bus.subscribe("office/+/switch", self._on_switch)
         self.temps: dict[str, float] = {}
         self.temp_msg: dict[str, int] = {}
         self.started: set[str] = set()
+
+    def _on_switch(self, m: Message) -> None:
+        """A wall switch always works, whatever the rule set."""
+        rid = m.topic.split("/")[1]
+        st = self.rooms.get(rid)
+        if st is None:
+            return
+        if self.mode != "schedule":
+            st.occupied = True
+            st.last_motion, st.motion_msg = m.t, m.id
+            if m.t - st.vacated_at <= 120 and st.hold_mult < HOLD_MULT_MAX:
+                st.hold_mult *= 2
+        self._set(rid, "light", True, m.id, "wall switch")
 
     def _on_temp(self, m: Message) -> None:
         rid = m.topic.split("/")[1]
@@ -85,6 +106,13 @@ class Automation:
                 self.booking_seen[b.id] = True
         if self.mode == "schedule":
             return
+        if not st.occupied and m.t - st.vacated_at <= RETRIGGER and st.hold_mult < HOLD_MULT_MAX:
+            # motion right after switching off: someone was there all along. Learn from it.
+            st.hold_mult *= 2
+            self.bus.publish(f"office/{rid}/hold", st.hold_mult, m.id,
+                             f"Motion {m.t - st.vacated_at} s after switching {self._name(rid)} off — "
+                             f"someone was still there; hold time now "
+                             f"{HOLD.get(self.plan.rooms[rid].kind, HOLD_DEFAULT) * st.hold_mult // 60} min")
         if not st.occupied:
             st.occupied = True
             self._set(rid, "light", True, m.id, f"motion in {self._name(rid)}")
@@ -124,6 +152,13 @@ class Automation:
         self._booking_tick(t)
 
     def _schedule_tick(self, t: int) -> None:
+        if t > SCHEDULE_OFF and t % 3600 == 0:
+            # after-hours sweep: lights switched on by hand go off on the hour
+            lit = [rid for rid, st in self.rooms.items() if st.light]
+            if lit:
+                m = self.bus.publish("office/schedule/sweep", None, None, f"After-hours sweep at {clock(t)}")
+                for rid in lit:
+                    self._set(rid, "light", False, m.id, "after-hours sweep")
         if t == SCHEDULE_ON:
             m = self.bus.publish("office/schedule/on", None, None, "Building schedule: 08:30 start")
             for rid in self.rooms:
@@ -155,22 +190,35 @@ class Automation:
 
     def _occupancy_tick(self, t: int) -> None:
         self._optimum_start(t)
+        for rid, st in self.rooms.items():
+            # a switch-off that nobody contradicted within a minute was right: relax the hold
+            if (not st.occupied and st.hold_mult > 1 and st.vacated_at > 0
+                    and t - st.vacated_at >= RETRIGGER and not st.relaxed):
+                st.relaxed = True
+                st.hold_mult //= 2
         for rid in list(self.started):
             st = self.rooms[rid]
             if st.precool is not None and t >= OPTIMUM_START[rid] + 1800:
                 st.precool = None          # the start window is over; occupancy rules take it from here
         for rid, st in self.rooms.items():
             kind = self.plan.rooms[rid].kind
-            hold = HOLD.get(kind, HOLD_DEFAULT)
+            hold = HOLD.get(kind, HOLD_DEFAULT) * st.hold_mult
             if st.occupied and t - st.last_motion >= hold:
+                if t < st.co2_hold_until:
+                    continue
                 if self.mode == "pir+co2" and self._co2_says_occupied(st):
-                    if t - st.kept_note >= 1800:
+                    # one verdict buys a fixed extension, so sensor noise cannot flip
+                    # the decision from one tick to the next
+                    st.co2_hold_until = t + CO2_EXTEND
+                    if st.kept_note < st.last_motion:
                         st.kept_note = t
                         self.bus.publish(f"office/{rid}/kept", None, st.motion_msg,
-                                         f"No motion in {self._name(rid)} for {hold // 60} min, "
+                                         f"No motion in {self._name(rid)} for {(t - st.last_motion) // 60} min, "
                                          f"but CO₂ is steady at {st.co2[-1][1]:.0f} ppm — keeping it on")
                     continue
                 st.occupied = False
+                st.vacated_at = t
+                st.relaxed = False
                 m = self.bus.publish(f"office/{rid}/vacant", None, st.motion_msg,
                                      f"No motion in {self._name(rid)} since {clock(st.last_motion)}")
                 self._set(rid, "light", False, m.id, f"{self._name(rid)} empty")

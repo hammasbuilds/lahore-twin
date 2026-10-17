@@ -27,8 +27,8 @@
   ],
   "doors": [
     {"a": "parking",   "b": "lobby",  "span": [11, 13.5], "gate": "entrance"},
-    {"a": "lobby",     "b": "reception", "span": [14.5, 16], "gate": "badge"},
-    {"a": "lobby",     "b": "corr1",  "span": [12, 14], "gate": "badge"},
+    {"a": "lobby",     "b": "reception", "span": [14.5, 16], "gate": "badge", "name": "Reception staff door"},
+    {"a": "lobby",     "b": "corr1",  "span": [12, 14], "gate": "badge", "name": "Main badge gate"},
     {"a": "meet_l",    "b": "corr1",  "span": [21, 22.5]},
     {"a": "meet_s",    "b": "corr1",  "span": [28, 29.5]},
     {"a": "work",      "b": "corr1",  "span": [3, 5]},
