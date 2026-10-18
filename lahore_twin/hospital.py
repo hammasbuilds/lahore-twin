@@ -67,6 +67,8 @@ class EDPatient:
     xray: bool
     drip: bool
     admit: bool
+    ward: str            # medical (this ward) | other (a bed elsewhere in the main block)
+    other_bed_wait: int  # for "other": how long until another ward has a bed
     lab_tat: int         # sample taken -> result
     speed: float
 
@@ -182,6 +184,8 @@ def build(ed_plan, ward_plan, seed: int = 7) -> HospitalScenario:
                 consult_s=_trunc_exp(r_pat, 540, 300, 900), review_s=_trunc_exp(r_pat, 900, 300, 1500),
                 blood=r_pat.random() < NEEDS_BLOOD[colour], xray=r_pat.random() < NEEDS_XRAY[colour],
                 drip=r_pat.random() < NEEDS_DRIP[colour], admit=r_pat.random() < ADMIT[colour],
+                # a tertiary ED admits to many wards; about 40% are medical (assumption)
+                ward="medical" if r_pat.random() < 0.4 else "other", other_bed_wait=_gamma(r_pat, 90 * 60, 2),
                 lab_tat=_gamma(r_pat, 3600, 6), speed=round(r_pat.uniform(0.7, 1.2), 2)))
             t += r_pat.expovariate(rate / H)
 

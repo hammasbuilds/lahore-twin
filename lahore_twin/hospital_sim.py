@@ -146,6 +146,7 @@ class HospitalSim:
         self.seats = {i: None for i in range(len(ed.spots["seat"]))}
         self.reg_queue: list = []
         self.xray_busy = None
+        self.xray_queue: list = []
         self.assets = {a.id: dict(id=a.id, kind=a.kind, building=a.building, pos=a.spot, room=a.room,
                                   holder=None, attached=None) for a in sc.assets}
         self.fridges = {"ward": dict(temp=5.0, open=False, opened=None, over_since=None, alerted=False,
@@ -271,7 +272,9 @@ class HospitalSim:
             if a.advance(1.0):
                 if a.legs:
                     self._start_leg(a)
-                    return
+                    if a.path:
+                        return
+                # a last leg of zero length (already standing there) must not strand the walker
                 self._resume(a)
             return
         if a.wait_until is not None:
@@ -380,8 +383,8 @@ class HospitalSim:
             asset = self.assets[tk.meta["asset_id"]]
             p.escort = a
             yield ("until", lambda: p.following, 600)
-            bed = self.beds[p.ward_bed]
-            yield ("go", "ward", bed.spot)
+            dest = self.beds[p.ward_bed].spot if p.ward_bed else self.plans["ward"].spots["entry"][0]
+            yield ("go", "ward", dest)
             yield ("until", lambda: p.arrived_ward, 900)
             # the porter takes the trolley or chair back, or the ED runs out of them
             self.say(a, f"Taking the {asset['kind']} back to the ED")
@@ -397,13 +400,19 @@ class HospitalSim:
             p.escort = a
             yield ("until", lambda: p.following, 600)
             yield ("go", "ed", (5.0, 9.0))
-            yield ("until", lambda: p.xray_done, 3600)
-            yield ("go", "ed", tk.spot)
-            yield ("until", lambda: not p.following, 900)
-            asset["holder"], asset["pos"], asset["building"] = None, a.pos, "ed"
-            asset["room"] = self.plans["ed"].room_at(*a.pos)
-            self.asset_moved(asset)
+            yield ("until", lambda: not p.following, 600)
+            # the chair stays with the patient; the porter goes back to work
+            asset["holder"], asset["attached"] = None, p.id
+            p.chair = asset["id"]
+            self.asset_moved(asset, p.id)
             a.carrying = None
+            return
+        if tk.kind == "xray_return":
+            p = tk.patient
+            p.escort = a
+            yield ("until", lambda: p.following, 600)
+            yield ("go", "ed", tk.meta["back"])
+            yield ("until", lambda: not p.following, 900)
             return
         if tk.kind == "pump_retrieve":
             asset = self.assets[tk.meta["asset_id"]]
@@ -606,7 +615,9 @@ class HospitalSim:
         delay = 0 if self.conn else (int(self.rng.uniform(20, 90) * 60) if bed.unit == "ward" else int(self.rng.uniform(5, 20) * 60))
         rec = dict(bed=bed.id, unit=bed.unit, dirty=self.t, requested=self.t + delay, ready=None)
         self.bed_log.append(rec)
-        tk = self.task("clean", bed.unit, bed.spot, 3, 1200 if bed.unit == "ward" else 600, "cleaner",
+        # a ward bed is stripped and remade; a cubicle or resus bay cleaned; a minors couch or chair wiped
+        dur = 1200 if bed.unit == "ward" else 120 if bed.id.split("-")[0] in ("minors", "chair") else 600
+        tk = self.task("clean", bed.unit, bed.spot, 3, dur, "cleaner",
                        visible=self.t + delay, cause=cause, meta={"label": f"Clean {bed.id}"})
 
         def done(t_, a, bed=bed, rec=rec):
@@ -765,24 +776,48 @@ class HospitalSim:
                       on_done=got_sample, meta={"label": f"Blood sample from {p.name}"})
             result_at = DAY * 2
         if p.xray:
-            self.say(a, "Going for an X-ray")
-            if p.colour in ("red", "orange"):
-                tk2 = self.task("xray_escort", "ed", here, COLOUR_PRIO[p.colour], 0, "porter", visible=self.t, patient=a,
-                                asset="wheelchair", meta={"label": f"Take {p.name} to X-ray"})
+            escorted = p.colour in ("red", "orange")
+            walk_speed = a.speed
+            if escorted:
+                self.say(a, "Waiting for a porter (X-ray)")
+                self.task("xray_escort", "ed", here, COLOUR_PRIO[p.colour], 0, "porter", visible=self.t, patient=a,
+                          asset="wheelchair", meta={"label": f"Take {p.name} to X-ray"})
                 yield ("until", lambda: a.escort is not None and math.dist(a.escort.pos, a.pos) < 2 and not a.escort.path)
                 a.following = True
                 a.speed = min(a.speed, a.escort.speed)
-                yield ("go", "ed", (5.6, 9.0))
-            else:
-                yield ("go", "ed", (5.6, 9.0))
-            yield ("until", lambda: self.xray_busy is None)
+            self.say(a, "Going to X-ray")
+            yield ("go", "ed", (5.6, 9.0))
+            a.following, a.escort, a.speed = False, None, walk_speed
+            self.xray_queue.append(p.id)
+            self.say(a, "Waiting for the X-ray room")
+            yield ("until", lambda: self.xray_busy is None and self.xray_queue[0] == p.id)
+            self.xray_queue.pop(0)
             self.xray_busy = p.id
+            self.say(a, "Having an X-ray")
             yield ("go", "ed", ed.spots["xray_table"][0])
             yield ("wait", 480)
             self.xray_busy = None
             a.xray_done = True
+            rec["xray"] = self.t
+            if escorted:
+                self.say(a, "Waiting for a porter back")
+                yield ("go", "ed", (5.6, 9.0))
+                self.task("xray_return", "ed", (5.6, 9.0), COLOUR_PRIO[p.colour], 0, "porter", visible=self.t, patient=a,
+                          meta={"label": f"Bring {p.name} back from X-ray", "back": here})
+                yield ("until", lambda: a.escort is not None and math.dist(a.escort.pos, a.pos) < 2 and not a.escort.path)
+                a.following = True
+                a.speed = min(a.speed, a.escort.speed)
+            self.say(a, "Back from X-ray")
             yield ("go", "ed", here)
-            a.following = False
+            a.following, a.escort, a.speed = False, None, walk_speed
+            if getattr(a, "chair", None):
+                x = self.assets[a.chair]
+                x["attached"], x["pos"], x["building"] = None, a.pos, "ed"
+                x["room"] = ed.room_at(*a.pos)
+                self.asset_moved(x)
+                a.chair = None
+        if result_at > self.t:
+            self.say(a, "Waiting for results")
         yield ("until", lambda: self.t >= result_at)
         rec["results"] = self.t
         tk = self.task("review", "ed", a.pos, COLOUR_PRIO[p.colour], p.review_s, "doctor", visible=self.t, patient=a,
@@ -791,14 +826,22 @@ class HospitalSim:
         rec["reviewed"] = self.t
         if p.admit:
             rec["decision"] = self.t
-            m = self.bus.publish(f"hospital/ed/{p.id}/admit", True, cause, f"{p.name}: admit to the medical ward")
-            self.say(a, "Waiting for a ward bed")
+            rec["ward"] = p.ward
             a.ward_bed = None
-            self.pending_admit.append((COLOUR_PRIO[p.colour], self.t, a, rec, m.id))
-            yield ("until", lambda: a.ward_bed is not None)
+            if p.ward == "medical":
+                m = self.bus.publish(f"hospital/ed/{p.id}/admit", True, cause, f"{p.name}: admit to the medical ward")
+                self.say(a, "Waiting for a ward bed")
+                self.pending_admit.append((COLOUR_PRIO[p.colour], self.t, a, rec, m.id))
+                yield ("until", lambda: a.ward_bed is not None)
+            else:
+                self.bus.publish(f"hospital/ed/{p.id}/admit", "other", cause, f"{p.name}: admit to another ward")
+                self.say(a, "Waiting for a bed on another ward")
+                ready_at = self.t + p.other_bed_wait
+                yield ("until", lambda: self.t >= ready_at)
             on_bed = bed is not None and not bed.id.startswith("chair")
             tk = self.task("transfer", "ed", a.pos, 1, 0, "porter", visible=self.t, patient=a,
-                           asset="trolley" if on_bed else "wheelchair", meta={"label": f"Take {p.name} to the ward"})
+                           asset="trolley" if on_bed else "wheelchair",
+                           meta={"label": f"Take {p.name} to " + ("the ward" if a.ward_bed else "the main block")})
             yield ("until", lambda: a.escort is not None and math.dist(a.escort.pos, a.pos) < 2 and not a.escort.path)
             a.following = True
             a.speed = a.escort.speed
@@ -806,11 +849,21 @@ class HospitalSim:
             if bed:
                 dm = self.bed_state(bed, "dirty", None, cause, f"{p.name} left {bed.id} for the ward")
                 self.request_clean(bed, dm.id)
-            walk_out("admitted", f"{p.name} left the ED for the ward ({a.ward_bed})")
+            walk_out("admitted", f"{p.name} left the ED for " + (f"the ward ({a.ward_bed})" if a.ward_bed else "another ward"))
             rec["boarding"] = self.t - rec["decision"]
-            self.say(a, "Going to the ward")
             for pid in a.pumps:
                 self.assets[pid]["attached"] = p.id
+            if not a.ward_bed:
+                # another ward in the main block: the patient, and any pump on them, leave the model there
+                self.say(a, "Going to another ward")
+                yield ("go", "ward", self.plans["ward"].spots["entry"][0])
+                for pid in a.pumps:
+                    x = self.assets[pid]
+                    x["building"], x["pos"] = "elsewhere", (0.0, 0.0)
+                    self.asset_moved(x, p.id)
+                a.arrived_ward = True
+                return
+            self.say(a, "Going to the ward")
             wb = self.beds[a.ward_bed]
             yield ("go", "ward", wb.spot)
             for pid in a.pumps:

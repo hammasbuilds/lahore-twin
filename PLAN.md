@@ -7,7 +7,7 @@ above it has finished its build **and** ten review rounds.
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
-| 3 | Hospital — staff, patients, IoT, management panel | built; review rounds next |
+| 3 | Hospital — staff, patients, IoT, management panel | review round 1 of 10 done |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
@@ -795,3 +795,38 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   so up to 200 hours a day are spent waiting for a bed (a tertiary ED admits to
   many wards); patients labelled "Going for an X-ray" while waiting for a
   porter; the site map shortens "Lahore General Hospital" to "Lahore".
+
+**Round 1 — where the admissions went.**
+- *Found:* every ED admission went to this one 36-bed ward, so up to 200
+  hours a day were spent waiting for a bed. A tertiary ED admits to many wards.
+  *Fixed:* each admission is medical (40%, this ward) or for another ward,
+  which finds a bed after a drawn delay; a porter then takes the patient (and
+  any pump on them) to the main block, where they leave the model.
+- *Found while checking that fix — numbers got worse, not better:* still only 3
+  admissions; three porters stood at the ward entrance from 09:00 to midnight
+  holding all three trolleys. A walk whose last leg had zero length (the
+  destination was the entrance itself) was consumed without resuming the
+  walker's next step, so porter and patient both froze. *Fixed* in the
+  movement step; a test now fails if any task is taken, reached and unfinished
+  for over an hour — checked to fail on the old code.
+- *Found:* a porter escorting a patient to X-ray waited through the queue and
+  the scan, tying up one of only 1–2 porters for up to an hour; the board said
+  "Going for an X-ray" throughout. *Fixed:* the porter drops the patient (the
+  chair stays with them), a separate task brings them back; the X-ray room
+  serves a first-come queue; labels say which stage they are at.
+- *Found:* every minors couch and chair got a 10-min deep clean after each
+  consult, burying the one ED cleaner (9 cleans open at midnight). Couches and
+  chairs are wiped (2 min); cubicles and resus bays keep 10 min.
+- *Found in the UI:* the site map called the main block "Lahore" (a replace
+  applied in the wrong order); the bed KPI wrapped "2 · 2 dirty" over two lines.
+  Both fixed.
+- *Test fixed honestly:* "critical alarms reached in the same seconds under both
+  rule sets" only held while nurses happened to stand in the same places; the
+  test now checks the actual claim — critical alarms sound the second they
+  start, sustained ones 15 s later.
+- *Re-checked:* seed 7: 18 admitted (was 3), 23.7 h waiting for a ward bed
+  (was 98); three other days 24–54 h. Leaving unseen stays 22%: about 165
+  patients × ~24 doctor-minutes is 66 doctor-hours against 60 rostered — the
+  doctors, not the sensors, are the bottleneck, and badges do not change that.
+- Office and home replays regenerated: adding the hospital to `SOURCES` in
+  export.py changed their digests (content unchanged). Tests 79 → 80.

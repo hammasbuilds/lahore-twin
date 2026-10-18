@@ -201,7 +201,7 @@
     for (const bld of S.buildings) {
       if (!bld.name) continue;
       const xs = bld.poly.map((p) => p[0]), ys = bld.poly.map((p) => p[1]);
-      const nm = bld.name.replace(" General Hospital", "").replace(" (General Hospital)", "").replace("Lahore General Hospital", "Main block");
+      const nm = bld.name === "Lahore General Hospital" ? "Main block" : bld.name.replace(" (General Hospital)", "").replace(" General Hospital", "");
       ctx.fillStyle = bld.sim ? palette.text : palette.muted;
       ctx.fillText(nm, X(Math.max(...xs)) + 6, Y((Math.min(...ys) + Math.max(...ys)) / 2));
     }
@@ -264,7 +264,8 @@
     $("k-wait").textContent = recs.filter((r) => inED(r, t) && (r.seen == null || r.seen > t)).length;
     let free = 0, dirty = 0;
     for (const [id, b] of Object.entries(R.beds)) if (b.unit === "ward") { const s = bedAt(id, t).state; if (s === "ready") free++; if (s === "dirty") dirty++; }
-    $("k-beds").textContent = free + (dirty ? ` · ${dirty} dirty` : "");
+    $("k-beds").textContent = free;
+    $("k-beds-l").textContent = dirty ? `Ward beds free · ${dirty} to clean` : "Ward beds free";
     const fr = ["ed", "ward"].filter((k) => fridgeAt(k, t) > 8).length;
     $("k-alerts").textContent = openAlarms(t).length + openCalls(t).length + fr;
   }

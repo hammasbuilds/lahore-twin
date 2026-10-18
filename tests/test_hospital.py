@@ -85,8 +85,11 @@ def test_the_alarm_delay_silences_false_alarms_and_says_what_it_hides(runs):
     brief = sum(1 for r in sims["connected"].alarm_log if r["kind"] == "brief")
     assert 0 < conn["brief_true_events_not_sounded"] <= brief
     assert today["brief_true_events_not_sounded"] == 0
-    # critical alarms skip the delay
-    assert conn["critical_response_s"] == today["critical_response_s"]
+    # critical alarms skip the delay: they sound the second they start
+    crit = [r for r in sims["connected"].alarm_log if r["kind"] == "critical"]
+    assert crit and all(r["annunciated"] == r["t"] for r in crit)
+    assert all(r["annunciated"] == r["t"] + 15 for r in sims["connected"].alarm_log
+               if r["kind"] == "sustained" and r["annunciated"] is not None)
 
 
 def test_the_locator_ends_the_search_and_the_audit_flatters(runs):
@@ -115,3 +118,15 @@ def test_committed_hospital_replay_matches_the_current_code():
     text = (ROOT / "viewer" / "hospital_replay.js").read_text(encoding="utf-8")
     meta = json.loads(text[len("window.HOSPITAL = "):].rstrip().rstrip(";"))["meta"]
     assert meta["digest"] == source_digest("hospital"), "run python demo_hospital.py to refresh the replay"
+
+
+def test_no_one_is_stranded_mid_task(runs):
+    """A walk whose last leg has zero length (already standing at the door) once left the
+    walker frozen: three porters held the ED's trolleys at the ward entrance all day."""
+    _, sims = runs
+    for s in sims.values():
+        stuck = [(t.kind, t.taken) for t in s.tasks
+                 if t.taken and t.done is None and t.arrived is not None and 86400 - t.arrived > 3600]
+        assert not stuck, stuck
+        admitted = [r for r in s.records.values() if r["outcome"] == "admitted"]
+        assert len(admitted) >= 5
