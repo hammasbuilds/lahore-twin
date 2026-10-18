@@ -6,8 +6,8 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | done — build + 10 review rounds |
-| 3 | Hospital — staff, patients, IoT, management panel | — |
+| 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
+| 3 | Hospital — staff, patients, IoT, management panel | researched and planned; build next |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
@@ -655,3 +655,101 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   5 days, 2,043 s) reports 0 problems with the same numbers as the README; the
   UI check passes with no console errors. Launchpad entry updated.
 - Phase 2 closed.
+
+## Phase 3 — Hospital (Lahore General Hospital campus)
+
+### Research notes
+
+- **The site comes from the map, the inside from planning practice.** The campus
+  outline and its 53 building footprints are OpenStreetMap data (way 151735321,
+  fetched 2026-10-18, ODbL; `plans/osm/lgh_campus.json`). OSM names the main
+  hospital block (4,424 m²), the Emergency Department (1,465 m²), the Blood Bank
+  and PINS. The buildings sit 17.5° off north; rotated square, the ED is a
+  31 × 50 m block with one notch and the main block a 65 × 123 m comb. Interiors
+  are designed, not copied: room sizes are planning assumptions (resus bay ~25 m²,
+  majors cubicle ~12 m², multi-bed bay ~3.6 × 3.7 m per bed), not checked against
+  the HBN 15-01 / 04-01 room data sheets, which searches did not surface.
+- **Adjacencies:** ED next to imaging and resus nearest the ambulance door; triage
+  between the entrance and the treatment zone; clean and soiled utility separate;
+  nurse station with sight lines to the beds (SCCM 2024, FGI adjacency guides).
+- **Asset tracking is the best-supported hospital IoT use.** One metropolitan
+  hospital (Int J Qual Health Care 2025): equipment search 86.8% faster after
+  tracking. A 3-year, 23-hospital US study: asset tracking is the best use of
+  RTLS, only when hospital-wide. BLE gives room level. Nurses lose 21–60 min a
+  shift searching (summaries; Nursing Times 2009: over a third ≥1 h). The
+  "$14 bn search time" figure is vendor extrapolation and is not used.
+- **Alarm fatigue:** a Korean ICU observed 2,184 alarms in 48 h, 63.8% false
+  (Healthc Inform Res 2016); UCSF found 94.9% of one arrhythmia alarm type false.
+  A 15 s annunciation delay cut ward SpO2 alarms by a further 71% (Dartmouth
+  analysis) and NICU SpO2 alarms by 67% (UVA), with the warning that delays can
+  hide brief desaturations.
+- **Hand hygiene badges:** MedSense (6-bed ICU, BMC Infect Dis 2011) measured
+  35.1% compliance over 13,694 opportunities; BioVigil (pre-print) reports higher
+  compliance and fewer C. diff cases. Hawthorne effects inflate early gains.
+- **Cold chain:** an automated system in Melbourne (2022) detected 28,746 fridge
+  excursions against 344 on paper logs — mostly below +2 °C, 95% from one fridge
+  brand: monitoring changes what is seen more than what happens. Power loss is a
+  usual cause of breaches (Hosp Pharm 2024) — load-shedding makes this local.
+- **Staffing in Pakistan:** the Pakistan Nursing Council standard is 1 nurse per
+  10 general-ward patients; reported reality in public wards is about 1:40 (one
+  repeated source, Firdos et al. 2020). Services Hospital paediatric ward
+  occupancy 137.7% (2015 census). Shifts: morning 08–14, evening 14–20, night
+  20–08.
+- **ED flow (DES literature):** registration and triage times ~ gamma; triage
+  level drives arrival mix and patience before leaving without being seen;
+  first doctor consult mean 9 min (5–15). Length of stay is the most-validated
+  output, then throughput, then time to triage.
+- **Nurse call + RTLS:** presence can cancel a call when the nurse enters the
+  room; no outcome evidence found, so the response-time effect is labelled a
+  model.
+
+### Simulation model
+
+- **Two simulated buildings on a campus map.** The ED (ground floor) and one
+  medical ward floor in the main block's south wing, each a `Plan` with rooms,
+  doors and A* routes. Moves between them (admissions, porters, staff) follow a
+  campus path drawn on the site plan; its length sets the walking time.
+- **Patients.** ED arrivals by hour (walk-ins peaking late morning and evening;
+  Rescue 1122 ambulances), a 5-colour triage (red, orange, yellow, green, blue).
+  Registration → triage → bay (resus / majors / minors / chairs) → doctor →
+  tests (lab sample, X-ray) → discharge, admission to the ward, or leaving
+  unseen when the wait passes their patience. Ward patients carry vitals that
+  drift and occasionally deteriorate.
+- **Staff.** Shift rosters (doctors, nurses, porters, cleaners, guards,
+  registration clerks) with BLE badges; nurses answer calls and alarms, porters
+  move patients and equipment, cleaners turn beds over.
+- **Equipment.** Infusion pumps, wheelchairs, trolleys and an ECG cart, each
+  left wherever it was last used. Without tracking, finding one is a walk
+  through likely rooms; with tracking, a walk to the nearest free one.
+- **IoT.** Room-level RTLS, nurse call buttons, bedside monitors, soap
+  dispensers counted against bed-zone entries, fridge probes (blood bank 2–6 °C,
+  ward medicine fridge 2–8 °C) through grid outages and a generator, bed
+  occupancy sensors, waiting-room counter.
+- **Two rule sets, same patients and staff (matched seeds):**
+  *Today* — overhead page, every alarm sounds at once, calls stay on until
+  cancelled by hand, equipment found by searching, beds reported clean by phone.
+  *Connected* — calls and alarms routed to the assigned nurse with escalation,
+  a short annunciation delay for non-critical alarms (with the missed-brief-event
+  count reported beside it), presence auto-cancels calls, an asset locator, a
+  live bed board that pages the cleaner on discharge.
+- **Outputs.** ED door-to-doctor and length of stay by triage colour, left
+  unseen, nurse-call response, alarms reaching a nurse per hour and the critical
+  ones answered late, search minutes, hand-hygiene compliance as measured,
+  cold-chain minutes out of range and how fast they were noticed, bed turnaround.
+
+### UI
+
+- **Site view** — the campus from OSM (north arrow at 17.5°), the two simulated
+  buildings drawn in full, the rest as footprints with their OSM names; patients
+  and porters on the campus path.
+- **Building view** — ED or ward: rooms, beds coloured by triage or status,
+  people, equipment, alarms as pulses, fridge chips.
+- **Management panel** — census and ED board (patients by colour and wait),
+  bed board, staff on duty by place, equipment finder, alerts with their cause
+  chain, the two rule sets side by side.
+- **Design style and colour** — clinical and calm: the shared twin tokens with
+  a teal accent; the five triage colours are reserved and only ever mean
+  triage; alarm red is shared with nothing else. Dark and light themes, phone
+  layout, keyboard use, offline (no CDN), contrast measured from tokens.
+
+### Round log
