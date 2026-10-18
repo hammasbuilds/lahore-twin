@@ -24,6 +24,9 @@ SOURCES = {
                "../plans/office.json"],
     "home": ["bus.py", "climate.py", "devices.py", "gridsense.py", "home.py", "home_sim.py", "office.py",
              "people.py", "plan.py", "power.py", "export_home.py", "export.py", "../plans/home.json"],
+    "hospital": ["bus.py", "hospital.py", "hospital_site.py", "hospital_sim.py", "office.py", "plan.py",
+                 "export_hospital.py", "export.py", "../plans/hospital_ed.json", "../plans/hospital_ward.json",
+                 "../plans/osm/lgh_campus.json"],
 }
 
 
