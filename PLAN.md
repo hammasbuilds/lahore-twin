@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 5 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 6 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -582,3 +582,17 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
    not-cutoff test; the bill test recomputes from the minute series instead of
    copying the formula; reserve and stress tests find suitable outages/seeds
    instead of hard-coding them. Tests 65 → 67.
+
+**Round 6 — the rebuilt physics, re-checked.**
+- `tools/sweep_home.py` on the round-5 engine (warm starts, exact accounting,
+  per-category outages): 0 violations over 30 days; the categories now differ
+  (June default dark 44 / 60 / 61 min for III / IV / V).
+- *Found:* the README said October bills were "a few rupees either way"; with
+  honest export accounting they are negative (the houses export more than they
+  buy) except under the UPS circuit (Rs 69–107). *Fixed* in the README.
+- *Found (UI, 00:00 on a day starting inside an outage):* GridSense logged
+  "pre-cool before the outage 00:00–02:00", "fill the tank" and a reserve hold at
+  the instant the outage began — its first decision ran before the grid sensor's
+  first reading. *Fixed:* the simulator publishes the grid state before the first
+  tick; test added (seed 7 starts inside the 00:00 block).
+- Tests 67 → 68.

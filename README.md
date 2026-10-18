@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 67 tests, including the viewer's core under node
+python -m pytest -q          # 68 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 python demo_home.py           # the house under four controllers; writes viewer/home_replay.js
 python tools/sweep_home.py    # home invariants: 2 seasons x 3 feeder categories x 5 days (~11 min)
@@ -230,8 +230,11 @@ night outage, partly at peak price (4.1 kWh) — the cost of its comfort, stated
 
 Over 2 seasons × 3 feeder categories × 5 days (`tools/sweep_home.py`) neither
 profile is ever darker than the default, trips the inverter, flaps an AC,
-empties the tank or finishes a job late; in October nobody is too hot under any
-setup and the bills are a few rupees either way.
+empties the tank or finishes a job late. In October nobody is too hot under any
+setup and the houses export more than they buy: daily bills are negative for
+GridSense eco (Rs −57 to −75), the default (−43 to −63) and GridSense (−19 to
+−50); the UPS circuit still pays Rs 69–107, because its big loads cannot use the
+inverter's sun or battery.
 
 Tariff assumptions: off-peak Rs 42, peak Rs 50, export Rs 11 per kWh (the
 proposed gross-metering buyback). The bill values each controller's end-of-day

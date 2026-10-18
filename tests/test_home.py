@@ -251,3 +251,12 @@ def test_gridsense_keeps_the_lights_on_when_its_assumptions_fail(plan, case):
         for mode in ("gridsense_eco", "gridsense"):
             m = HomeSim(sc, mode).run().metrics()
             assert m["house_dark_min"] == 0 and m["no_fan_person_min"] == 0, (case, seed, mode)
+
+
+def test_no_decisions_are_made_on_an_unknown_grid_state(plan):
+    """The controller's first tick must already know whether the day starts in an outage."""
+    sc = build(plan, JUNE, seed=7)
+    assert not sc.grid_up(0)                     # seed 7 starts inside the 00:00 block
+    s = HomeSim(sc, "gridsense").run()
+    first = [m.text for m in s.bus.log if m.t == 0]
+    assert not any("pre-cool" in x or "fill the tank" in x for x in first), first
