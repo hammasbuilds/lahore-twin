@@ -397,14 +397,16 @@ class HomeSim:
             s["temp"][rid].append(round(env.temp, 2))
             s["occ"][rid].append(self.presence.get(rid, 0))
 
-    def run(self) -> "HomeSim":
+    def run(self, until: int = DAY, on_tick=None) -> "HomeSim":
+        """Simulate 00:00 to `until` (a whole day by default). `on_tick(t)` runs after every
+        second; the live runner uses it to pace the clock and service the broker."""
         # the controller reads its sensors before its first decision: without this it acted
         # at 00:00 as if the grid were up, inside an outage that had already begun
         self.bus.now = 0
         self.grid_was = self.sc.grid_up(0)
         self.bus.publish("home/grid/state", self.grid_was, None,
                          "Grid is up" if self.grid_was else "Power cut — grid is down")
-        for t in range(0, DAY):
+        for t in range(0, until):
             self.bus.now = t
             for p in self.people:
                 self._off_site_return(p, t)
@@ -415,8 +417,10 @@ class HomeSim:
                 self._physics(t)
             if t % SAMPLE_DT == 0:
                 self._report(t)
-        self.bus.now = DAY - 1
-        self.ctrl.finish(DAY - 1)
+            if on_tick:
+                on_tick(t)
+        self.bus.now = until - 1
+        self.ctrl.finish(until - 1)
         return self
 
     # ---- results --------------------------------------------------------

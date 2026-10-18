@@ -1,0 +1,18 @@
+{
+  "about": "Topic map between SolarAssistant's MQTT output and the home bus. Topic names follow SolarAssistant's documented pattern solar_assistant/<device>/<metric>/state (and /set for writable settings); check the exact names your installation publishes (SolarAssistant > Configuration > MQTT shows them) and edit this file. Not yet run against a real SolarAssistant box.",
+  "prefix": "solar_assistant/",
+  "inbound": [
+    {"from": "total/battery_state_of_charge/state", "to": "home/battery/soc",  "scale": 0.01, "note": "percent -> fraction"},
+    {"from": "inverter_1/pv_power/state",           "to": "home/pv/kw",        "scale": 0.001, "note": "W -> kW"},
+    {"from": "inverter_1/load_power/state",         "to": "home/house/load",   "scale": 0.001, "note": "W -> kW"},
+    {"from": "inverter_1/grid_voltage/state",       "to": "home/grid/voltage", "scale": 1.0},
+    {"from": "inverter_1/grid_voltage/state",       "to": "home/grid/state",   "threshold": 100.0, "note": "volts above threshold = grid up"}
+  ],
+  "outbound": {
+    "settings_topic": "inverter_1/output_source_priority/set",
+    "modes": {"SBU": "Solar/Battery/Utility", "UTI": "Utility first"},
+    "charge_topic": "inverter_1/max_grid_charge_current/set",
+    "charge_amps_per_kw": 20.8,
+    "charge_note": "48 V battery: 1 kW is about 20.8 A"
+  }
+}

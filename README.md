@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 68 tests, including the viewer's core under node
+python -m pytest -q          # 70 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 python demo_home.py           # the house under four controllers; writes viewer/home_replay.js
 python tools/sweep_home.py    # home invariants: 2 seasons x 3 feeder categories x 5 days (~11 min)
@@ -247,6 +247,19 @@ a power-flow card (solar, battery, grid, house), battery and tank gauges, an
 outage strip with unannounced cuts hatched, the day's power and battery charts,
 every decision with its cause, and the four controllers side by side.
 
+### Swapping in hardware (home)
+
+`python -m lahore_twin.live_home --broker <host> --solar-assistant` runs the house
+against an MQTT broker in simulated real time. Every bus message goes out on
+`lahore-twin/state/home/...`; sensors can publish presence and temperature on
+`lahore-twin/device/home/<room>/...`. With `--solar-assistant`, readings from a
+[SolarAssistant](https://solar-assistant.io) box (battery %, PV W, load W, grid
+volts) are rescaled and fed to GridSense, and its inverter settings go back as
+SolarAssistant `/set` messages (output priority, grid charge current at 48 V).
+The topic names are in `plans/solar_assistant_map.json`, so a different
+installation is an edit, not code. Tested against an in-process fake broker that
+echoes like mosquitto; not yet run against a real SolarAssistant box.
+
 ## Layout
 
 ```
@@ -255,6 +268,7 @@ lahore_twin/   plan.py (rooms, doors, A* routing) · bus.py (MQTT-style bus with
                rules.py (automation, attendance) · sim.py (1 s loop) · export.py (replay)
                climate.py · home.py (family, outages) · power.py (PV, battery, inverter, tank)
                gridsense.py (four home controllers) · home_sim.py · export_home.py
+               mqtt.py, live.py, live_home.py, solar_assistant.py (hardware path)
 plans/         office.json, home.json — the floor plans as data
 viewer/        index.html + app.js (office), home.html + home.js (home), core.js + twin.css shared;
                replay.js and home_replay.js are generated

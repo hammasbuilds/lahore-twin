@@ -156,3 +156,43 @@ def test_live_mode_closes_the_day_once(capsys):
     assert stamps and all(s == hm("21:00") - 1 for s in stamps)
     assert len(stamps) == len(set(json.loads(p)["payload"] for t, p in broker.published
                                   if t.endswith("/no_badge_out")))
+
+
+def test_solar_assistant_readings_reach_gridsense_and_its_settings_reach_the_inverter():
+    """SolarAssistant topics in (rescaled), GridSense's inverter settings out as /set messages."""
+    from lahore_twin.climate import JUNE
+    from lahore_twin.home import build
+    from lahore_twin.home_sim import HomeSim
+    from lahore_twin.solar_assistant import SolarAssistantAdapter
+    broker = FakeBroker()
+    sim = HomeSim(build(Plan.load("home.json"), JUNE, seed=7), "gridsense")
+    client = Client("127.0.0.1", broker.port)
+    adapter = SolarAssistantAdapter(sim.bus, client)
+    assert _wait(lambda: "solar_assistant/total/battery_state_of_charge/state" in broker.subscriptions)
+    sim.bus.now = hm("10:00")
+    broker.push("solar_assistant/total/battery_state_of_charge/state", b"57")
+    broker.push("solar_assistant/inverter_1/pv_power/state", b"3450")
+    broker.push("solar_assistant/inverter_1/grid_voltage/state", b"0")       # a cut
+    assert _wait(lambda: client.poll(0.05) >= 0 and adapter.received >= 3)
+    assert sim.ctrl.soc == 0.57 and sim.ctrl.pv == 3.45 and sim.ctrl.grid is False
+    # a GridSense settings change goes out as SolarAssistant /set messages
+    sim.bus.publish("home/inverter/settings", {"mode": "UTI", "back_to_grid": 0.5, "grid_charge_kw": 1.5})
+    # both /set messages, not just the first: the broker records them on its own thread
+    assert _wait(lambda: {t for t, _ in broker.published} >= {
+        "solar_assistant/inverter_1/output_source_priority/set",
+        "solar_assistant/inverter_1/max_grid_charge_current/set"})
+    sets = {t: p for t, p in broker.published if t.endswith("/set")}
+    assert sets["solar_assistant/inverter_1/output_source_priority/set"] == b"Utility first"
+    assert sets["solar_assistant/inverter_1/max_grid_charge_current/set"] == b"31"
+    client.close()
+
+
+def test_live_home_streams_the_house_and_answers_solar_assistant(capsys):
+    from lahore_twin import live_home
+    broker = FakeBroker()
+    live_home.main(["--port", str(broker.port), "--speed", "1000000", "--hours", "0.5", "--solar-assistant"])
+    assert _wait(lambda: len(broker.published) > 20)
+    topics = {t for t, _ in broker.published}
+    assert "lahore-twin/state/home/grid/state" in topics
+    assert any(t.startswith("lahore-twin/state/home/") and t.endswith("/temp") for t in topics)
+    assert "00:00" in capsys.readouterr().out

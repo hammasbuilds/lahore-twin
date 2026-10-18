@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 7 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 8 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -607,3 +607,22 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   day charts and comparison. The UI check switches to October and requires the
   scenario and comparison to change. The replay test checks both seasons share
   the current source digest.
+
+**Round 8 — a path to a real inverter.**
+- *Found:* the home had no hardware path at all; the office had an MQTT bridge
+  and live mode, the house only a replay. Most solar homes here that log their
+  inverter use SolarAssistant, which already speaks MQTT.
+- *Added:* `solar_assistant.py` — inbound battery SOC, PV, load and grid volts
+  rescaled onto the home topics GridSense reads (grid up/down from a voltage
+  threshold, published on change only); outbound `home/inverter/settings` becomes
+  SolarAssistant's output-priority and max-grid-charge-current `/set` messages.
+  Topic names live in `plans/solar_assistant_map.json`. `live_home.py` runs the
+  house against a broker (paced clock, `--solar-assistant`); `HomeSim.run` gained
+  `until` and `on_tick` for it.
+- *Re-checked:* a fake broker test feeds SOC 57 % / 3450 W / 0 V and sees
+  GridSense read 0.57 / 3.45 kW / grid down, then a UTI + 1.5 kW setting reach the
+  broker as "Utility first" and 31 A; a second test streams half an hour of the
+  live house. The first version of the adapter test raced (asserted after the
+  first `/set` arrived); it now waits for both. Five consecutive passes.
+- Limitation stated in the README: never run against a real box.
+- Tests 68 → 70.

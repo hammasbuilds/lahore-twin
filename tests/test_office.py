@@ -473,6 +473,6 @@ def test_every_engine_module_belongs_to_a_replay_digest():
     """A module that feeds a replay but is missing from SOURCES would let that replay go stale silently."""
     from lahore_twin.export import SOURCES
     listed = {n for files in SOURCES.values() for n in files}
-    helpers = {"__init__.py", "mqtt.py", "live.py"}          # not part of any replay
+    helpers = {"__init__.py", "mqtt.py", "live.py", "live_home.py", "solar_assistant.py"}          # not part of any replay
     for f in (ROOT / "lahore_twin").glob("*.py"):
         assert f.name in listed or f.name in helpers, f.name
