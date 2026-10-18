@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hospital Twin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='5' fill='%2314b8a6'/%3E%3Cpath d='M16 9v14M9 16h14' stroke='%230b1220' stroke-width='4' stroke-linecap='round'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="twin.css">
+<style>
+/* the hospital accent is teal; the five triage colours mean triage and nothing else */
+:root { --accent: #2dd4bf; --t-red: #ef4444; --t-orange: #f97316; --t-yellow: #eab308; --t-green: #22c55e; --t-blue: #3b82f6; --call: #facc15; }
+:root[data-theme="light"] { --accent: #0f766e; --t-red: #dc2626; --t-orange: #c2410c; --t-yellow: #a16207; --t-green: #15803d; --t-blue: #1d4ed8; --call: #a16207; }
+aside { grid-template-rows: auto auto 1fr; }
+.kpis.k4 { grid-template-columns: repeat(4, 1fr); }
+.kpi .v { font-size: 20px; }
+.chip { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.board td { padding: 4px 3px; }
+.board tr { cursor: pointer; }
+.board tr:hover td { background: var(--panel-2); }
+.beds { display: grid; grid-template-columns: repeat(auto-fill, minmax(62px, 1fr)); gap: 5px; }
+.bed { border: 1px solid var(--line); border-radius: 7px; padding: 4px 6px; font-size: 11.5px; cursor: pointer; background: var(--panel-2); }
+.bed b { display: block; font-size: 12px; }
+.bed.occupied { border-color: color-mix(in srgb, var(--accent) 55%, transparent); }
+.bed.dirty { border-color: color-mix(in srgb, var(--warn) 70%, transparent); color: var(--warn); }
+.bed.reserved { border-style: dashed; border-color: var(--accent); }
+.bed.ready { color: var(--ok); }
+.note { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.cmp .cost { color: var(--warn); }
+#views button { min-width: 64px; }
+@media (max-width: 900px) { canvas#plan { aspect-ratio: 3 / 4; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>Hospital Twin <span>· Lahore Twin, phase 3</span></h1>
+  <div class="clock num" id="clock">00:00</div>
+  <button class="btn" id="play" aria-label="Play">▶ Play</button>
+  <select id="speed" aria-label="Playback speed">
+    <option value="60">60×</option>
+    <option value="300" selected>300×</option>
+    <option value="900">900×</option>
+    <option value="1800">1800×</option>
+  </select>
+  <div class="seg" id="modes" role="group" aria-label="Rule set">
+    <button data-mode="today" aria-pressed="false" title="Alarms sound for everyone, call lights seen from the corridor, equipment found by searching, beds reported by phone">Today</button>
+    <button data-mode="connected" aria-pressed="true" title="Badges and sensors: routed calls and alarms, 15 s alarm delay, equipment locator, bed board, pump par level">Connected</button>
+  </div>
+  <div class="seg" id="views" role="group" aria-label="View">
+    <button data-view="site" aria-pressed="false" title="The campus from OpenStreetMap">Site</button>
+    <button data-view="ed" aria-pressed="true" title="Emergency Department, ground floor">Emergency</button>
+    <button data-view="ward" aria-pressed="false" title="Medical ward, main block">Ward</button>
+  </div>
+  <div class="spacer"></div>
+  <a class="btn" href="index.html" style="text-decoration:none">Office</a>
+  <a class="btn" href="home.html" style="text-decoration:none">Home</a>
+  <button class="btn" id="theme" aria-label="Toggle colour theme">Light</button>
+</header>
+<main>
+  <section id="stage">
+    <canvas id="plan" aria-label="Hospital plan"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="tip" id="tip"></div>
+  </section>
+  <aside>
+    <div class="kpis k4">
+      <div class="kpi"><div class="v num" id="k-ed">–</div><div class="l">In the ED</div></div>
+      <div class="kpi"><div class="v num" id="k-wait">–</div><div class="l">Waiting for doctor</div></div>
+      <div class="kpi"><div class="v num" id="k-beds">–</div><div class="l">Ward beds free</div></div>
+      <div class="kpi"><div class="v num" id="k-alerts">–</div><div class="l">Open alerts</div></div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="board" aria-selected="true">Board</button>
+      <button role="tab" data-tab="beds" aria-selected="false">Beds</button>
+      <button role="tab" data-tab="kit" aria-selected="false">Equipment</button>
+      <button role="tab" data-tab="events" aria-selected="false">Events</button>
+      <button role="tab" data-tab="inspect" aria-selected="false">Inspector</button>
+      <button role="tab" data-tab="compare" aria-selected="false">Compare</button>
+    </div>
+    <div class="pane on" id="pane-board"></div>
+    <div class="pane" id="pane-beds"></div>
+    <div class="pane" id="pane-kit"></div>
+    <div class="pane" id="pane-events">
+      <div class="filter"><label><input type="checkbox" id="only-key" checked> Alerts and decisions only</label><span class="spacer"></span><span id="log-count" class="num"></span></div>
+      <ul class="log" id="log"></ul>
+    </div>
+    <div class="pane" id="pane-inspect">
+      <label class="find"><span class="muted">Find</span><select id="find" aria-label="Find a person, bed or piece of equipment"></select></label>
+      <div id="inspect-body"><p class="muted">Pick someone or something above, or click the plan, the board or an event.</p></div>
+    </div>
+    <div class="pane" id="pane-compare"></div>
+  </aside>
+</main>
+<footer>
+  <div class="timeline"><canvas id="tl"></canvas><input type="range" id="scrub" min="0" max="86399" step="1" value="0" aria-label="Time of day"></div>
+  <div class="ticks num" id="ticks"></div>
+</footer>
+<script src="hospital_replay.js"></script>
+<script src="core.js"></script>
+<script src="hospital.js"></script>
+</body>
+</html>

@@ -6,9 +6,9 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 
 | # | Phase | What it simulates | Status |
 |---|---|---|---|
-| 1 | [Office tower](#phase-1--office-tower) | 34 people, badge gate, meeting rooms, lights, AC, CO₂, attendance | built, in review |
-| 2 | [Home + GridSense](#phase-2--home--gridsense) | a Lahore family, 6 kWp solar, 10 kWh battery, load-shedding | built, in review |
-| 3 | Hospital | staff, patients, IoT devices, management panel | planned |
+| 1 | [Office tower](#phase-1--office-tower) | 34 people, badge gate, meeting rooms, lights, AC, CO₂, attendance | done: build + 10 review rounds |
+| 2 | [Home + GridSense](#phase-2--home--gridsense) | a Lahore family, 6 kWp solar, 10 kWh battery, load-shedding | done: build + 10 review rounds |
+| 3 | [Hospital](#phase-3--hospital) | Lahore General Hospital ED + medical ward on the OSM campus, staff, patients, IoT, management panel | built, in review |
 | 4 | Lahore traffic | OpenStreetMap road network, smart signals, hotspot finder | planned |
 | 5 | Junction fix planner | test underpass / U-turn / flyover options; ambulance green wave | planned |
 | 6 | City systems | smog, underpass flooding, streetlights | planned |
@@ -16,10 +16,11 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 70 tests, including the viewer's core under node
+python -m pytest -q          # 79 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 python demo_home.py           # the house under four controllers; writes viewer/home_replay.js
 python tools/sweep_home.py    # home invariants: 2 seasons x 3 feeder categories x 5 days (~11 min)
+python demo_hospital.py       # the ED and ward under two rule sets; writes viewer/hospital_replay.js
 ```
 
 Python 3.10+, standard library only. The viewer is one offline HTML page.
@@ -260,6 +261,85 @@ The topic names are in `plans/solar_assistant_map.json`, so a different
 installation is an edit, not code. Tested against an in-process fake broker that
 echoes like mosquitto; not yet run against a real SolarAssistant box.
 
+## Phase 3 — Hospital
+
+The Lahore General Hospital campus, from OpenStreetMap: the campus outline and
+53 building footprints (`plans/osm/lgh_campus.json`, ODbL). Two floors are
+simulated room by room inside their real footprints, turned 17.5° so the
+buildings sit square: the **Emergency Department** (31 × 50 m: registration,
+two triage rooms, waiting hall, six majors cubicles, three resus bays, minors,
+isolation, X-ray, sample lab, utilities) and a **36-bed medical ward** in the
+main block's south wing (three 10-bed bays, a 4-bed high-dependency unit, two
+side rooms, nurse station, medicine store). Interiors are designed from
+planning practice, not copied; the room sizes are assumptions. Porters and
+admitted patients walk a 264 m campus path between the buildings.
+
+**The day.** About 160 ED arrivals with a 5-colour triage (some by Rescue 1122),
+registration, triage, cubicles, doctors, blood tests, X-ray, drips on infusion
+pumps, admission or discharge; patients who wait past their patience leave
+unseen. The ward starts nearly full, sends seven people home after the round,
+and its patients press call buttons; the four HDU beds raise about 100 monitor
+alarms a day, 64% of them false (the share a Korean ICU observed). Medicine
+fridge doors get left ajar. 66 staff shifts (morning, evening, night) do the
+work from a shared task board.
+
+**Two rule sets, same patients and events:**
+
+| | Today | Connected |
+|---|---|---|
+| call buttons | seen from the corridor or station, or a relative walks over after 5 min | routed to the bed's nurse, or to any free nurse when that one is busy |
+| HDU alarms | sound for everyone at once | wait 15 s (critical ones do not), then go to the bed's nurse |
+| equipment | look in the store, then room by room | walk to the nearest free one; pumps fetched back from the ward when the ED is below two |
+| beds | cleaning requested by phone (20–90 min), ED told by phone (10–40 min) | empty-bed sensor pages the cleaner; ED sees the bed board |
+| fridges | paper log at 08:00 and 20:00 | probe alerts after 5 min above 8 °C |
+| hand hygiene | one-hour audit on the ward | every dispenser use counted against badge entries |
+
+`python demo_hospital.py` (seed 7):
+
+```
+                                             Today   Connected
+Door to triage, median (min)                   4.2         4.2
+Door to doctor, median (min)                  15.1        15.0
+  red (min)                                    0.9         0.8
+  green (min)                                 24.5        26.2
+Length of stay, median (min)                  82.8        84.5
+Left without being seen                         28          27
+Admitted to the ward                             9           9
+Hours waiting for a ward bed                  57.7        46.8
+Call button answered, median (min)             0.4         0.3
+  90th percentile (min)                        2.9         1.4
+HDU alarms that sounded                         99          38
+  per ward nurse-hour                         1.65        0.63
+Walks to false alarms                           58          12
+Real alarm reached, median (min)               0.3         0.6
+Brief real events never sounded                  0          15
+Critical alarms reached (s)                11 / 16     11 / 16
+Minutes searching for equipment               58.5         0.8
+Drips run without a pump                        18           0
+Free ED pumps at midnight                        0           1
+Hand hygiene, true (%)                        37.3        36.0
+Hand hygiene, as reported (%)                 73.3        35.7
+  reported from (n)                             30         638
+Fridge minutes above 8 °C                      551          42
+Bed turnaround, median (min)                  97.2        20.4
+Ward nurses walked (km)                       14.1        12.3
+```
+
+What it shows, honestly: badges and sensors do not add doctors, so ED waits
+barely move. They do end the equipment hunt, keep pumps in the ED, cut the
+alarms nurses walk to by about 60% (the price: brief real desaturations that
+end inside the 15 s delay never sound, counted above), shorten bed turnaround,
+and catch an open fridge in minutes. Hand hygiene is the same underneath in
+both; the audit reports roughly double the true rate because staff wash more
+when watched, while dispenser counting reports it as it is. Badges are not
+assumed to change behaviour.
+
+`viewer/hospital.html` replays the day: the campus (Site), the ED and the ward,
+with patients coloured by triage, staff by role, pumps, chairs and trolleys,
+call lights and pulsing alarms, fridge temperatures; a management panel with
+the ED board, bed board, equipment list (marked untracked under Today), events
+with their cause chains, an inspector and the side-by-side comparison.
+
 ## Layout
 
 ```
@@ -269,9 +349,10 @@ lahore_twin/   plan.py (rooms, doors, A* routing) · bus.py (MQTT-style bus with
                climate.py · home.py (family, outages) · power.py (PV, battery, inverter, tank)
                gridsense.py (four home controllers) · home_sim.py · export_home.py
                mqtt.py, live.py, live_home.py, solar_assistant.py (hardware path)
-plans/         office.json, home.json — the floor plans as data
-viewer/        index.html + app.js (office), home.html + home.js (home), core.js + twin.css shared;
-               replay.js and home_replay.js are generated
+               hospital.py (staff, patients, events) · hospital_site.py (OSM campus) · hospital_sim.py · export_hospital.py
+plans/         office.json, home.json, hospital_ed.json, hospital_ward.json — the floor plans as data; osm/ holds the campus extract
+viewer/        index.html + app.js (office), home.html + home.js (home), hospital.html + hospital.js; core.js + twin.css shared;
+               replay.js, home_replay.js and hospital_replay.js are generated
 tools/         ui_check.js — drives the viewer in headless Chromium for review rounds
 PLAN.md        research notes, design, and the review-round log
 ```

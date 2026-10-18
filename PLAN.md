@@ -7,7 +7,7 @@ above it has finished its build **and** ten review rounds.
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
-| 3 | Hospital — staff, patients, IoT, management panel | researched and planned; build next |
+| 3 | Hospital — staff, patients, IoT, management panel | built; review rounds next |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
@@ -753,3 +753,45 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   layout, keyboard use, offline (no CDN), contrast measured from tokens.
 
 ### Round log
+
+**Build.**
+- *Site:* `hospital_site.py` projects the OSM extract, rotates it 17.5°, places
+  the ED plan on the ED footprint and the ward plan in the main block's south
+  wing (turned so its lift lobby meets the corridor joining the wing), and
+  finds a 264 m campus path by A* on a 2 m grid around every footprint. The
+  ward's lifts are inside the main block, so the path starts from the open
+  ground nearest each end.
+- *Scenario:* `hospital.py` draws everything no rule set controls from separate
+  streams: rosters for three shifts (plus last night's crew on at 00:00), ED
+  arrivals by hour with colours, needs, patience and service times, the ward
+  census and discharges, call buttons, HDU alarms (64% false, some brief real
+  events), fridge doors, equipment.
+- *Simulation:* `hospital_sim.py` — every person is a generator yielding
+  go / wait / until; staff take tasks from a shared board; equipment can be
+  searched for, carried and attached to a patient; beds run ready → reserved →
+  occupied → dirty → ready. Both rule sets in ~21 s.
+- *Bugs found by the first numbers (each a "surprising number"):* door to
+  triage 134 min and 65 of 150 leaving unseen — the nurse waited for the patient
+  within 1.6 m of the nurse's own spot, and the patient sat 2.5 m away, so every
+  triage hung for a 30-min timeout (now: each task says where the patient
+  should be). 304 failed fetches — the ED's six pumps were all on patients and
+  the retry loop counted every 5 min (now: a drip with no pump runs by gravity
+  and is counted). Only 3 admissions — porters left trolleys on the ward, so
+  after three transfers the ED had none (now they bring them back). Connected
+  call p90 worse than Today — a call waited for its assigned nurse even when
+  that nurse was busy (now it goes to a free nurse). Red patients 13 min to a doctor —
+  "seen" was stamped at the end of the consult (now at its start), and doctors
+  now pause a lower-priority consult for a red patient. Leaving unseen was
+  17% with exponential patience (many walk out within minutes); gamma k = 3.
+- *Viewer:* `hospital.html` + `hospital.js` — Site / Emergency / Ward views,
+  the management panel (board, beds, equipment, events, inspector, compare),
+  census timeline with alarm ticks and fridge bars; `tools/ui_check_hospital.js`
+  drives it (views, rule sets, tabs, a why chain, a real click on a person, the
+  site crossing, theme, keyboard, phone width) with no console errors. A
+  keyboard shortcut did nothing after clicking a header button (focus on the
+  button swallowed every key); now only Space is left to the button.
+- *Tests:* `tests/test_hospital.py`, 9 tests. Launchpad entry added.
+- *Known weaknesses for the rounds:* every ED admission goes to this one ward,
+  so up to 200 hours a day are spent waiting for a bed (a tertiary ED admits to
+  many wards); patients labelled "Going for an X-ray" while waiting for a
+  porter; the site map shortens "Lahore General Hospital" to "Lahore".

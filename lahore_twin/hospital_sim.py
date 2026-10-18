@@ -132,7 +132,7 @@ class HospitalSim:
         self.open: list[Task] = []
         self._tid = 0
         self.trips: list = []
-        self.presence: list = []            # [aid, t_on, t_off]
+        self.presence: list = []            # [aid, t_on, t_off, building, x, y]
         self.labels: list = []              # [t, aid, text]
         self.asset_ev: list = []            # [t, asset, building, x, y, holder]
         self.records: dict[str, dict] = {}
@@ -236,7 +236,7 @@ class HospitalSim:
     def spawn(self, a: Agent, building: str, spot, gen) -> None:
         a.building, a.pos, a.on, a.gen = building, tuple(spot), True, gen
         self.agents[a.id] = a
-        self.presence.append([a.id, self.t, None])
+        self.presence.append([a.id, self.t, None, building, round(spot[0], 2), round(spot[1], 2)])
         self._resume(a)
 
     def _resume(self, a: Agent) -> None:
@@ -994,7 +994,6 @@ class HospitalSim:
         walk = [r for r in recs if not r["ambulance"] and r["triaged"]]
         seen = [r for r in recs if r["seen"]]
         done = [r for r in recs if r["left"] is not None and r["outcome"] != "left unseen"]
-        calls = [c for c in self.call_log if c.get("arrived")]
         for c in self.call_log:
             tk = next((t for t in self.tasks if t.kind == "call" and t.meta.get("rec") is c), None)
             if tk and tk.arrived:

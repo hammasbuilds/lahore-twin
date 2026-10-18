@@ -15,6 +15,7 @@ TRIAGE_HEX = {"red": "#ef4444", "orange": "#f97316", "yellow": "#eab308", "green
 
 
 def mode_replay(s: HospitalSim) -> dict:
+    metrics = s.metrics()             # first: it fills in when each call and alarm was answered
     agents = {}
     for a in s.agents.values():
         rec = s.records.get(a.id)
@@ -41,7 +42,7 @@ def mode_replay(s: HospitalSim) -> dict:
         "calls": calls,
         "fetches": s.fetch_log,
         "log": log,
-        "metrics": s.metrics(),
+        "metrics": metrics,
     }
 
 
