@@ -51,6 +51,16 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   const t0 = await page.evaluate(() => window.__home.state.t);
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(100);
   if ((await page.evaluate(() => window.__home.state.t)) !== t0) throw new Error("ArrowRight in the picker moved the clock");
+  // season switch: October must be a different day, with its own outages and bills
+  const juneOut = await page.evaluate(() => JSON.stringify(window.HOME_SCENARIOS.june.outages));
+  await page.click('#seasons button[data-season="october"]'); await page.waitForTimeout(250);
+  if ((await page.evaluate(() => window.__home.season())) !== "october") throw new Error("season switch did not take");
+  await page.click(".tabs button[data-tab=compare]"); await page.waitForTimeout(200);
+  const octBill = await page.textContent("#pane-compare");
+  if (!/Bill/.test(octBill)) throw new Error("October compare table missing");
+  await setT("15:00"); await shot("12b-october-compare");
+  await page.click('#seasons button[data-season="june"]'); await page.waitForTimeout(200);
+  void juneOut;
   await page.click("#theme"); await page.waitForTimeout(200); await shot("13-light");
   await page.click("#play"); await page.waitForTimeout(1200); await page.click("#play"); await shot("14-after-play");
   await page.setViewportSize({ width: 390, height: 844 }); await page.waitForTimeout(300); await shot("15-phone");

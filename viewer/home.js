@@ -6,7 +6,10 @@
 "use strict";
 
 (function () {
-  const H = window.HOME;
+  // one replay per season; the plan and appliances are the same house in both
+  const SCEN = window.HOME_SCENARIOS || { june: window.HOME };
+  let season = SCEN.june ? "june" : Object.keys(SCEN)[0];
+  let H = SCEN[season];
   const C = TwinCore;
   const plan = H.plan;
   const rooms = Object.fromEntries(plan.rooms.map((r) => [r.id, r]));
@@ -14,26 +17,31 @@
   const MODE_NAMES = { default: "Inverter default", ups: "UPS circuit", gridsense_eco: "GridSense eco", gridsense: "GridSense" };
   const ROLE_NAMES = { father: "Father", mother: "Mother", grandmother: "Dadi", school: "School child", student: "University student", helper: "Helper" };
 
-  // ---- index ----
-  const people = {};
-  for (const p of H.people) people[p.id] = { ...p, trips: [], labels: [], gone: p.leave < 86400 ? p.leave + 600 : Infinity, entry: null };
-  for (const tr of H.trips) people[tr.p].trips.push(tr);
-  for (const [t, pid, label] of H.labels) people[pid].labels.push([t, label]);
-  for (const p of Object.values(people)) { p.trips.sort((a, b) => a.t - b.t); }
-  const modes = {};
-  for (const [name, M] of Object.entries(H.modes)) {
-    const dev = {};
-    for (const [t, aid, val, id] of M.devices) (dev[aid] = dev[aid] || []).push([t, val, id]);
-    const byId = {};
-    for (const m of M.log) byId[m.id] = m;
-    modes[name] = { ...M, dev, byId, wired: new Set(H.wiring[name]) };
+  // ---- index (rebuilt when the season changes) ----
+  let people = {}, modes = {};
+  function index() {
+    people = {};
+    for (const p of H.people) people[p.id] = { ...p, trips: [], labels: [], gone: p.leave < 86400 ? p.leave + 600 : Infinity, entry: null };
+    for (const tr of H.trips) people[tr.p].trips.push(tr);
+    for (const [t, pid, label] of H.labels) people[pid].labels.push([t, label]);
+    for (const p of Object.values(people)) { p.trips.sort((a, b) => a.t - b.t); }
+    modes = {};
+    for (const [name, M] of Object.entries(H.modes)) {
+      const dev = {};
+      for (const [t, aid, val, id] of M.devices) (dev[aid] = dev[aid] || []).push([t, val, id]);
+      const byId = {};
+      for (const m of M.log) byId[m.id] = m;
+      modes[name] = { ...M, dev, byId, wired: new Set(H.wiring[name]) };
+    }
   }
+  index();
 
   const state = { t: 21.5 * 3600, mode: "gridsense", layer: "state", playing: false, speed: 300, sel: null };
   try {
     const saved = JSON.parse(localStorage.getItem("home-twin") || "{}");
     if (saved.theme) document.documentElement.dataset.theme = saved.theme;
     if (saved.mode && H.modes[saved.mode]) state.mode = saved.mode;
+    if (saved.season && SCEN[saved.season]) { season = saved.season; H = SCEN[season]; index(); }
   } catch (e) { /* storage blocked: defaults are fine */ }
 
   const $ = (id) => document.getElementById(id);
@@ -445,7 +453,19 @@
     prev = ts; requestAnimationFrame(loop);
   }
   function setPlaying(on) { state.playing = on; $("play").textContent = on ? "❚❚ Pause" : "▶ Play"; $("play").setAttribute("aria-label", on ? "Pause" : "Play"); }
-  function save() { try { localStorage.setItem("home-twin", JSON.stringify({ theme: document.documentElement.dataset.theme, mode: state.mode })); } catch (e) { /* ignore */ } }
+  function save() { try { localStorage.setItem("home-twin", JSON.stringify({ theme: document.documentElement.dataset.theme, mode: state.mode, season })); } catch (e) { /* ignore */ } }
+  for (const b of document.querySelectorAll("#seasons button")) {
+    b.setAttribute("aria-pressed", b.dataset.season === season);
+    b.disabled = !SCEN[b.dataset.season];
+    b.onclick = () => {
+      season = b.dataset.season; H = SCEN[season]; index();
+      for (const x of document.querySelectorAll("#seasons button")) x.setAttribute("aria-pressed", x === b);
+      state.sel = null; lastLogKey = ""; save(); fillFinder(); renderLegend();
+      if ($("pane-day").classList.contains("on")) renderDay();
+      if ($("pane-compare").classList.contains("on")) renderCompare();
+      frame(true);
+    };
+  }
   function showTab(name) {
     for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.tab === name);
     for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === "pane-" + name);
@@ -501,5 +521,5 @@
 
   $("theme").textContent = document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
   readPalette(); fit(); fillFinder(); renderLegend(); frame(true); requestAnimationFrame(loop);
-  window.__home = { state, frame, showTab, hits: () => hits, people, modes };
+  window.__home = { state, frame, showTab, hits: () => hits, get people() { return people; }, get modes() { return modes; }, season: () => season };
 })();

@@ -242,7 +242,7 @@ battery change at the off-peak rate, so leaving the battery flat does not look
 cheap. Appliance wattages are nameplate assumptions; no measured Pakistani
 appliance dataset was found.
 
-`viewer/home.html` replays the day: people, spinning fans, AC and light state,
+`viewer/home.html` replays the day (June or October): people, spinning fans, AC and light state,
 a power-flow card (solar, battery, grid, house), battery and tank gauges, an
 outage strip with unannounced cuts hatched, the day's power and battery charts,
 every decision with its cause, and the four controllers side by side.

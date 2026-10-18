@@ -59,7 +59,9 @@ def main() -> None:
     if a.days:
         spread(a)
     if not a.no_write:
-        p = write(replay)
+        other = "october" if a.season == "june" else "june"
+        alt, _ = run_all(seed=a.seed, season=other, category=a.category)
+        p = write(replay if a.season == "june" else alt, extra={"october": alt if a.season == "june" else replay})
         print(f"\nwrote {p} ({p.stat().st_size / 1e6:.2f} MB) - open viewer/home.html")
 
 

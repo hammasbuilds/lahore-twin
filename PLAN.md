@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 6 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 7 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -596,3 +596,14 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   first reading. *Fixed:* the simulator publishes the grid state before the first
   tick; test added (seed 7 starts inside the 00:00 block).
 - Tests 67 → 68.
+
+**Round 7 — the viewer, both seasons.**
+- *Measured:* contrast of the home's energy colours against the panel, computed
+  from the live tokens: dark theme 6.3–10.4:1, light 4.8–7.1:1 — all above 4.5:1.
+- *Found:* the viewer could only show June; the October story (nobody too hot,
+  negative bills, the UPS circuit still paying) was invisible. *Added:* a
+  June/October switch. The replay carries both seasons (`window.HOME_SCENARIOS`;
+  `window.HOME` stays June); switching rebuilds the index, the finder, legend,
+  day charts and comparison. The UI check switches to October and requires the
+  scenario and comparison to change. The replay test checks both seasons share
+  the current source digest.

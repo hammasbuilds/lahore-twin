@@ -192,7 +192,11 @@ def test_the_bill_agrees_with_the_minute_series(day):
 def test_committed_home_replay_matches_the_current_code():
     from lahore_twin.export import source_digest
     text = (ROOT / "viewer" / "home_replay.js").read_text(encoding="utf-8")
-    meta = json.loads(text[len("window.HOME = "):].rstrip().rstrip(";"))["meta"]
+    first = text.split("\n", 1)[0]
+    scen = json.loads(first[len("window.HOME_SCENARIOS = "):].rstrip().rstrip(";"))
+    assert set(scen) == {"june", "october"}
+    meta = scen["june"]["meta"]
+    assert scen["october"]["meta"]["digest"] == meta["digest"]
     assert meta.get("digest") == source_digest("home"), "run `python demo_home.py` to regenerate viewer/home_replay.js"
 
 

@@ -41,10 +41,14 @@ def run_all(seed: int = 7, season: str = "june", category: str = "IV") -> tuple[
     return replay, sims
 
 
-def write(replay: dict, out: Path | None = None) -> Path:
+def write(replay: dict, out: Path | None = None, extra: dict | None = None) -> Path:
+    """Write the June replay as window.HOME, plus every scenario (June and any `extra`,
+    e.g. October) under window.HOME_SCENARIOS for the viewer's season switch."""
     out = out or ROOT / "viewer" / "home_replay.js"
-    out.write_bytes(("window.HOME = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False)
-                     + ";\n").encode("utf-8"))
+    scen = {"june": replay, **(extra or {})}
+    body = ("window.HOME_SCENARIOS = " + json.dumps(scen, separators=(",", ":"), ensure_ascii=False) + ";\n"
+            "window.HOME = window.HOME_SCENARIOS.june;\n")
+    out.write_bytes(body.encode("utf-8"))
     return out
 
 
