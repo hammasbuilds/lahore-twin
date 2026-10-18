@@ -14,7 +14,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from lahore_twin.climate import SEASONS
 from lahore_twin.home import build
-from lahore_twin.home_sim import HomeSim
+from lahore_twin.home_sim import run_day
 from lahore_twin.plan import Plan
 
 MODES = ("default", "ups", "gridsense_eco", "gridsense")
@@ -44,7 +44,7 @@ def main() -> int:
             sums = {m: [0, 0, 0] for m in MODES}
             for seed in range(1, 6):
                 sc = build(plan, SEASONS[season], seed=seed, category=cat)
-                runs = {m: HomeSim(sc, m).run() for m in MODES}
+                runs = {m: run_day(sc, m) for m in MODES}
                 ms = {m: r.metrics() for m, r in runs.items()}
                 for m in MODES:
                     sums[m][0] += ms[m]["house_dark_min"] / 5

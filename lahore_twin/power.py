@@ -71,14 +71,20 @@ class InverterSettings:
 
 @dataclass
 class StepResult:
+    """Where every kilowatt went in one step. Solar is split exactly once:
+    pv_kw = pv_load_kw + pv_batt_kw + pv_out_kw + curtailed_kw."""
     served: set = field(default_factory=set)      # appliance ids that actually ran
     pv_kw: float = 0.0
-    pv_used_kw: float = 0.0
+    pv_load_kw: float = 0.0       # solar straight into the inverter's loads
+    pv_batt_kw: float = 0.0       # solar into the battery
+    pv_out_kw: float = 0.0        # solar pushed out to the house's grid side (grid-only loads, then export)
+    curtailed_kw: float = 0.0     # solar thrown away: battery full and nowhere to send it
     batt_kw: float = 0.0          # + discharge, - charge
-    grid_kw: float = 0.0          # + import, - export
-    load_kw: float = 0.0
+    grid_in_kw: float = 0.0       # what the inverter drew from the grid (bypassed loads + charging)
+    load_kw: float = 0.0          # inverter loads actually served
     tripped: bool = False
     dark: bool = False            # inverter output off during an outage
+    dark_reason: str = ""         # "cutoff" (battery empty) or "overload" (asked for more than it can give)
 
 
 @dataclass
@@ -90,95 +96,100 @@ class Inverter:
     trips: int = 0
     shutdown: bool = False        # hit cutoff during an outage; wakes when PV or grid returns
 
+    def capacity_kw(self, grid_up: bool, pv_kw: float) -> float:
+        """What the output can carry: the rating on grid (bypass), and in an outage also
+        no more than the battery's discharge limit plus the sun."""
+        if grid_up:
+            return self.rating_kw
+        b = self.battery
+        batt = b.max_discharge_kw if b.soc > self.settings.cutoff_soc else 0.0
+        return min(self.rating_kw, batt + pv_kw)
+
     def step(self, t: int, dt: float, demand: dict[str, float], on_inverter: set[str],
              grid_up: bool, pv_kw: float, export_ok: bool = True) -> StepResult:
-        """demand: appliance id -> kW wanted. on_inverter: ids wired to the inverter output."""
+        """demand: appliance id -> kW wanted. on_inverter: ids wired to the inverter output.
+        Grid-only loads are the house's business (see the meter in home_sim); this returns
+        what the inverter itself did."""
         r = StepResult(pv_kw=pv_kw)
-        inv_loads = {a: kw for a, kw in demand.items() if a in on_inverter}
-        grid_only = {a: kw for a, kw in demand.items() if a not in on_inverter}
+        b = self.battery
+        inv_kw = sum(kw for a, kw in demand.items() if a in on_inverter)
         if grid_up:
-            r.served |= set(grid_only)
-            r.grid_kw += sum(grid_only.values())
+            r.served |= {a for a in demand if a not in on_inverter}
+        allowance = b.max_charge_kw                  # one charge limit, shared by sun and grid
 
+        def bank(kw: float) -> float:
+            nonlocal allowance
+            took = b.charge(min(kw, allowance), dt)
+            allowance -= took
+            return took
+
+        overload = inv_kw > self.capacity_kw(grid_up, pv_kw) + 1e-9
+        if overload and t >= self.trip_until:
+            self.trips += 1
+            self.trip_until = t + 60                 # real units shut their output for a minute
         if t < self.trip_until:
             r.tripped = True
-            if not grid_up:
-                r.dark = True
-                self._charge_from(pv_kw, dt, r)
-                return r
-        inv_kw = sum(inv_loads.values())
-        if inv_kw > self.rating_kw:
-            # overload: the inverter shuts its output for a minute, as real units do
-            self.trips += 1
-            self.trip_until = t + 60
-            r.tripped = True
-            if not grid_up:
-                r.dark = True
+            if grid_up:                              # most hybrids pass the grid straight through
+                r.served |= {a for a in demand if a in on_inverter}
+                r.grid_in_kw += inv_kw
+                r.load_kw = inv_kw
             else:
-                # on grid most hybrids pass the grid straight through (bypass)
-                r.served |= set(inv_loads)
-                r.grid_kw += inv_kw
-            self._charge_from(pv_kw, dt, r)
-            r.load_kw = sum(demand[a] for a in r.served)
+                r.dark, r.dark_reason = True, "overload"
+            r.pv_batt_kw = bank(pv_kw)
+            rest = pv_kw - r.pv_batt_kw
+            r.batt_kw = -r.pv_batt_kw
+            if grid_up and export_ok:
+                r.pv_out_kw = rest
+            else:
+                r.curtailed_kw = rest
             return r
 
-        b = self.battery
         if not grid_up:
             if self.shutdown and (pv_kw > 0.3 or b.soc > self.settings.cutoff_soc + 0.05):
                 self.shutdown = False
             if not self.shutdown:
-                need = inv_kw
-                pv_used = min(pv_kw, need)
-                need -= pv_used
-                available = max(0.0, (b.soc - self.settings.cutoff_soc) * b.capacity_kwh * 3600 / dt)
-                if need > 0 and need > min(b.max_discharge_kw, available):
-                    self.shutdown = True      # not enough battery left: output stops
-                    r.dark = True
+                r.pv_load_kw = min(pv_kw, inv_kw)
+                need = inv_kw - r.pv_load_kw
+                available_kwh = max(0.0, (b.soc - self.settings.cutoff_soc) * b.capacity_kwh)
+                if need > 0 and need * dt / 3600 > available_kwh:
+                    self.shutdown = True             # the battery has reached cut-off
                 else:
                     r.batt_kw += b.discharge(need, dt)
-                    r.served |= set(inv_loads)
-                    r.pv_used_kw = pv_used
-                    surplus = pv_kw - pv_used
-                    if surplus > 0:
-                        r.batt_kw -= b.charge(surplus, dt)
-                        r.pv_used_kw += min(surplus, b.max_charge_kw)
-            else:
-                r.dark = True
-                self._charge_from(pv_kw, dt, r)
-            r.load_kw = sum(demand[a] for a in r.served)
+                    r.served |= {a for a in demand if a in on_inverter}
+                    r.load_kw = inv_kw
+            if self.shutdown:
+                r.dark, r.dark_reason = True, "cutoff"
+                r.pv_load_kw = 0.0
+            surplus = pv_kw - r.pv_load_kw
+            r.pv_batt_kw = bank(surplus)
+            r.batt_kw -= r.pv_batt_kw
+            r.curtailed_kw = surplus - r.pv_batt_kw  # no grid to send it to
             return r
 
         # grid present
         self.shutdown = False
         s = self.settings
-        r.served |= set(inv_loads)
-        need = inv_kw
-        pv_used = min(pv_kw, need)
-        need -= pv_used
+        r.served |= {a for a in demand if a in on_inverter}
+        r.load_kw = inv_kw
+        r.pv_load_kw = min(pv_kw, inv_kw)
+        need = inv_kw - r.pv_load_kw
         if s.mode == "SBU" and b.soc > s.back_to_grid_soc and need > 0:
             r.batt_kw += b.discharge(need, dt)
             need -= r.batt_kw
-        r.grid_kw += need
-        surplus = pv_kw - pv_used
-        if surplus > 0:
-            took = b.charge(surplus, dt)
-            r.batt_kw -= took
-            surplus -= took
-            pv_used += took
+        r.grid_in_kw += need
+        surplus = pv_kw - r.pv_load_kw
+        r.pv_batt_kw = bank(surplus)
+        r.batt_kw -= r.pv_batt_kw
+        surplus -= r.pv_batt_kw
         if s.grid_charge_kw > 0 and b.soc < 1.0:
-            took = b.charge(s.grid_charge_kw, dt)
-            r.batt_kw -= took
-            r.grid_kw += took
-        if surplus > 0 and export_ok:
-            r.grid_kw -= surplus           # exported: counted as export, not as used at home
-        r.pv_used_kw = pv_used
-        r.load_kw = sum(demand[a] for a in r.served)
+            gc = bank(s.grid_charge_kw)
+            r.batt_kw -= gc
+            r.grid_in_kw += gc
+        if export_ok:
+            r.pv_out_kw = surplus
+        else:
+            r.curtailed_kw = surplus
         return r
-
-    def _charge_from(self, pv_kw: float, dt: float, r: StepResult) -> None:
-        took = self.battery.charge(pv_kw, dt)
-        r.batt_kw -= took
-        r.pv_used_kw = took
 
 
 @dataclass

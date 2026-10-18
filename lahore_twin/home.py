@@ -243,8 +243,51 @@ def build(plan: Plan, season: Season, seed: int = 7, category: str = "IV") -> Ho
         a = rng.randint(hm("18:30"), hm("23:00"))
         sags.append((a, a + rng.randint(300, 1500), rng.uniform(176, 189)))
 
-    return HomeScenario(plan, season, seed, category, people, _outages(rng, category), requests, water,
+    outages = _outages(random.Random(f"outages-{seed}-{category}"), category)
+    return HomeScenario(plan, season, seed, category, people, outages, requests, water,
                         meals, cloud, day_factor, forecast, sags)
+
+
+def learned_occupancy(plan: Plan, season: Season, seed: int, days: int = 4) -> dict[str, list[tuple[int, int]]]:
+    """What a controller would learn from presence sensors over `days` earlier days.
+
+    Each earlier day is a different generated day of the same household (different seed);
+    a room counts as usually occupied in a 30-minute slot if someone was in it on at least
+    half of those days. Not today's script — the controller never sees that.
+    """
+    slots = 48
+    counts: dict[str, list[int]] = {}
+    for k in range(days):
+        sc = build(plan, season, seed=10_000 + seed * 10 + k)
+        seen: dict[str, set[int]] = {}
+        for p in sc.people:
+            stays = sorted(p.day, key=lambda s: s.t)
+            for s, nxt in zip(stays, stays[1:] + [None]):
+                if s.label in ("Out", "Leaving") or s.kind == "leave":
+                    continue
+                room = plan.room_at(*s.spot)
+                if room is None:
+                    continue
+                end = nxt.t if nxt else DAY
+                for b in range(s.t // 1800, min(slots, (end - 1) // 1800 + 1)):
+                    seen.setdefault(room, set()).add(b)
+        for room, bins in seen.items():
+            c = counts.setdefault(room, [0] * slots)
+            for b in bins:
+                c[b] += 1
+    out: dict[str, list[tuple[int, int]]] = {}
+    for room, c in counts.items():
+        spans, start = [], None
+        for b in range(slots + 1):
+            on = b < slots and c[b] * 2 >= days
+            if on and start is None:
+                start = b
+            elif not on and start is not None:
+                spans.append((start * 1800, b * 1800))
+                start = None
+        if spans:
+            out[room] = spans
+    return out
 
 
 def describe(sc: HomeScenario) -> str:

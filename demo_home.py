@@ -1,4 +1,4 @@
-"""Simulate one day in a Lahore house under three controllers and print what happened.
+"""Simulate one day in a Lahore house under four controllers and print what happened.
 
     python demo_home.py                         # June, feeder category IV, seed 7
     python demo_home.py --season october --category V --seed 3
@@ -47,7 +47,7 @@ def main() -> None:
     replay, sims = run_all(seed=a.seed, season=a.season, category=a.category)
     sc = sims[MODES[0]].sc
     print(f"{sc.season.name}, seed {a.seed}, {len(sc.people)} people, 6 kWp solar, 10 kWh battery, "
-          f"6 kW inverter — three controllers in {time.perf_counter() - t:.1f} s")
+          f"6 kW inverter — four controllers (each after a warm-up day) in {time.perf_counter() - t:.1f} s")
     print(describe(sc))
     print(f"Solar: {'clear' if sc.day_factor >= 0.95 else 'hazy' if sc.day_factor >= 0.7 else 'overcast'} day\n")
     table({k: s.metrics() for k, s in sims.items()})
@@ -66,13 +66,13 @@ def main() -> None:
 def spread(a) -> None:
     from lahore_twin.climate import SEASONS
     from lahore_twin.home import build
-    from lahore_twin.home_sim import HomeSim
+    from lahore_twin.home_sim import run_day
     from lahore_twin.plan import Plan
     plan = Plan.load("home.json")
     rows = []
     for seed in range(1, a.days + 1):
         sc = build(plan, SEASONS[a.season], seed=seed, category=a.category)
-        rows.append({k: HomeSim(sc, k).run().metrics() for k in MODES})
+        rows.append({k: run_day(sc, k).metrics() for k in MODES})
     print(f"\n{a.days} days, {SEASONS[a.season].name}, category {a.category} (mean, worst day)")
     for label, key in ROWS:
         cells = []

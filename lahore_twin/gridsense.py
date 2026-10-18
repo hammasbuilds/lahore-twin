@@ -1,6 +1,6 @@
 """Controllers for the house: two common setups and GridSense.
 
-All three see the same things a real controller could: the bus (wants from
+All four see the same things a real controller could: the bus (wants from
 switches and remotes, presence sensors, grid state, voltage, battery SOC, solar
 power, tank level, room temperatures) plus the published load-shedding schedule
 and a day-ahead solar forecast. None sees unannounced cuts coming.
@@ -176,23 +176,33 @@ class GridSense(Base):
     name = "gridsense"
     COMFORT = True               # pre-cool, solar soak, AC allowance in the night reserve
     AC_KW_OUTAGE = 0.75          # average draw of a 1.5-ton inverter AC holding 27 °C at night
-    HEADROOM_KW = 5.5            # keep under the 6 kW rating with margin
+    HEADROOM_MARGIN_KW = 0.5     # stay this far under what the inverter can carry
     # never spend below this, even at peak: ~1.5 h of fans, lights and fridge for a cut nobody announced
     UNANNOUNCED_FLOOR = 0.25
 
     def __init__(self, *a):
         super().__init__(*a)
-        self.published = sorted(self.sc.published(), key=lambda o: o.start)
+        # LESCO publishes schedules ahead: tonight's plan can see tomorrow's blocks, so an outage
+        # starting at 00:00 is prepared for before midnight (same daily pattern, one day later)
+        from .home import Outage
+        today = self.sc.published()
+        self.published = sorted(today + [Outage(o.start + DAY, o.end + DAY, True) for o in today],
+                                key=lambda o: o.start)
         self.lowv_since = None
         self.lowv_cut = False
         self.precool_rooms: set[str] = set()
         self.soak_rooms: set[str] = set()
         self.soak_prev: set[str] = set()
         self.soak_decided_at = None
+        self.sun_rooms: set[str] = set()
+        self.sun_prev: set[str] = set()
+        self.sun_decided_at = None
         self.outage_began = None
         self.kwp = 6.0
         self.pv_seen_kwh = 0.0
         self.pv_expected_kwh = 0.0
+        from .home import learned_occupancy
+        self.occupancy = learned_occupancy(self.sc.plan, self.sc.season, self.sc.seed)
 
     # ---- planning --------------------------------------------------------
 
@@ -216,15 +226,14 @@ class GridSense(Base):
     def expected_in(self, room: str, a: int, b: int) -> bool:
         """Does the household's usual routine use `room` at some point between a and b?
 
-        A real controller learns this from weeks of presence data; here it is the
-        plan's `operations.usual_occupancy`.
+        Learned from four earlier days of presence (home.learned_occupancy), not from
+        today's routine.
         """
-        for start, end in self.sc.plan.operations.get("usual_occupancy", {}).get(room, []):
-            s, e = hm(start), hm(end)
-            spans = [(s, e)] if s < e else [(s, DAY), (0, e)]
-            for x, y in spans:
-                if a % DAY < y and b % DAY > x or (b % DAY < a % DAY and (x < b % DAY or y > a % DAY)):
-                    return True
+        a, b = a % DAY, b % DAY or DAY
+        windows = [(a, b)] if a < b else [(a, DAY), (0, b)]
+        for x, y in self.occupancy.get(room, []):
+            if any(x < hi and lo < y for lo, hi in windows):
+                return True
         return False
 
     def sky_factor(self) -> float:
@@ -259,7 +268,10 @@ class GridSense(Base):
             return b.min_soc + 0.10, None
         night = o.start % DAY >= hm("21:00") or o.start % DAY < hm("06:00")
         dur_h = (o.end - max(o.start, t)) / 3600
-        e = self.essential_kw(night) * dur_h + (self.AC_KW_OUTAGE * dur_h if night and self.COMFORT else 0.0)
+        # comfort: an AC for every bedroom the learned routine expects to be asleep in during the cut
+        sleepers = sum(1 for aid, a in self.apps.items() if a.kind == "ac" and a.room.startswith("bed")
+                       and self.expected_in(a.room, o.start, o.end)) if night and self.COMFORT else 0
+        e = self.essential_kw(night) * dur_h + self.AC_KW_OUTAGE * dur_h * sleepers
         return min(0.95, b.min_soc + 1.15 * e / b.capacity_kwh), o
 
     # ---- the loop --------------------------------------------------------
@@ -340,8 +352,13 @@ class GridSense(Base):
         """What the switched-on loads could draw together (an AC counted at full output)."""
         return sum(self.apps[a].watts for a, on in self.state.items() if on and a != exclude) / 1000
 
+    def headroom_kw(self) -> float:
+        """What the output can carry now, with a margin: the 6 kW rating on grid; in an
+        outage also no more than the battery's discharge limit plus the sun."""
+        return self.inv.capacity_kw(self.grid, self.pv) - self.HEADROOM_MARGIN_KW
+
     def headroom_ok(self, aid: str) -> bool:
-        return self.committed_kw(exclude=aid) + self.apps[aid].watts / 1000 <= self.HEADROOM_KW
+        return self.committed_kw(exclude=aid) + self.apps[aid].watts / 1000 <= self.headroom_kw()
 
     def _outage_hours_left(self, t: int) -> float:
         cur = next((x for x in self.published if x.start <= t < x.end), None)
@@ -355,6 +372,7 @@ class GridSense(Base):
     def _acs(self, t: int, o, why_o: str) -> None:
         self.precool_prev, self.precool_rooms = self.precool_rooms, set()
         self.soak_prev, self.soak_rooms = self.soak_rooms, set()
+        self.sun_prev, self.sun_rooms = self.sun_rooms, set()
         acs = [aid for aid, a in self.apps.items() if a.kind == "ac"]
         if self.lowv_cut:
             for aid in acs:
@@ -414,13 +432,54 @@ class GridSense(Base):
                 running.append(aid)
                 self.command(aid, True, self.grid_msg,
                              f"outage: battery covers it ({spare + per_ac:.1f} kWh spare, {hours:.1f} h left)")
-            else:
-                self.command(aid, False, self.grid_msg, "outage: battery reserved for fans, lights and fridge")
+        # the battery is full and the sun has nowhere to go: it runs ACs the battery could not
+        sun = self._sun_plan(acs, running)
         for aid in acs:
-            if aid not in wanted:
+            room = self.apps[aid].room
+            if aid in running:
+                continue
+            if room in sun and (self.state.get(aid) or self.headroom_ok(aid)):
+                self.sun_rooms.add(room)
+                self.command(aid, True, None, "outage, battery full: sun that would be thrown away runs it")
+            elif aid in wanted:
+                self.command(aid, False, self.grid_msg, "outage: battery reserved for fans, lights and fridge")
+            else:
                 self.command(aid, False, self.want_msg.get(aid), "not wanted")
 
     SOAK_KW = 1.65              # a soaking AC pulls the room down at full output first
+
+    def _sun_plan(self, acs, battery_running) -> set[str]:
+        """Rooms whose AC runs on sun that would otherwise be curtailed (outage, battery full).
+
+        Same discipline as the soak: decide on a fresh load reading, keep the ones already
+        running while the sun roughly covers them, add one room at a time on a clear margin.
+        Wanted ACs come first; comfort also cools warm, occupied rooms nobody switched on.
+        """
+        if self.soc < 0.90:
+            return set()
+        if self.load_t == self.sun_decided_at:
+            return set(self.sun_prev)
+        self.sun_decided_at = self.load_t
+        running = [a for a in acs if self.apps[a].room in self.sun_prev and self.state.get(a)
+                   and a not in battery_running]
+        free = self.pv - self.load + self.SOAK_KW * len(running)
+        # a room already running stays a candidate (hysteresis): once cooled below the
+        # "warm" bar it would otherwise drop out, warm up, and restart a minute later
+        cands = [a for a in acs if a not in battery_running and (
+            a in running or self.wants.get(a) or (self.COMFORT and self.presence.get(self.apps[a].room, 0)
+                                                  and self.temps.get(self.apps[a].room, 30.0) > 28.0))]
+        cands.sort(key=lambda a: (a not in running, not self.wants.get(a)))
+        keep, started = set(), False
+        for aid in cands:
+            room = self.apps[aid].room
+            if aid in running and free >= self.SOAK_KW - 0.5:
+                keep.add(room)
+                free -= self.SOAK_KW
+            elif aid not in running and not started and self.soc > 0.95 and free >= self.SOAK_KW + 0.5:
+                keep.add(room)
+                free -= self.SOAK_KW
+                started = True
+        return keep
 
     def _soak_plan(self, acs) -> set[str]:
         """Share the spare sun among occupied rooms, one AC at a time.
@@ -459,7 +518,10 @@ class GridSense(Base):
     def _pump(self, t: int, o, why_o: str, soon: bool) -> None:
         surplus = self.pv - self.load
         if not self.grid:
-            if self.tank < 0.15 and self.inv.battery.usable_kwh > 2.0:
+            free_sun = self.soc > 0.90 and surplus + (0.75 if self.state.get("pump") else 0.0) > 0.9
+            if self.tank < 0.98 and free_sun and (self.state.get("pump") or self.headroom_ok("pump")):
+                self.command("pump", True, None, "outage, battery full: sun that would be thrown away fills the tank")
+            elif self.tank < 0.15 and self.inv.battery.usable_kwh > 2.0:
                 self.command("pump", True, self.tank_msg, f"outage, but the tank is at {self.tank * 100:.0f}%")
             else:
                 self.command("pump", False, self.grid_msg, "outage: pump waits for the grid or the sun")
@@ -486,7 +548,8 @@ class GridSense(Base):
             clash = o is not None and o.start - t < job["left"] and o.end > t
             surplus = self.pv - self.load + (kw if self.state.get(kind) else 0)
             if not self.grid:
-                if self.state.get(kind) and surplus >= kw:
+                if surplus >= kw and self.soc > 0.90 and (self.state.get(kind) or self.headroom_ok(kind)):
+                    self.command(kind, True, job["msg"], "outage, battery full: spare sun runs it")
                     continue
                 self.command(kind, False, self.grid_msg, "outage: paused until power returns")
                 continue
@@ -518,12 +581,12 @@ class GridSense(Base):
     def setpoint(self, room: str, t: int) -> float:
         if room in self.precool_rooms:
             return 23.5
-        if room in self.soak_rooms:
+        if room in self.soak_rooms or room in self.sun_rooms:
             return 25.0
         return 27.0 if not self.grid else 26.0
 
     def precooling(self, room: str, t: int) -> bool:
-        return room in self.precool_rooms or room in self.soak_rooms
+        return room in self.precool_rooms or room in self.soak_rooms or room in self.sun_rooms
 
 
 class GridSenseEco(GridSense):

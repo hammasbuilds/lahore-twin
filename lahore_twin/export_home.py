@@ -8,7 +8,7 @@ from pathlib import Path
 from .climate import SEASONS
 from .export import ROOT, source_digest
 from .home import CATEGORIES, build
-from .home_sim import HOME_COLOURS, TARIFF, HomeSim
+from .home_sim import HOME_COLOURS, TARIFF, HomeSim, run_day
 from .plan import Plan
 
 MODES = ("default", "ups", "gridsense_eco", "gridsense")
@@ -17,7 +17,7 @@ MODES = ("default", "ups", "gridsense_eco", "gridsense")
 def run_all(seed: int = 7, season: str = "june", category: str = "IV") -> tuple[dict, dict[str, HomeSim]]:
     plan = Plan.load("home.json")
     sc = build(plan, SEASONS[season], seed=seed, category=category)
-    sims = {m: HomeSim(sc, m).run() for m in MODES}
+    sims = {m: run_day(sc, m) for m in MODES}
     first = sims[MODES[0]]
     replay = {
         "meta": {"seed": seed, "season": SEASONS[season].name, "category": category,

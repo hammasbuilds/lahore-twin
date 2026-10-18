@@ -16,7 +16,7 @@ ESP32 or Zigbee sensor can replace a simulated one without touching the rules.
 ```bash
 python demo.py               # simulate the office day three ways, write the replay
 # then open viewer/index.html in a browser — no server, no network
-python -m pytest -q          # 65 tests, including the viewer's core under node
+python -m pytest -q          # 67 tests, including the viewer's core under node
 python tools/sweep.py         # invariants over 20 simulated days (~5 min)
 python demo_home.py           # the house under four controllers; writes viewer/home_replay.js
 python tools/sweep_home.py    # home invariants: 2 seasons x 3 feeder categories x 5 days (~11 min)
@@ -172,7 +172,7 @@ sags toward 200 V in the evening, with dips below 190 V.
 
 **The grid.** A LESCO-style feeder category sets the published load-shedding
 (category IV: 5 hours, one block at night); one or two unannounced cuts come on
-top. All three controllers see the published schedule and a day-ahead solar
+top. All four controllers see the published schedule (today's and tomorrow's) and a day-ahead solar
 forecast; none sees an unannounced cut coming.
 
 | controller | what it is |
@@ -180,58 +180,58 @@ forecast; none sees an unannounced cut coming.
 | Inverter default | every circuit on the inverter, fixed settings, everything runs when wanted, pump on its float switch |
 | UPS circuit | the common Lahore wiring: fans, lights, fridge, router and TV on the inverter; ACs, pump, washer, iron and microwave die in an outage |
 | GridSense eco | GridSense's guarantees without the comfort extras: a reserve for fans, lights, fridge and router, off-peak charging, battery in the peak window, compressor protection |
-| GridSense | holds a battery reserve sized for the next published outage, pre-cools bedrooms and fills the tank before it, cools occupied rooms with sun that would otherwise be exported at Rs 11, moves laundry and ironing into solar hours, runs on battery in the peak-tariff window, rations ACs during an outage by the energy left (sleepers first), keeps every heavy load inside the inverter's rating, and cuts the AC and fridge below 190 V |
+| GridSense | holds a battery reserve sized for the next published outage (tomorrow's schedule included), pre-cools bedrooms and fills the tank before it, cools occupied rooms with sun that would otherwise be exported at Rs 11, moves laundry and ironing into solar hours, spends the battery above that reserve in the peak-tariff window, rations ACs during an outage by the energy left (sleepers first), keeps every heavy load inside the inverter's rating, and cuts the AC and fridge below 190 V |
 
 `python demo_home.py`, June, seed 7 (a simulated house, not a measurement):
 
 ```
                                    Inverter default      UPS circuit    GridSense eco        GridSense
-House dark (min)                                 35                0                0                0
-No fan when wanted (person-min)                 212                0                0                0
-Too hot to sleep (person-min)                   380              847              544              384
-Too hot awake (person-min)                      729             1141              729              494
+House dark (min)                                 61                0                0                0
+No fan when wanted (person-min)                 356                0                0                0
+Too hot to sleep (person-min)                   392              892              848              380
+Too hot awake (person-min)                      729             1125              729              494
 Roof tank empty (min)                             0                0                0                0
-Grid at peak price (kWh)                        0.0              4.3              0.0             0.87
-Grid off-peak (kWh)                            4.34             8.72             3.84             3.84
-Exported (kWh)                                 7.62             8.71             6.62             4.65
-Solar used at home (%)                         79.8             61.5             82.5             87.7
-Solar wasted (kWh)                              0.0             5.83              0.0              0.0
-Day's bill (Rs)                                 308              383              282              341
+Grid at peak price (kWh)                        0.0             4.97              0.0             1.53
+Grid off-peak (kWh)                            7.18             8.55             7.87             7.77
+Exported (kWh)                                 8.54            15.94             10.0             7.38
+Solar used at home (%)                         63.4             36.6             59.5             67.4
+Solar wasted (kWh)                             5.32             8.04              5.3             4.94
+Day's bill (Rs)                                 208              432              221              322
 Inverter overload trips                           0                0                0                0
-AC/fridge below 190 V (min)                      10               10                0                0
+AC/fridge below 190 V (min)                      16               16                0                0
 Jobs finished late                                0                0                0                0
 ```
 
-Over ten June days (`python demo_home.py --days 10`, mean per day):
+Each controller starts the day with the battery it left the night before (a
+warm-up run of the same day), not a level nobody chose. Over ten June days
+(`python demo_home.py --days 10`, mean per day):
 
 | | Inverter default | UPS circuit | GridSense eco | GridSense |
 |---|---:|---:|---:|---:|
-| house dark, minutes | 31 | 0 | 0 | 0 |
-| person-minutes without a fan when wanted | 187 | 0 | 0 | 0 |
-| person-minutes too hot to sleep | 404 | 683 | 505 | 362 |
-| person-minutes too hot awake | 733 | 1,081 | 733 | 542 |
-| grid at peak price, kWh | 1.9 | 4.2 | 1.4 | 2.3 |
-| solar used at home | 84% | 59% | 85% | 89% |
-| bill, Rs | 456 | 468 | **418** | 515 |
+| house dark, minutes | 70 | 0 | 0 | 0 |
+| person-minutes without a fan when wanted | 417 | 0 | 0 | 0 |
+| person-minutes too hot to sleep | 521 | 688 | 628 | **391** |
+| person-minutes too hot awake | 733 | 1,024 | 733 | **555** |
+| grid at peak price, kWh | 1.9 | 4.4 | **1.5** | 4.1 |
+| solar used at home | 80% | 50% | 78% | 83% |
+| solar wasted (curtailed), kWh | 1.7 | 5.5 | 1.9 | 1.8 |
+| bill, Rs | 380 | 543 | 382 | 539 |
 
-The default setup goes dark when the battery reaches cut-off in the night
-outage. The UPS circuit never goes dark but cannot run an AC in an outage and
-wastes 5.8 kWh of solar a day when the battery is full during a cut. **GridSense
-eco** gives the same never-dark guarantee for 8% less than the default. **GridSense**
-buys comfort with it: the coolest house awake and asleep, at Rs 515 — partly
-because it cools rooms with sun that would otherwise be sold back at Rs 11.
+The default setup goes dark when the battery reaches cut-off in a night outage
+(70 minutes a day on average, 173 on the worst). The UPS circuit never goes dark
+but cannot run an AC in an outage, and with its big loads grid-only it curtails
+the most sun when the battery is full during a cut. **GridSense eco** keeps the
+lights and fans on through every outage for the same money as the default — but
+it sleeps hotter (628 vs 521 person-minutes), because the default runs the ACs
+until the battery dies while eco keeps the battery for fans, lights and fridge.
+**GridSense** is the coolest house asleep and awake and never dark, at Rs 539:
+it buys a reserve big enough to run an AC in every sleeping bedroom through a
+night outage, partly at peak price (4.1 kWh) — the cost of its comfort, stated.
+
 Over 2 seasons × 3 feeder categories × 5 days (`tools/sweep_home.py`) neither
 profile is ever darker than the default, trips the inverter, flaps an AC,
-empties the tank or finishes a job late; in October nobody is too hot under
-any setup and all bills are small (Rs 7–50 a day).
-
-Stress cases (five days each): a clear-sky forecast on an overcast day, a
-two-hour unannounced cut ending half an hour before the night outage, and a
-six-hour feeder on an overcast day. The default setup is dark 248–318 minutes
-in each; both GridSense profiles 0. It corrects its forecast from what the
-panels actually produce, keeps the next outage's reserve through an unannounced
-cut, never spends the battery below ~1.5 hours of essentials, and tops up when an
-earlier outage left it low.
+empties the tank or finishes a job late; in October nobody is too hot under any
+setup and the bills are a few rupees either way.
 
 Tariff assumptions: off-peak Rs 42, peak Rs 50, export Rs 11 per kWh (the
 proposed gross-metering buyback). The bill values each controller's end-of-day
@@ -242,7 +242,7 @@ appliance dataset was found.
 `viewer/home.html` replays the day: people, spinning fans, AC and light state,
 a power-flow card (solar, battery, grid, house), battery and tank gauges, an
 outage strip with unannounced cuts hatched, the day's power and battery charts,
-every decision with its cause, and the three controllers side by side.
+every decision with its cause, and the four controllers side by side.
 
 ## Layout
 
@@ -251,7 +251,7 @@ lahore_twin/   plan.py (rooms, doors, A* routing) · bus.py (MQTT-style bus with
                office.py (people, calendar, schedules) · people.py · devices.py (room physics)
                rules.py (automation, attendance) · sim.py (1 s loop) · export.py (replay)
                climate.py · home.py (family, outages) · power.py (PV, battery, inverter, tank)
-               gridsense.py (three home controllers) · home_sim.py · export_home.py
+               gridsense.py (four home controllers) · home_sim.py · export_home.py
 plans/         office.json, home.json — the floor plans as data
 viewer/        index.html + app.js (office), home.html + home.js (home), core.js + twin.css shared;
                replay.js and home_replay.js are generated

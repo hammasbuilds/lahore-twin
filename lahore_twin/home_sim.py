@@ -65,8 +65,15 @@ def appliances_for(plan) -> list[Appliance]:
     return out
 
 
+def run_day(sc: HomeScenario, mode: str) -> "HomeSim":
+    """Simulate the day after a warm-up run of the same day, so each controller starts at
+    00:00 with the battery it left the night before rather than a level nobody chose."""
+    warm = HomeSim(sc, mode).run()
+    return HomeSim(sc, mode, soc_start=warm.inverter.battery.soc).run()
+
+
 class HomeSim:
-    def __init__(self, sc: HomeScenario, mode: str):
+    def __init__(self, sc: HomeScenario, mode: str, soc_start: float | None = None):
         self.sc, self.plan, self.season, self.mode = sc, sc.plan, sc.season, mode
         self.rng_people = random.Random(sc.seed * 1000 + 11)
         self.people: list[Person] = copy.deepcopy(sc.people)
@@ -79,6 +86,8 @@ class HomeSim:
         self.bus = Bus(quiet=("voltage", "soc", "kw", "level", "temp", "load", "presence"))
         self.apps = {a.id: a for a in appliances_for(self.plan)}
         self.inverter = Inverter()
+        if soc_start is not None:
+            self.inverter.battery.soc = soc_start
         self.tank = RoofTank()
         self.env = {}
         for rid, r in self.plan.rooms.items():
@@ -106,11 +115,15 @@ class HomeSim:
         self.labels: list[list] = []
         self.served: set[str] = set()
         self.last_result = None
-        self.acc = {"pv_kwh": 0.0, "pv_used_kwh": 0.0, "grid_peak_kwh": 0.0, "grid_offpeak_kwh": 0.0,
+        self.house_kw = 0.0
+        self.meter_kw = 0.0
+        self.acc = {"pv_kwh": 0.0, "pv_used_kwh": 0.0, "curtailed_kwh": 0.0, "grid_peak_kwh": 0.0,
+                    "grid_offpeak_kwh": 0.0,
                     "export_kwh": 0.0, "load_kwh": 0.0, "dark_s": 0, "no_fan_ps": 0, "hot_sleep_ps": 0,
                     "hot_awake_ps": 0, "lowv_stress_s": 0}
         self.soc_start = self.inverter.battery.soc
         self.series = {"t": [], "pv_kw": [], "load_kw": [], "grid_kw": [], "batt_kw": [], "soc": [],
+                       "curtailed_kw": [], "dark_reason": [],
                        "tank": [], "volts": [], "grid_up": [], "out_temp": [], "dark": [],
                        "temp": {r: [] for r in self.env}, "occ": {r: [] for r in self.env}}
 
@@ -304,15 +317,20 @@ class HomeSim:
                     self.bus.publish(f"home/{req.room}/{aid}/done", req.id, None,
                                      f"{req.label} finished at {t // 3600:02d}:{t % 3600 // 60:02d}"
                                      + (" — LATE" if t > req.deadline else ""))
-        # energy accounting
+        # energy accounting, at the meter: grid-only loads are fed first by solar the inverter
+        # pushes out, then by the grid; only what is left over leaves the house as export
         h = PHYS_DT / 3600
+        grid_only_kw = sum(demand[a] for a in r.served if a not in self.ctrl.on_inverter)
+        meter_kw = grid_only_kw + r.grid_in_kw - r.pv_out_kw
+        imp, exp = max(0.0, meter_kw), max(0.0, -meter_kw)
+        self.house_kw = r.load_kw + grid_only_kw
+        self.meter_kw = meter_kw
         self.acc["pv_kwh"] += pv * h
-        self.acc["pv_used_kwh"] += min(pv, r.pv_used_kw) * h
-        self.acc["load_kwh"] += r.load_kw * h
-        if r.grid_kw > 0:
-            self.acc["grid_peak_kwh" if self.season.is_peak(t) else "grid_offpeak_kwh"] += r.grid_kw * h
-        else:
-            self.acc["export_kwh"] += -r.grid_kw * h
+        self.acc["curtailed_kwh"] += r.curtailed_kw * h
+        self.acc["pv_used_kwh"] += (pv - exp - r.curtailed_kw) * h    # used at home, behind the meter
+        self.acc["load_kwh"] += self.house_kw * h
+        self.acc["grid_peak_kwh" if self.season.is_peak(t) else "grid_offpeak_kwh"] += imp * h
+        self.acc["export_kwh"] += exp * h
         if not grid and r.dark:
             self.acc["dark_s"] += PHYS_DT
         for p in self.people:
@@ -335,13 +353,17 @@ class HomeSim:
             self.grid_was = grid
             self.bus.publish("home/grid/state", grid, None, "Grid is back" if grid else "Power cut — grid is down")
         if r.tripped and (not self.trips or t - self.trips[-1][0] > 60):
-            self.trips.append([t, sum(demand.get(a, 0) for a in demand if a in self.ctrl.on_inverter)])
-            self.bus.publish("home/alert/overload", round(self.trips[-1][1], 2), None,
-                             f"Inverter overloaded ({self.trips[-1][1]:.1f} kW asked of 6 kW) — output tripped for a minute")
+            asked = sum(demand.get(a, 0) for a in demand if a in self.ctrl.on_inverter)
+            cap = self.inverter.capacity_kw(grid, pv)
+            self.trips.append([t, asked])
+            self.bus.publish("home/alert/overload", round(asked, 2), None,
+                             f"Inverter overloaded: {asked:.1f} kW asked, it can carry {cap:.1f} kW"
+                             + ("" if grid else " (battery limit + sun)") + " — output off for a minute")
         if not prev.issubset(r.served) and r.dark and not getattr(self, "_dark_said", False):
             self._dark_said = True
-            self.bus.publish("home/alert/dark", self.inverter.battery.soc, None,
-                             f"House dark: battery at {self.inverter.battery.soc * 100:.0f}% cut-off")
+            why = (f"battery at {self.inverter.battery.soc * 100:.0f}%, its cut-off" if r.dark_reason == "cutoff"
+                   else "inverter overloaded")
+            self.bus.publish("home/alert/dark", self.inverter.battery.soc, None, f"House dark: {why}")
         if not r.dark:
             self._dark_said = False
         self._volts = volts
@@ -354,14 +376,16 @@ class HomeSim:
         self.bus.publish("home/pv/kw", round(self._pv, 3))
         self.bus.publish("home/tank/level", round(self.tank.fraction, 3))
         self.bus.publish("home/grid/voltage", round(self._volts, 1))
-        self.bus.publish("home/house/load", round(r.load_kw, 3))
+        self.bus.publish("home/house/load", round(self.house_kw, 3))
         for rid, env in self.env.items():
             self.bus.publish(f"home/{rid}/temp", round(env.temp, 2))
         s = self.series
         s["t"].append(t)
         s["pv_kw"].append(round(self._pv, 3))
-        s["load_kw"].append(round(r.load_kw, 3))
-        s["grid_kw"].append(round(r.grid_kw, 3))
+        s["load_kw"].append(round(self.house_kw, 3))
+        s["grid_kw"].append(round(self.meter_kw, 3))
+        s["curtailed_kw"].append(round(r.curtailed_kw, 3))
+        s["dark_reason"].append(r.dark_reason)
         s["batt_kw"].append(round(r.batt_kw, 3))
         s["soc"].append(round(b.soc, 4))
         s["tank"].append(round(self.tank.fraction, 3))
@@ -412,7 +436,7 @@ class HomeSim:
             "pv_kwh": round(a["pv_kwh"], 2),
             # solar used at home (loads + battery), not counting what was exported or wasted
         "solar_used_pct": round(100 * a["pv_used_kwh"] / max(a["pv_kwh"], 1e-9), 1),
-        "solar_wasted_kwh": round(max(0.0, a["pv_kwh"] - a["pv_used_kwh"] - a["export_kwh"]), 2),
+        "solar_wasted_kwh": round(a["curtailed_kwh"], 2),
             "battery_throughput_kwh": round(b.throughput_kwh, 2),
             "soc_end": round(b.soc, 3),
             # the day's bill, with the battery's end-of-day change valued at the off-peak rate,

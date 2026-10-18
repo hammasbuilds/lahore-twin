@@ -159,8 +159,9 @@
     if (dark) {
       ctx.fillStyle = "rgba(0,0,0,0.45)";
       const [W, Hh] = plan.size; ctx.fillRect(X(0), Y(5), W * s, (Hh - 7.5) * s);
-      ctx.fillStyle = palette.outage; ctx.font = `700 ${Math.max(13, s * 0.7)}px Segoe UI, system-ui`; ctx.textAlign = "center";
-      ctx.fillText("House dark — battery at cut-off", X(plan.size[0] / 2), Y(13.5));
+      const why = (S.dark_reason && S.dark_reason[i] === "overload") ? "inverter overloaded" : "battery at cut-off";
+      ctx.fillStyle = palette.outage; ctx.font = `700 ${Math.max(12, s * 0.62)}px Segoe UI, system-ui`; ctx.textAlign = "center";
+      ctx.fillText(`House dark — ${why}`, X(plan.size[0] / 2), Y(3.6));
     }
     drawPeople(t);
   }
@@ -232,7 +233,8 @@
     svg += wire(`M${cx} ${cy + 16} L${cx} 143`, "battery", Math.abs(b) > 0.05, b > 0);
     svg += wire(`M${cx + 16} ${cy} L284 ${cy}`, "home", load > 0.02, false);
     svg += `<circle cx="${cx}" cy="${cy}" r="16" fill="var(--panel-2)" stroke="var(--line)"/><text x="${cx}" y="${cy + 4}" text-anchor="middle" style="fill:var(--muted);font:600 10px Segoe UI">INV</text>`;
-    svg += node(cx, 25, "Solar", pv.toFixed(2) + " kW", "");
+    const cut = S.curtailed_kw ? S.curtailed_kw[i] : 0;
+    svg += node(cx, 25, "Solar", pv.toFixed(2) + " kW", cut > 0.05 ? cut.toFixed(2) + " kW wasted" : "");
     svg += node(52, cy, up ? "Grid" : "Grid down", up ? (g >= 0 ? g.toFixed(2) + " kW in" : (-g).toFixed(2) + " kW out") : "outage", up ? S.volts[i].toFixed(0) + " V" : "");
     svg += node(cx, 165, "Battery", (soc * 100).toFixed(0) + "%", b > 0.05 ? "giving " + b.toFixed(2) + " kW" : b < -0.05 ? "taking " + (-b).toFixed(2) + " kW" : "idle");
     svg += node(308, cy, "House", load.toFixed(2) + " kW", "");
@@ -302,8 +304,13 @@
       for (const [lt, l] of p.labels) if (lt <= t) html += `<tr><td class="num muted">${C.clock(lt)}</td><td>${esc(l)}</td></tr>`;
       body.innerHTML = html + `</table>`;
     } else if (state.sel.type === "msg") {
-      const m = M().byId[state.sel.id];
-      body.innerHTML = m ? `<h3>Event at ${C.clock(m.t)}</h3><p>${esc(m.text)}</p><p class="muted num">topic <code>${esc(m.topic)}</code></p><h3>Why it happened</h3>${whyHtml(m.id)}` : `<p class="muted">That event does not exist under this controller.</p>`;
+      // message ids differ between controllers: when switching, find the same topic nearest in time
+      let m = M().byId[state.sel.id];
+      if (!m || (state.sel.topic && m.topic !== state.sel.topic)) {
+        const cands = M().log.filter((x) => x.topic === state.sel.topic && x.text);
+        m = cands.sort((a, b) => Math.abs(a.t - state.sel.t) - Math.abs(b.t - state.sel.t))[0];
+      }
+      body.innerHTML = m ? `<h3>Event at ${C.clock(m.t)}</h3><p>${esc(m.text)}</p><p class="muted num">topic <code>${esc(m.topic)}</code></p><h3>Why it happened</h3>${whyHtml(m.id)}` : `<p class="muted">Nothing like that event happens under this controller.</p>`;
     }
   }
   function appBlock(a, t, full) {
@@ -344,7 +351,12 @@
       g.fillRect(xs(o.start), top, xs(o.end) - xs(o.start), h - B - top);
     }
     g.strokeStyle = palette.line; g.lineWidth = 1; g.font = "10.5px Segoe UI, system-ui"; g.fillStyle = palette.muted;
-    for (let k = 0; k <= 4; k++) { const v = lo + (hi - lo) * k / 4, y = ys(v); g.beginPath(); g.moveTo(L, y); g.lineTo(w - 4, y); g.stroke(); g.textAlign = "right"; g.fillText(v.toFixed(0), L - 4, y + 3); }
+    const raw = (hi - lo) / 4, mag = Math.pow(10, Math.floor(Math.log10(raw || 1)));
+    const step = [1, 2, 2.5, 5, 10].map((f) => f * mag).find((x) => x >= raw) || raw;
+    for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) {
+      const y = ys(v); g.beginPath(); g.moveTo(L, y); g.lineTo(w - 4, y); g.stroke(); g.textAlign = "right";
+      g.fillText(Number.isInteger(v) ? String(v) : v.toFixed(1), L - 4, y + 3);
+    }
     g.textAlign = "center"; for (let hh = 0; hh <= 24; hh += 4) g.fillText(String(hh).padStart(2, "0"), xs(hh * 3600), h - 3);
     return { g, xs, ys, w, h, top, B };
   }
@@ -450,7 +462,12 @@
   for (const b of document.querySelectorAll("#layers button")) b.onclick = () => { state.layer = b.dataset.layer; for (const x of document.querySelectorAll("#layers button")) x.setAttribute("aria-pressed", x === b); frame(true); };
   for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
   $("only-key").onchange = () => renderLog(true);
-  $("log").onclick = (e) => { const li = e.target.closest("li[data-msg]"); if (!li) return; state.sel = { type: "msg", id: +li.dataset.msg }; showTab("inspect"); frame(true); };
+  $("log").onclick = (e) => {
+    const li = e.target.closest("li[data-msg]"); if (!li) return;
+    const m = M().byId[+li.dataset.msg];
+    state.sel = { type: "msg", id: +li.dataset.msg, topic: m && m.topic, t: m && m.t };
+    showTab("inspect"); frame(true);
+  };
   $("theme").onclick = () => { const d = document.documentElement.dataset.theme !== "light"; document.documentElement.dataset.theme = d ? "light" : "dark"; $("theme").textContent = d ? "Dark" : "Light"; readPalette(); renderLegend(); save(); if ($("pane-day").classList.contains("on")) renderDay(); frame(true); };
   function pick(ev) {
     const rect = cv.getBoundingClientRect(), mx = ev.clientX - rect.left, my = ev.clientY - rect.top;

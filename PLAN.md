@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 4 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 5 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -537,3 +537,48 @@ Four causes, each traced to the minute it went dark:
    (at peak only if very low). Also: an unannounced cut is now assumed to last
    1.5 h from its start (they run 20–90 min), not "one more hour" forever.
 Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
+
+**Round 5 — an independent reviewer, cold (62/100).** Its findings and what changed:
+1. *High — solar accounting wrong both ways.* In an outage the inverter reported
+   sun as used even when the battery took none (real curtailment on seed 7:
+   8–14 kWh, reported 0); grid-only loads were netted against export, so solar
+   feeding them showed as "wasted". *Fixed:* the inverter now splits solar once
+   (`pv_load + pv_batt + pv_out + curtailed = pv`, tested), and the house computes
+   the meter: grid-only loads are fed by solar pushed out before any export.
+2. *High — one battery, two charge limits.* Sun and grid charging each took the
+   full 5 kW (7 kW measured). *Fixed:* one shared allowance (tested).
+3. *High — the 5 kW discharge limit below the 6 kW rating* blacked the house out
+   as "battery at cut-off". *Fixed:* asking more than battery + sun can give is
+   an overload trip with its own reason; GridSense's headroom is the inverter's
+   real capacity minus a margin, not a fixed 5.5 kW.
+4. *Day boundary:* every controller started at 00:00 on 60% nobody chose.
+   *Fixed:* a warm-up run of the same day; each starts with what it left the night
+   before. This exposed a planning blind spot — a published block at 00:00 was
+   invisible before midnight. *Fixed:* GridSense sees tomorrow's published
+   schedule (LESCO publishes ahead).
+5. *Feeder categories shared one random stream* (the night block never changed).
+   *Fixed:* each category draws its own outages.
+6. *usual_occupancy was the generator's script* (perfect foreknowledge).
+   *Fixed:* GridSense learns it from four other generated days (rooms used ≥50%
+   of days per 30-min slot); the plan no longer carries it.
+7. *Sun thrown away in outages while rooms sat at 39 °C.* *Added:* with the
+   battery full, curtailed sun runs wanted ACs the battery could not, the pump and
+   pending laundry/ironing; comfort also cools warm occupied rooms. A flap this
+   introduced (the plan dropped its own room once cooled below 28 °C) was caught
+   by the flapping test and fixed with the same hysteresis as the soak.
+8. *Comfort's night reserve covered one AC for three sleeping bedrooms*; it now
+   covers each bedroom the learned routine expects asleep.
+9. *Stale README numbers / overstated claims:* rewritten from fresh runs. The old
+   "eco is 8% cheaper" does not survive the honest accounting — eco now costs the
+   same as the default (Rs 382 vs 380) while never going dark (default 70
+   min/day) and sleeping hotter (628 vs 521); stated plainly. "Runs on battery at
+   peak" became "spends the battery above the reserve"; comfort's 4.1 kWh of
+   peak import is stated as the cost of its reserve.
+10. *Viewer:* events matched across controllers by topic and time; even chart
+   ticks; the dark banner names the real reason and sits off the hall label; the
+   flow card shows curtailed sun. *Wording:* "three controllers" → four.
+11. *Tests:* the same-day test compares all four; the solar tests cover the
+   outage branch and the exact split; a shared-charge-limit test; an overload-
+   not-cutoff test; the bill test recomputes from the minute series instead of
+   copying the formula; reserve and stress tests find suitable outages/seeds
+   instead of hard-coding them. Tests 65 → 67.

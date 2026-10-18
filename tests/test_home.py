@@ -6,7 +6,7 @@ import pytest
 from lahore_twin.bus import Bus
 from lahore_twin.climate import JUNE, OCTOBER, hm
 from lahore_twin.home import build
-from lahore_twin.home_sim import HomeSim
+from lahore_twin.home_sim import HomeSim, run_day
 from lahore_twin.plan import Plan
 from lahore_twin.power import Battery, Inverter, InverterSettings, RoofTank
 
@@ -21,7 +21,7 @@ def plan():
 @pytest.fixture(scope="module")
 def day(plan):
     sc = build(plan, JUNE, seed=7)
-    return sc, {m: HomeSim(sc, m).run() for m in ("default", "ups", "gridsense_eco", "gridsense")}
+    return sc, {m: run_day(sc, m) for m in ("default", "ups", "gridsense_eco", "gridsense")}
 
 
 # ---- physics ---------------------------------------------------------------
@@ -48,17 +48,38 @@ def test_battery_stops_at_cutoff_and_the_house_goes_dark():
 def test_sbu_spends_the_battery_only_above_back_to_grid():
     inv = Inverter(battery=Battery(soc=0.5), settings=InverterSettings("SBU", 0.45, 0.0))
     r = inv.step(0, 10, {"x": 1.0}, {"x"}, grid_up=True, pv_kw=0.0)
-    assert r.batt_kw > 0.9 and r.grid_kw < 0.1
+    assert r.batt_kw > 0.9 and r.grid_in_kw < 0.1
     inv.battery.soc = 0.40
     r = inv.step(10, 10, {"x": 1.0}, {"x"}, grid_up=True, pv_kw=0.0)
-    assert r.batt_kw == 0 and r.grid_kw == pytest.approx(1.0)
+    assert r.batt_kw == 0 and r.grid_in_kw == pytest.approx(1.0)
 
-
-def test_exported_solar_is_not_counted_as_used_at_home():
+def test_solar_is_split_exactly_once():
+    """Grid up: surplus goes out to the house's grid side. Outage with a full battery: it
+    is curtailed (the review found it reported as used). Either way the parts add up."""
     inv = Inverter(battery=Battery(soc=1.0))
     r = inv.step(0, 10, {"x": 0.5}, {"x"}, grid_up=True, pv_kw=3.0)
-    assert r.grid_kw == pytest.approx(-2.5) and r.pv_used_kw == pytest.approx(0.5)
+    assert r.pv_load_kw == pytest.approx(0.5) and r.pv_out_kw == pytest.approx(2.5) and r.curtailed_kw == 0
+    r = inv.step(10, 10, {"x": 0.3}, {"x"}, grid_up=False, pv_kw=4.0)
+    assert r.pv_load_kw == pytest.approx(0.3) and r.curtailed_kw == pytest.approx(3.7) and r.pv_out_kw == 0
+    for grid in (True, False):
+        for soc in (0.2, 0.7, 1.0):
+            inv = Inverter(battery=Battery(soc=soc), settings=InverterSettings("UTI", 0.3, 3.0))
+            r = inv.step(0, 10, {"x": 1.2}, {"x"}, grid_up=grid, pv_kw=4.5)
+            assert r.pv_load_kw + r.pv_batt_kw + r.pv_out_kw + r.curtailed_kw == pytest.approx(4.5)
 
+
+def test_sun_and_grid_share_one_charge_limit():
+    inv = Inverter(battery=Battery(soc=0.3), settings=InverterSettings("UTI", 0.9, 3.0))
+    before = inv.battery.soc
+    r = inv.step(0, 3600, {}, set(), grid_up=True, pv_kw=4.5)
+    charged_kw = (inv.battery.soc - before) * inv.battery.capacity_kwh / inv.battery.efficiency
+    assert charged_kw <= inv.battery.max_charge_kw + 1e-6 and r.pv_batt_kw + (r.grid_in_kw) <= 5.0 + 1e-6
+
+
+def test_asking_more_than_the_battery_can_give_is_an_overload_not_a_cutoff():
+    inv = Inverter(battery=Battery(soc=0.8))
+    r = inv.step(0, 10, {"x": 5.3}, {"x"}, grid_up=False, pv_kw=0.0)
+    assert r.dark and r.dark_reason == "overload" and r.tripped
 
 def test_tank_runs_dry_and_counts_it():
     tank = RoofTank(level_l=10)
@@ -71,7 +92,7 @@ def test_tank_runs_dry_and_counts_it():
 def test_the_family_lives_the_same_day_under_every_controller(day):
     _, sims = day
     trips = [json.dumps(s.trips_log) for s in sims.values()]
-    assert trips[0] == trips[1] == trips[2]
+    assert len(trips) == 4 and len(set(trips)) == 1
 
 
 def test_outages_mix_published_and_unannounced(plan):
@@ -97,22 +118,25 @@ def test_default_goes_dark_where_gridsense_does_not(day):
     assert m["gridsense"]["house_dark_min"] == 0 and m["gridsense"]["no_fan_person_min"] == 0
 
 
-def test_ups_wiring_loses_the_acs_in_an_outage_and_wastes_solar(day):
+def test_ups_wiring_loses_the_acs_in_an_outage_and_curtails_more_sun(day):
     _, sims = day
     ups = sims["ups"]
     assert "ac:bed1" not in ups.ctrl.on_inverter and "fan:bed1" in ups.ctrl.on_inverter
     m = {k: s.metrics() for k, s in sims.items()}
     assert m["ups"]["hot_sleep_person_min"] > m["gridsense"]["hot_sleep_person_min"]
-    assert m["ups"]["solar_wasted_kwh"] > 0
-
+    # a full battery in a cut has nowhere to put the sun when the big loads are grid-only
+    assert m["ups"]["solar_wasted_kwh"] > m["gridsense"]["solar_wasted_kwh"]
 
 def test_gridsense_holds_a_reserve_before_a_published_outage(day):
+    """At the start of a published night outage the battery holds the reserve sized for it.
+    A block at 00:00 is prepared the evening before (tomorrow's schedule is published), so
+    there the check is the level carried over midnight."""
     sc, sims = day
     gs = sims["gridsense"]
-    night = next(o for o in sc.outages if o.published and o.start >= hm("21:00"))
-    i = night.start // 60 - 1
-    target, _ = gs.ctrl.reserve_soc(night.start - 60)
-    assert gs.series["soc"][i] >= target - 0.05
+    night = next(o for o in sc.outages if o.published and (o.start >= hm("21:00") or o.start < hm("06:00")))
+    soc = gs.soc_start if night.start == 0 else gs.series["soc"][night.start // 60 - 1]
+    target, _ = gs.ctrl.reserve_soc(night.start - 60 if night.start else 0)
+    assert soc >= target - 0.05, (soc, target)
 
 
 def test_outage_rationing_does_not_flap(day):
@@ -152,14 +176,18 @@ def test_low_voltage_protects_the_compressors(plan):
     assert isinstance(ctrl, GridSense)
 
 
-def test_the_bill_values_the_battery_left_at_the_end(day):
+def test_the_bill_agrees_with_the_minute_series(day):
+    """An independent path: integrate the minute samples of the meter instead of the
+    10-second accumulators, price them, and credit the battery's end-of-day change."""
     _, sims = day
     for s in sims.values():
-        m = s.metrics()
-        raw = m["grid_peak_kwh"] * 50 + m["grid_offpeak_kwh"] * 42 - m["export_kwh"] * 11
-        delta = (s.inverter.battery.soc - s.soc_start) * s.inverter.battery.capacity_kwh
-        assert abs(m["bill_rs"] - (raw - delta * 42)) <= 1      # metrics use unrounded kWh
-
+        S, cost = s.series, 0.0
+        for t, kw in zip(S["t"], S["grid_kw"]):
+            price = 50 if s.season.is_peak(t) else 42
+            cost += (kw * price if kw > 0 else kw * 11) / 60
+        b = s.inverter.battery
+        cost -= (b.soc - s.soc_start) * b.capacity_kwh * 42
+        assert abs(s.metrics()["bill_rs"] - cost) <= max(12, 0.05 * abs(cost)), (s.mode, s.metrics()["bill_rs"], cost)
 
 def test_committed_home_replay_matches_the_current_code():
     from lahore_twin.export import source_digest
@@ -204,9 +232,14 @@ def test_gridsense_keeps_the_lights_on_when_its_assumptions_fail(plan, case):
     """Stress cases from home round 4: a clear-sky forecast on an overcast day, and an
     unannounced cut ending half an hour before the published night outage."""
     from lahore_twin.home import Outage
-    # seeds with the shape each case needs (4: a long unannounced cut at 21:38; 1 and 7: a
-    # published 22:00 night outage to cut in front of)
-    for seed in ((2, 4) if case == "forecast_wrong" else (1, 7)):
+    # seeds with the shape each case needs: for the cut, the first two with a published
+    # evening block to cut in front of (found, not hard-coded: outage draws differ by category)
+    if case == "forecast_wrong":
+        seeds = (2, 4)
+    else:
+        seeds = [k for k in range(1, 40)
+                 if any(o.published and o.start >= hm("20:00") for o in build(plan, JUNE, seed=k).outages)][:2]
+    for seed in seeds:
         sc = build(plan, JUNE, seed=seed)
         if case == "forecast_wrong":
             sc.day_factor, sc.forecast_factor = 0.45, 1.0
