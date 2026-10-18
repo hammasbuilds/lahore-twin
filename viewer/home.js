@@ -179,7 +179,9 @@
     const r = rooms[a.room]; if (!r) return null;
     const [x0, y0, x1, y1] = r.rect, cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
     const spot = { fridge: "fridge", pump: "pump", washer: "washer", iron: "iron" }[a.kind];
-    if (spot && plan.spots[spot]) return plan.spots[spot][0];
+    // the spot is where the user stands; a machine they attend (washer, iron, pump) sits 0.6 m beside it, towards the room's
+    // middle, or the person using it hides it at exactly the moment it is running
+    if (spot && plan.spots[spot]) { const [sx, sy] = plan.spots[spot][0]; return a.kind === "fridge" ? [sx, sy] : [sx + (sx < cx ? 0.6 : -0.6), sy]; }
     if (a.kind === "fan") return [cx, cy];
     if (a.kind === "ac") return [x1 - 0.95, y1 - 0.45];   // bottom-right corner: room names own the top edge
     if (a.kind === "tv") return [cx, y1 - 0.9];
@@ -193,7 +195,7 @@
       if (a.kind === "light") continue;
       const p = appPos(a); if (!p) continue;
       const on = live(a.id, t), wanted = cmdOn(a.id, t), x = X(p[0]), y = Y(p[1]);
-      const col = on ? ({ fan: palette.text, ac: palette.ac, pump: palette.water, washer: palette.solar, iron: palette.alert, fridge: palette.ok, tv: palette.people, router: palette.ok, microwave: palette.alert }[a.kind] || palette.text) : palette.muted;
+      const col = on ? ({ fan: palette.text, ac: palette.ac, pump: palette.water, washer: palette.text, iron: palette.alert, fridge: palette.ok, tv: palette.people, router: palette.ok, microwave: palette.alert }[a.kind] || palette.text) : palette.muted;
       ctx.globalAlpha = on ? 1 : (wanted ? 0.9 : 0.45);
       ctx.strokeStyle = col; ctx.fillStyle = col; ctx.lineWidth = 1.6;
       if (a.kind === "fan") {
@@ -521,5 +523,16 @@
 
   $("theme").textContent = document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
   readPalette(); fit(); fillFinder(); renderLegend(); frame(true); requestAnimationFrame(loop);
-  window.__home = { state, frame, showTab, hits: () => hits, get people() { return people; }, get modes() { return modes; }, season: () => season };
+  // running machines whose glyph a person's dot covers right now (the UI check wants none)
+  function hiddenRunning() {
+    const t = state.t, rp = Math.max(3.5, view.s * 0.3), out = [];
+    for (const a of H.appliances) {
+      // fan blades and AC bars reach past a dot; the small square glyphs do not
+      if (["light", "fan", "ac"].includes(a.kind) || !live(a.id, t)) continue;
+      const p = appPos(a); if (!p) continue;
+      for (const h of hits) if (Math.hypot(h.x - X(p[0]), h.y - Y(p[1])) < rp) out.push(a.id + " under " + h.p.name);
+    }
+    return out;
+  }
+  window.__home = { state, frame, showTab, hits: () => hits, hiddenRunning, get people() { return people; }, get modes() { return modes; }, season: () => season };
 })();

@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 8 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | review round 9 of 10 done |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -626,3 +626,18 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   first `/set` arrived); it now waits for both. Five consecutive passes.
 - Limitation stated in the README: never run against a real box.
 - Tests 68 → 70.
+
+**Round 9 — a machine hidden by the person using it.**
+- *Found (using the viewer at 10:30):* the log said the washer ran 09:45–10:44,
+  but the plan showed it off. The helper stands on the washer's spot, and her
+  dot covered the glyph — every attended machine (washer, iron, pump) vanished
+  exactly while it was in use.
+- *Fixed:* attended machines are drawn 0.6 m beside their spot, towards the
+  room's middle; the fridge stays put (it sat clear of its user and moving it
+  covered the Kitchen label). The running washer was amber, the legend's colour
+  for lights; it is now neutral.
+- *Re-checked:* `__home.hiddenRunning()` lists running square glyphs under a
+  dot; the UI check scans 06:00–23:00 every 15 min for GridSense and the default
+  and fails on any. It fails on the old placement (washer under the helper,
+  09:45) and passes now. Fans and ACs are excluded: their blades and bars reach
+  past a dot (the first version of the check flagged fans over sleepers).

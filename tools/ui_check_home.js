@@ -40,6 +40,16 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   const first = page.locator("#log li[data-msg]").first(); await first.waitFor({ state: "visible" });
   await first.click(); await page.waitForTimeout(200); await shot("10-why");
   // a real click on a person
+  // a machine in use must stay visible: the person using it stands at its spot
+  for (const mode of ["gridsense", "default"]) {
+    await page.click(`#modes button[data-mode="${mode}"]`);
+    for (let h = 6; h < 23; h += 0.25) {
+      await page.evaluate((t) => { window.__home.state.t = t; window.__home.frame(true); }, Math.round(h * 3600));
+      const hid = await page.evaluate(() => window.__home.hiddenRunning());
+      if (hid.length) throw new Error(`${mode} ${h}h: running appliance hidden by a person: ${hid.join(", ")}`);
+    }
+  }
+  await page.click('#modes button[data-mode="gridsense"]');
   await setT("20:45");
   const dot = await page.evaluate(() => { const r = document.getElementById("plan").getBoundingClientRect(); const h = window.__home.hits()[0]; return h ? { x: r.left + h.x, y: r.top + h.y, name: h.p.name } : null; });
   if (!dot) throw new Error("nobody on the plan at 20:45");
