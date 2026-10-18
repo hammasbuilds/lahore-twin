@@ -41,12 +41,18 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   await first.click(); await page.waitForTimeout(200); await shot("10-why");
   // a real click on a person
   // a machine in use must stay visible: the person using it stands at its spot
-  for (const mode of ["gridsense", "default"]) {
+  for (const mode of ["gridsense", "default", "ups"]) {
     await page.click(`#modes button[data-mode="${mode}"]`);
     for (let h = 6; h < 23; h += 0.25) {
       await page.evaluate((t) => { window.__home.state.t = t; window.__home.frame(true); }, Math.round(h * 3600));
       const hid = await page.evaluate(() => window.__home.hiddenRunning());
       if (hid.length) throw new Error(`${mode} ${h}h: running appliance hidden by a person: ${hid.join(", ")}`);
+      // and every power-flow label fits inside its box and the card
+      const spill = await page.evaluate(() => [...document.querySelectorAll("#flow .node")].flatMap((g) => {
+        const r = g.querySelector("rect").getBBox();
+        return [...g.querySelectorAll("text")].filter((t) => { const b = t.getBBox(); return b.x < r.x || b.x + b.width > r.x + r.width || r.x < 0 || r.x + r.width > 360; }).map((t) => t.textContent);
+      }));
+      if (spill.length) throw new Error(`${mode} ${h}h: power-flow text outside its box: ${spill.join(" | ")}`);
     }
   }
   await page.click('#modes button[data-mode="gridsense"]');

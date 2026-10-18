@@ -249,6 +249,16 @@
     svg += node(cx, 165, "Battery", (soc * 100).toFixed(0) + "%", b > 0.05 ? "giving " + b.toFixed(2) + " kW" : b < -0.05 ? "taking " + (-b).toFixed(2) + " kW" : "idle");
     svg += node(308, cy, "House", load.toFixed(2) + " kW", "");
     $("flow").innerHTML = svg;
+    // "100% · giving 0.32 kW" and "4.20 kW · 1.23 kW wasted" outgrow the 104-wide box:
+    // grow each box to its widest line, kept inside the card
+    for (const g of $("flow").querySelectorAll(".node")) {
+      const rect = g.querySelector("rect"), x = +g.querySelector("text").getAttribute("x");
+      let w = 104;
+      for (const tx of g.querySelectorAll("text")) { try { w = Math.max(w, tx.getComputedTextLength() + 14); } catch (e) { /* not laid out */ } }
+      const left = Math.min(Math.max(1, x - w / 2), 359 - w);
+      rect.setAttribute("x", left); rect.setAttribute("width", w);
+      for (const tx of g.querySelectorAll("text")) tx.setAttribute("x", left + w / 2);
+    }
     $("k-soc").textContent = (soc * 100).toFixed(0) + "%";
     $("g-soc").style.width = (soc * 100).toFixed(0) + "%";
     $("k-tank").textContent = (S.tank[i] * 100).toFixed(0) + "%";

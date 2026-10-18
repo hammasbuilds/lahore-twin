@@ -6,7 +6,7 @@ above it has finished its build **and** ten review rounds.
 | # | Phase | Status |
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
-| 2 | Home + GridSense — load-shedding energy manager | review round 9 of 10 done |
+| 2 | Home + GridSense — load-shedding energy manager | done — build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | — |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
@@ -641,3 +641,17 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   and fails on any. It fails on the old placement (washer under the helper,
   09:45) and passes now. Fans and ACs are excluded: their blades and bars reach
   past a dot (the first version of the check flagged fans over sleepers).
+
+**Round 10 — labels that leave their box; closing the phase.**
+- *Found (light theme, 15:00):* "100% · giving 0.32 kW" ran outside the
+  Battery box of the power-flow card; "4.20 kW · 1.23 kW wasted" and
+  "1.72 kW out · 228 V" are as long. *Fixed:* each box grows to its widest
+  line after drawing, kept inside the card.
+- *Re-checked:* the UI check scans 06:00–23:00 every 15 min for GridSense, the
+  default and the UPS circuit and fails if any power-flow text leaves its box or
+  the card; it fails on the old fixed-width boxes (06:00, "25% · giving
+  0.67 kW") and passes now.
+- *Final checks:* 70 tests pass; the home sweep (2 seasons × 3 categories ×
+  5 days, 2,043 s) reports 0 problems with the same numbers as the README; the
+  UI check passes with no console errors. Launchpad entry updated.
+- Phase 2 closed.
