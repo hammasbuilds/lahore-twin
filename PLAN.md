@@ -1183,3 +1183,23 @@ hospital rounds, which continue alongside.*
   vehicles) back from a red at Lane 24 — no shop stop, parked or held vehicle in any chain,
   no simulator fault. Adaptive signals never gridlocked. The sweep now reports overload
   outcomes at 12,000 separately from problems; they are what the junction planner is for.
+
+**Hospital: families.**
+- *Built:* every emergency patient arrives with 1–3 relatives (2–3 with an ambulance or a red
+  triage) who follow them to the waiting hall, the bay and across the campus to the ward;
+  each ward patient has one relative staying the night, who goes down to the ground-floor
+  pharmacy for the medicines after the morning round (70%); families visit together, 0–4 a
+  patient, between 11:00 and 21:00. Connected adds one attendant card per patient (the others
+  wait outside the ED door) and a pass desk in the ward lobby: 16:00–18:00, two per bed,
+  early families wait downstairs, late ones are turned away. All shares are assumptions;
+  the families draw from their own random stream, so every clinical result is unchanged
+  (a test runs the day with and without them).
+- *Found:* a "crowded bed minutes" metric read 0 under both rule sets — visitors arrived at
+  independent random times and never met at a bed. Families visit together; once modelled
+  that way Today reaches 4 at one bed and Connected never passes 2. The metric was dropped
+  for "most visitors at one bed", checked every minute (the first test only looked at
+  midnight).
+- *Found:* attendants were drawn in the Orange triage colour. Now sand.
+- Day 7: relatives in the ED bays 11.9 → 6.1 on average (peak 29 → 14); ward visitor-minutes
+  outside visiting hours 3,010 → 19; most at one bed 4 → 2; costs counted: 32 on the ward at
+  16:00 against 12, 40 families waiting downstairs, 18 turned away after 18:00.

@@ -69,7 +69,8 @@ window.TWIN_ABOUT = {
       "About 160 emergency arrivals in a day: registration, five-colour triage, doctors, blood tests, X-ray, drips, admission or discharge, and people who leave without being seen.",
       "A medical ward with call buttons, a high-dependency unit whose monitors raise alarms (most of them false), medicine fridges and bed cleaning.",
       "Doctors, nurses, porters, cleaners and clerks working three shifts from a shared task board.",
-      "Two ways of running it on the same patients: Today (alarms for everyone, searching for equipment, phone calls about beds) and Connected (badges, routed alarms with a short delay, an equipment locator, a live bed board, fridge probes).",
+      "Families, as in a Pakistani government hospital: 1–3 relatives come with every emergency patient and stay at the bedside, one stays the night on the ward and goes down to the pharmacy for the medicines, and visitors come through the day.",
+      "Two ways of running it on the same patients: Today (alarms for everyone, searching for equipment, phone calls about beds, relatives everywhere) and Connected (badges, routed alarms with a short delay, an equipment locator, a live bed board, fridge probes, one attendant card per patient and a visitor pass desk).",
     ],
     inputs: [
       ["Rule set", "Today or Connected"],
@@ -84,7 +85,7 @@ window.TWIN_ABOUT = {
       "Waits to triage and to a doctor, length of stay, patients who left unseen",
       "Call-button and alarm response, false-alarm walks, minutes spent searching for equipment, fridge minutes above 8 °C, bed turnaround",
     ],
-    analysis: "Badges and sensors do not add doctors, so emergency waits barely change. They end the equipment hunt, keep infusion pumps in the department, cut the alarms nurses walk to by about 60% (at the price of brief real events that never sound, counted), shorten bed turnaround and catch an open fridge in minutes. A one-hour hand-hygiene audit reports about twice the true rate; counting dispensers reports it as it is.",
+    analysis: "Badges and sensors do not add doctors, so emergency waits barely change. They end the equipment hunt, keep infusion pumps in the department, cut the alarms nurses walk to by about 60% (at the price of brief real events that never sound, counted), shorten bed turnaround and catch an open fridge in minutes. A one-hour hand-hygiene audit reports about twice the true rate; counting dispensers reports it as it is. One attendant card per patient halves the relatives standing in the emergency bays, and the visitor pass desk all but ends visiting outside 16:00–18:00, at the price of a crowded ward at four and families turned away after six.",
   },
   traffic: {
     title: "Lahore traffic",

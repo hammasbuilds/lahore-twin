@@ -142,3 +142,32 @@ def test_no_one_is_stranded_mid_task(runs):
         assert not stuck, stuck
         admitted = [r for r in s.records.values() if r["outcome"] == "admitted"]
         assert len(admitted) >= 5
+
+
+def test_families_do_not_change_the_clinical_day(plans):
+    """Relatives draw from their own random stream: the patients, alarms and staff are the
+    same with or without them, so every clinical result stays comparable."""
+    ed, ward = plans
+    sc = build(ed, ward, seed=7)
+    with_fam = HospitalSim(sc, ed, ward, "connected").run()
+    plain = HospitalSim(sc, ed, ward, "connected")
+    plain._families = lambda: []
+    plain.run()
+    a, b = with_fam.metrics(), plain.metrics()
+    for k in ("alarms_sounded", "equipment_search_min", "bed_turnaround_min", "left_unseen", "admitted"):
+        assert a[k] == b[k], k
+    assert a["attendants"] > 150 and b["attendants"] == 0
+
+
+def test_attendant_cards_and_visitor_passes(runs):
+    _, sims = runs
+    td, cn = sims["today"].metrics(), sims["connected"].metrics()
+    assert td["attendants"] == cn["attendants"]
+    assert cn["ed_attendants_in_bays_mean"] < 0.7 * td["ed_attendants_in_bays_mean"]
+    assert td["visitor_min_outside_hours"] > 500 and cn["visitor_min_outside_hours"] < 30
+    assert td["visitors_turned_away"] == 0 and cn["visitors_turned_away"] > 0     # the cost is counted
+    assert cn["most_visitors_at_a_bed"] <= 2 < td["most_visitors_at_a_bed"]
+    # nobody in a family is left walking at midnight or standing in a wall
+    for s in sims.values():
+        fam = [a for a in s.agents.values() if a.role in ("attendant", "visitor")]
+        assert fam and all(s.plans[a.building].room_at(*a.pos) or a.building == "campus" for a in fam if a.on)

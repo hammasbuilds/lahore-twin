@@ -12,7 +12,7 @@
   const ROOMS = { ed: Object.fromEntries(PL.ed.rooms.map((r) => [r.id, r])), ward: Object.fromEntries(PL.ward.rooms.map((r) => [r.id, r])) };
   const MODE_NAMES = { today: "Today", connected: "Connected" };
   const VIEW_NAMES = { site: "Site", ed: "Emergency", ward: "Ward" };
-  const ROLE_NAMES = { doctor: "Doctor", nurse: "Nurse", clerk: "Clerk", porter: "Porter", cleaner: "Cleaner", radiographer: "Radiographer", guard: "Guard", patient: "Patient" };
+  const ROLE_NAMES = { doctor: "Doctor", nurse: "Nurse", clerk: "Clerk", porter: "Porter", cleaner: "Cleaner", radiographer: "Radiographer", guard: "Guard", patient: "Patient", attendant: "Attendant (family)", visitor: "Visitor" };
   const PRIO = { red: 0, orange: 1, yellow: 2, green: 3, blue: 4 };
   const KEY_TOPIC = /\/(alarm|call|answered|admit|left|alert|door|below_par|clean_request|triage)$/;
 
@@ -440,6 +440,15 @@
     ["Fridge minutes above 8 °C", "fridge_minutes_over_8C", "min"],
     ["Bed turnaround, median min", "bed_turnaround_min", "min"],
     ["Ward nurses walked, km", "ward_nurse_km", "min"],
+    ["Family attendants who came", "attendants", "info"],
+    ["Attendants in the ED bays, mean", "ed_attendants_in_bays_mean", "min"],
+    ["… at the busiest minute", "ed_attendants_in_bays_peak", "min"],
+    ["Ward visitor-minutes outside 16:00–18:00", "visitor_min_outside_hours", "min"],
+    ["Most visitors on the ward at once", "ward_visitors_peak", "info"],
+    ["Most visitors at one bed", "most_visitors_at_a_bed", "min"],
+    ["Families asked to wait for visiting hours", "visitors_asked_to_wait", "cost"],
+    ["Families turned away after 18:00", "visitors_turned_away", "cost"],
+    ["Attendants' trips to the pharmacy", "pharmacy_trips", "info"],
   ];
   function renderCompare() {
     const names = Object.keys(R.modes), ms = names.map((n) => R.modes[n].metrics);
@@ -455,6 +464,7 @@
     const td = R.modes.today.metrics, cn = R.modes.connected.metrics;
     html += `<p class="note">Hand hygiene: staff really washed ${td.hand_hygiene_true_pct}% / ${cn.hand_hygiene_true_pct}% of the time in both. Today's figure comes from a one-hour audit (${td.hand_hygiene_reported_n} observations, staff wash more when watched); Connected counts ${cn.hand_hygiene_reported_n} dispenser uses against badge entries. Badges are not assumed to change behaviour.</p>`;
     html += `<p class="note">The 15-second alarm delay is not free: ${cn.brief_true_events_not_sounded} brief real desaturations ended before it ran out and never sounded (orange). Critical alarms skip the delay (reached in ${cn.critical_response_s.join(" and ")} s).</p>`;
+    if (cn.attendants != null) html += `<p class="note">Nobody comes alone: ${td.attendants} relatives came with the emergency patients, one stays each night on the ward and buys the medicines downstairs. Connected gives each patient one attendant card, so the others wait outside the ED door, and a pass desk keeps visitors to 16:00–18:00, two per bed. That empties the bays and the ward outside visiting hours, but crowds the ward at 16:00 (${cn.ward_visitors_peak} at once against ${td.ward_visitors_peak}) and turns away ${cn.visitors_turned_away} families who come after 18:00 (orange). Family numbers are assumptions.</p>`;
     html += `<p class="note">Simulated hospital, not a measurement: arrival mix, call rates, alarm rates and fridge events are assumptions or published figures listed in PLAN.md. Green = better.</p>`;
     $("pane-compare").innerHTML = html;
   }
@@ -472,7 +482,7 @@
     tctx.fillStyle = palette.accent; tctx.fillRect(xs(state.t) - 1.5, 0, 3, h);
   }
   function renderLegend() {
-    const roles = ["doctor", "nurse", "porter", "cleaner", "clerk"].map((r) => `<span><i style="background:${R.roles[r]}"></i>${ROLE_NAMES[r]}</span>`).join("");
+    const roles = ["doctor", "nurse", "porter", "cleaner", "clerk", "attendant", "visitor"].map((r) => `<span><i style="background:${R.roles[r]}"></i>${ROLE_NAMES[r]}</span>`).join("");
     const triage = ["red", "orange", "yellow", "green", "blue"].map((c) => `<span><i style="background:${tri(c)}"></i>${c[0].toUpperCase() + c.slice(1)}</span>`).join("");
     const kit = `<span><i class="sq" style="background:${rgba(palette.water, 0.5)};border:1.5px solid ${palette.water}"></i>Pump ◆ chair ● trolley ▬</span>`;
     const extra = state.view === "ward" ? `<span><i class="sq" style="border:2px solid ${palette.call};background:transparent"></i>Call button</span><span><i style="border:2px solid ${palette.alert};background:transparent"></i>Alarm</span>`

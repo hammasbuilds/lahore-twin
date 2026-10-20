@@ -128,6 +128,13 @@ class HospitalSim:
         self.site = site()
         self.bus = Bus(quiet=("temp", "location", "census"))
         self.rng = random.Random(sc.seed * 7 + 3)          # rule-set-specific draws (phone delays etc.)
+        # families: their own stream, drawn the same way under both rule sets and never
+        # disturbing the patients' and staff's draws
+        self.rng_fam = random.Random(sc.seed * 1000 + 77)
+        self.fam_ed: dict[str, list] = {}                 # ED patient -> [(attendant id, relation)]
+        self.visitors_at: dict[str, int] = {}             # ward bed -> visitors at the bedside now
+        self.fam_log = {"ed_att_treat": [], "ed_att_out": [], "ward_vis": [], "vis_off_hours": 0,
+                        "turned_away": 0, "most_at_a_bed": 0, "asked_to_wait": 0, "pharmacy_trips": 0}
         self.hh_rng = random.Random(sc.seed * 7 + 5)
         self.t = 0
         self.agents: dict[str, Agent] = {}
@@ -967,7 +974,8 @@ class HospitalSim:
             self.spawn(a, "ward", bed.spot, self.ward_patient(a, wp, bed))
         for x in self.assets.values():
             self.asset_moved(x)
-        si = ai = ci = li = fi = 0
+        si = ai = ci = li = fi = vi = 0
+        family = self._families()
         for t in range(DAY):
             self.t = self.bus.now = t
             while si < len(starts) and max(0, starts[si].start) <= t:
@@ -984,6 +992,9 @@ class HospitalSim:
                 ai += 1
                 a = Agent(p.id, p.name, "patient", "ed", p.speed)
                 self.spawn(a, "ed", ed.spots["ambulance_bay" if p.ambulance else "walkin"][0], self.ed_patient(a, p))
+            while vi < len(family) and family[vi][0] <= t:
+                self._spawn_family(family[vi])
+                vi += 1
             while ci < len(calls) and calls[ci].t <= t:
                 self.ward_call(calls[ci])
                 ci += 1
@@ -1032,6 +1043,7 @@ class HospitalSim:
             if t % 60 == 0:
                 self.fridge_tick()
                 self._census()
+                self._family_census()
             for a in list(self.agents.values()):
                 if a.on:
                     if a.carrying:
@@ -1040,6 +1052,166 @@ class HospitalSim:
                     self._step(a)
         self.t = self.bus.now = DAY - 1
         return self
+
+    # ---------------------------------------------------------------- families
+    # In a Pakistani government hospital nobody comes alone: 1-3 relatives bring each emergency
+    # patient and stay with them, one relative stays the night on the ward and buys the
+    # medicines, and the ward fills with visitors. Shares and times are assumptions.
+    ED_TREAT = {"majors", "m1", "m2", "m3", "m4", "m5", "m6", "resus", "minors", "iso"}
+    RELATIONS = ("son", "daughter", "brother", "sister", "husband", "wife", "mother", "father", "nephew", "cousin")
+
+    def _near(self, building: str, pos, k: int):
+        """A standing spot k places beside pos, kept inside pos's room."""
+        plan = self.plans[building]
+        rid = plan.room_at(*pos)
+        dx, dy = ((0.8, 0.5), (-0.8, 0.5), (0.8, -0.6), (-0.8, -0.6))[k % 4]
+        x, y = pos[0] + dx, pos[1] + dy
+        if rid:
+            r = plan.rooms[rid]
+            x, y = min(max(x, r.x0 + 0.35), r.x1 - 0.35), min(max(y, r.y0 + 0.35), r.y1 - 0.35)
+        return (x, y)
+
+    def ed_attendant(self, a: Agent, pid: str, k: int):
+        """Follows the patient: to the waiting seats, the bay, across the campus to the ward.
+        Connected: one attendant card per patient, so the others wait outside the ED door."""
+        ed = self.plans["ed"]
+        last = None
+        while True:
+            rec, pa = self.records.get(pid), self.agents.get(pid)
+            if rec is None or pa is None or pa.building not in self.plans:
+                yield ("wait", 10)
+                continue
+            if rec["left"] is not None or not pa.on:
+                break
+            inside = pa.building == "ed" and ed.room_at(*pa.pos) in self.ED_TREAT
+            if self.conn and k > 0 and (inside or pa.building == "ward"):
+                if pa.building == "ward":
+                    break                                 # one card goes up to the ward; the rest go home
+                where, why = ("ed", (ed.spots["walkin"][0][0] + 1.0 + 0.7 * k, ed.spots["walkin"][0][1] + 1.2)), \
+                    "Waiting outside: one attendant card per patient"
+            else:
+                where, why = (pa.building, self._near(pa.building, pa.pos, k)), f"With {self.records[pid]['name']}"
+            if last is None or where[0] != last[0] or math.dist(where[1], last[1]) > 2.5:
+                self.say(a, why)
+                last = where
+                yield ("go", where[0], where[1])
+            yield ("wait", 20)
+        self.say(a, "Leaving with the patient" if rec and rec["outcome"] != "admitted" else "Going home")
+        exit_ = ("ed", ed.spots["walkin"][0]) if a.building == "ed" else ("ward", self.plans["ward"].spots["entry"][0])
+        yield ("go", *exit_)
+
+    def ward_attendant(self, a: Agent, bed: Bed, errand_at: int | None):
+        """The relative who stays the night; after the morning round goes down for the medicines."""
+        ward = self.plans["ward"]
+        here = self._near("ward", bed.spot, 0)
+        self.say(a, f"Staying with the patient in {bed.id}")
+        yield ("go", "ward", here)
+        if errand_at is not None:
+            yield ("until", lambda: self.t >= errand_at)
+            self.fam_log["pharmacy_trips"] += 1
+            r = ward.rooms["g_pharm"]
+            self.say(a, "Buying the medicines at the pharmacy")
+            yield ("go", "ward", ((r.x0 + r.x1) / 2, (r.y0 + r.y1) / 2))
+            yield ("wait", int(self.rng_fam.uniform(8, 20) * 60))            # the queue at the counter
+            self.say(a, f"Back with the medicines for {bed.id}")
+            yield ("go", "ward", here)
+        yield ("until", lambda: False)
+
+    def ward_visitor(self, a: Agent, bed: Bed, k: int, stay: int):
+        """Relatives visiting a ward patient. Connected: a pass desk in the lobby lets two per bed
+        up during visiting hours (16:00-18:00) and asks the others to wait or come back."""
+        ward = self.plans["ward"]
+        lob = ward.rooms["lobby"]
+        lobby = ((lob.x0 + lob.x1) / 2 + 0.6 * (k % 3), (lob.y0 + lob.y1) / 2)
+        if self.conn:
+            if self.t >= 18 * H:                         # too late: turned away at the gate
+                self.fam_log["turned_away"] += 1
+                self.say(a, "Turned away: visiting hours are 16:00-18:00")
+                return
+            if self.t < 16 * H:
+                self.fam_log["asked_to_wait"] += 1
+                self.say(a, "Waiting downstairs for visiting hours")
+                hall = ward.rooms["g_hall"]
+                yield ("go", "ward", ((hall.x0 + hall.x1) / 2 + 0.5 * (k % 4), (hall.y0 + hall.y1) / 2))
+                yield ("until", lambda: self.t >= 16 * H)
+            self.say(a, "In the lobby: two visitors per bed")
+            yield ("go", "ward", lobby)
+            yield ("until", lambda: self.visitors_at.get(bed.id, 0) < 2 or self.t >= 18 * H)
+            if self.t >= 18 * H:
+                self.fam_log["turned_away"] += 1
+                self.say(a, "Visiting hours ended before a pass was free")
+                yield ("go", "ward", ward.spots["entry"][0])
+                return
+            stay = min(stay, 18 * H - self.t)
+        self.visitors_at[bed.id] = self.visitors_at.get(bed.id, 0) + 1
+        self.say(a, f"Visiting {bed.id}")
+        yield ("go", "ward", self._near("ward", bed.spot, k + 1))
+        yield ("wait", max(300, stay))
+        self.visitors_at[bed.id] -= 1
+        self.say(a, "Going home")
+        yield ("go", "ward", ward.spots["entry"][0])
+
+    def _families(self) -> list:
+        """Who comes with whom, drawn up front: [(time, agent, building, spot, generator factory)]."""
+        out, rng = [], self.rng_fam
+        for p in self.sc.ed_patients:
+            n = rng.choice((2, 3, 3)) if p.ambulance or p.colour == "red" else rng.choice((1, 1, 2, 2, 3))
+            self.fam_ed[p.id] = []
+            for k in range(n):
+                rel = rng.choice(self.RELATIONS)
+                aid = f"{p.id}-a{k}"
+                self.fam_ed[p.id].append((aid, rel))
+                out.append((p.arrive + 2 + 3 * k, aid, f"{p.name.split()[0]}'s {rel}", "attendant", "ed",
+                            "ambulance_bay" if p.ambulance else "walkin", ("ed", p.id, k)))
+        beds = [(wp, self.beds[wp.bed]) for wp in self.sc.ward_patients]
+        for wp, bed in beds:
+            rel = rng.choice(self.RELATIONS)
+            errand = int(rng.uniform(9.5, 12) * H) if rng.random() < 0.7 else None
+            out.append((0, f"{wp.id}-att", f"{wp.name.split()[0]}'s {rel}", "attendant", "ward", None, ("watt", bed, errand)))
+            # a family visits together, whenever it can, 11:00-21:00 (assumption: 0-4 a patient, mean 2)
+            t0 = int(rng.uniform(11, 21) * H)
+            stay0 = int(rng.uniform(25, 75) * 60)
+            for k in range(rng.choice((0, 1, 2, 2, 3, 4))):
+                t = t0 + 40 * k
+                stay = stay0 + int(rng.uniform(-5, 5) * 60)
+                rel = rng.choice(self.RELATIONS)
+                out.append((t, f"{wp.id}-v{k}", f"{wp.name.split()[0]}'s {rel}", "visitor", "ward", "entry",
+                            ("vis", bed, k, stay)))
+        out.sort(key=lambda x: x[0])
+        return out
+
+    def _spawn_family(self, row) -> None:
+        t, aid, name, role, building, spot_name, spec = row
+        a = Agent(aid, name, role, building, self.rng_fam.uniform(0.9, 1.25))
+        if spec[0] == "ed":
+            spot = self.plans["ed"].spots[spot_name][0]
+            spot = (spot[0] + 0.6 * (spec[2] + 1), spot[1] + 0.5)
+            self.spawn(a, "ed", spot, self.ed_attendant(a, spec[1], spec[2]))
+        elif spec[0] == "watt":
+            self.spawn(a, "ward", self._near("ward", spec[1].spot, 0), self.ward_attendant(a, spec[1], spec[2]))
+        else:
+            self.spawn(a, "ward", self.plans["ward"].spots["entry"][0], self.ward_visitor(a, spec[1], spec[2], spec[3]))
+
+    def _family_census(self) -> None:
+        ed = self.plans["ed"]
+        treat = out = 0
+        for p, atts in self.fam_ed.items():
+            for aid, _ in atts:
+                a = self.agents.get(aid)
+                if a is None or not a.on or a.building != "ed":
+                    continue
+                rid = ed.room_at(*a.pos)
+                if rid in self.ED_TREAT:
+                    treat += 1
+                elif rid in ("forecourt", "amb") or rid is None:
+                    out += 1
+        vis = sum(self.visitors_at.values())
+        self.fam_log["most_at_a_bed"] = max(self.fam_log["most_at_a_bed"], max(self.visitors_at.values(), default=0))
+        self.fam_log["ed_att_treat"].append(treat)
+        self.fam_log["ed_att_out"].append(out)
+        self.fam_log["ward_vis"].append(vis)
+        if vis and not (16 * H <= self.t < 18 * H):
+            self.fam_log["vis_off_hours"] += vis
 
     def _census(self) -> None:
         ed_in = sum(1 for r in self.records.values() if r["left"] is None)
@@ -1120,6 +1292,16 @@ class HospitalSim:
             "fridge_open_min": [((e["closed"] or DAY) - e["opened"]) // 60 for e in fr],
             "bed_turnaround_min": med(turn),
             "ward_nurse_km": round(sum(a.walked for a in ward_nurses) / 1000, 1),
+            # families
+            "attendants": sum(len(v) for v in self.fam_ed.values()),
+            "ed_attendants_in_bays_peak": max(self.fam_log["ed_att_treat"], default=0),
+            "ed_attendants_in_bays_mean": round(sum(self.fam_log["ed_att_treat"]) / max(1, len(self.fam_log["ed_att_treat"])), 1),
+            "ward_visitors_peak": max(self.fam_log["ward_vis"], default=0),
+            "most_visitors_at_a_bed": self.fam_log["most_at_a_bed"],
+            "visitor_min_outside_hours": self.fam_log["vis_off_hours"],
+            "visitors_turned_away": self.fam_log["turned_away"],
+            "visitors_asked_to_wait": self.fam_log["asked_to_wait"],
+            "pharmacy_trips": self.fam_log["pharmacy_trips"],
         }
         return out
 

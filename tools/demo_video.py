@@ -127,6 +127,10 @@ def main() -> None:
         shot("08-hospital-emergency-board")
         f.click('#views button[data-view="ward"]'); f.click(".tabs button[data-tab=beds]"); page.wait_for_timeout(700)
         shot("09-hospital-ward-beds")
+        # visiting hour: the pass desk lets two per bed up, the rest wait downstairs
+        set_time(f, "__hosp", 16 * 3600 + 10 * 60)
+        f.click('#modes button[data-mode="connected"]'); f.click('#floors button[data-floor="2"]'); page.wait_for_timeout(800)
+        shot("09b-hospital-visiting-hour")
         f.click('#views button[data-view="site"]'); page.wait_for_timeout(800)
         shot("10-hospital-campus")
         f.click('#views button[data-view="ed"]')

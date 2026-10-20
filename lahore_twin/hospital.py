@@ -36,7 +36,8 @@ ED_STAFF = {"doctor": (3, 3, 2), "nurse": (4, 4, 3), "clerk": (2, 2, 1), "porter
 WARD_STAFF = {"nurse": (3, 3, 2), "doctor": (1, 1, 1), "cleaner": (1, 1, 1)}
 
 ROLE_COLOURS = {"doctor": "#60a5fa", "nurse": "#2dd4bf", "clerk": "#a3a3a3", "porter": "#fbbf24",
-                "cleaner": "#a78bfa", "radiographer": "#38bdf8", "guard": "#94a3b8", "patient": "#f472b6"}
+                "cleaner": "#a78bfa", "radiographer": "#38bdf8", "guard": "#94a3b8", "patient": "#f472b6",
+                "attendant": "#d4b483", "visitor": "#e879f9"}
 
 
 @dataclass

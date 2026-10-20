@@ -8,13 +8,13 @@ simulated one without changing the rules.
 
 ![Overview: every module with its headline numbers](docs/screenshots/01-overview.png)
 
-**Demo video (50 s):** [lahore-twin-demo.mp4](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-demo.mp4)
+**Demo video (48 s):** [lahore-twin-demo.mp4](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-demo.mp4)
 
 | Module | What it simulates | Headline result | Status |
 |---|---|---|---|
 | **Office tower** | 3 floors (basement car park, ground, first), about 50 people who also step out for lunch, the bank, a client or the school pick-up; couriers at reception; badge doors, office Wi-Fi, lights, AC, CO₂ | motion + CO₂ uses **31% less** light and AC energy than a fixed timetable; badges + Wi-Fi keep the evacuation roll-call within **0.3** people on average (badges alone: 2.0) | ready |
 | **Home + GridSense** | double-storey house with roof solar (6 kWp), 10 kWh battery, a day of load-shedding; a family whose children take the school van, go to tuition, and whose relatives visit in the evening; a gate counter | GridSense keeps the house lit through every cut (**93 → 0** dark minutes); its eco setting costs about the same as the inverter default | ready |
-| **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2 | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
+| **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2; patients' attendants and visitors | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
 | **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes, 59 signals on a 60 s / 30 s plan; 7,097 trips in the evening peak with 1,763 stops at 432 real shops and amenities | adaptive signals cut median delay **105 → 60 s** and time stopped at signals **90 → 21** vehicle-hours | ready |
 | Junction planner | tests underpasses, U-turns and signal plans at the worst junctions; ambulance green wave | | planned |
 | City systems | smog sensors, underpass flooding alarms, smart streetlights | | planned |
@@ -71,6 +71,7 @@ puts its rule sets side by side for the whole day.
 
 ![Hospital emergency board](docs/screenshots/08-hospital-emergency-board.png)
 ![Hospital ward beds](docs/screenshots/09-hospital-ward-beds.png)
+![Visiting hour on the ward](docs/screenshots/09b-hospital-visiting-hour.png)
 ![Hospital campus](docs/screenshots/10-hospital-campus.png)
 ![Hospital comparison](docs/screenshots/11-hospital-compare.png)
 
@@ -141,6 +142,15 @@ Hospital, same patients and events:
 | Bed turnaround, median min | 70.4 | 20.4 |
 | Hand hygiene: true / as reported, % | 36.3 / 62.5 | 36.5 / 36.1 |
 | Door to doctor, median min | 16.7 | 18.0 |
+| Relatives standing in the ED bays, mean | 11.9 | 6.1 |
+| Ward visitor-minutes outside 16:00–18:00 | 3,010 | 19 |
+| Most visitors at one bed | 4 | 2 |
+| Families turned away after 18:00 (the cost of the pass desk) | 0 | 18 |
+
+Nobody comes alone: 319 relatives came with the day's emergency patients, one stays each
+night on the ward and goes down to the pharmacy for the medicines. One attendant card per
+patient halves the relatives in the bays; the pass desk ends visiting outside hours but packs
+the ward at 16:00 (32 visitors at once against 12) and turns late families away.
 
 Badges and sensors do not add doctors, so emergency waits barely move; a one-hour audit
 reports hand hygiene at about twice its true rate, while counting dispensers reports it as it is.
