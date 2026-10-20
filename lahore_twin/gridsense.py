@@ -360,6 +360,13 @@ class GridSense(Base):
     def headroom_ok(self, aid: str) -> bool:
         return self.committed_kw(exclude=aid) + self.apps[aid].watts / 1000 <= self.headroom_kw()
 
+    def outage_headroom_ok(self, aid: str) -> bool:
+        """Would the load still fit when the grid drops? A pre-cool runs into the outage, and
+        at that instant the inverter carries only the battery's discharge limit (no sun at
+        night): three ACs pre-cooling against the 6 kW grid rating tripped it at 22:00."""
+        cap = self.inv.capacity_kw(False, 0.0) - self.HEADROOM_MARGIN_KW
+        return self.committed_kw(exclude=aid) + self.apps[aid].watts / 1000 <= cap
+
     def _outage_hours_left(self, t: int) -> float:
         cur = next((x for x in self.published if x.start <= t < x.end), None)
         if cur:
@@ -390,7 +397,7 @@ class GridSense(Base):
                 # pre-cool only a room the household will use during the outage (learned routine),
                 # not one that merely has someone in it now
                 pre = self.COMFORT and warm and expected and (o is not None and 0 <= o.start - t <= 2400)
-                if pre and (self.state.get(aid) or self.headroom_ok(aid)):
+                if pre and self.outage_headroom_ok(aid) and (self.state.get(aid) or self.headroom_ok(aid)):
                     self.precool_rooms.add(room)
                     self.command(aid, True, None, f"pre-cool to 23.5 °C before the {why_o}")
                 elif room in soak_now and (self.state.get(aid) or self.headroom_ok(aid)):

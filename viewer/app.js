@@ -14,8 +14,19 @@ if (typeof document !== "undefined") (function () {
   const state = {
     t: R.meta.t0 + 3600 * 2.5, mode: "pir+co2", layer: "state", playing: false, speed: 60,
     sel: null, // {type:'room'|'person'|'msg', id}
-    hover: null,
+    hover: null, floor: "G",
   };
+  // floors: basement car park, ground floor, first floor; one is drawn at a time
+  const FLOORS = plan.floors && plan.floors.length ? plan.floors : [{ id: "G", name: "Ground floor", level: 0, origin: [0, 0], size: plan.size }];
+  TwinCore.setHops(plan.portal_hops);
+  const F = () => FLOORS.find((f) => f.id === state.floor) || FLOORS[0];
+  function floorOf(x, y) {
+    for (const f of FLOORS) { const [ox, oy] = f.origin; if (x >= ox && x <= ox + f.size[0] && y >= oy && y <= oy + f.size[1]) return f.id; }
+    return FLOORS[0].id;
+  }
+  const onFloor = (x, y) => floorOf(x, y) === F().id;
+  const roomOnFloor = (rid) => !rooms[rid] || (rooms[rid].floor || FLOORS[0].id) === F().id;
+  const RM = () => plan.rooms.filter((r) => roomOnFloor(r.id));
   try {
     const saved = JSON.parse(localStorage.getItem("office-twin") || "{}");
     if (saved.theme) document.documentElement.dataset.theme = saved.theme;
@@ -41,7 +52,7 @@ if (typeof document !== "undefined") (function () {
     const w = cv.clientWidth, h = cv.clientHeight;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr);
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const [W, H] = plan.size;
+    const [W, H] = F().size;
     // room for the layer buttons above and the legend below; little else wasted
     const top = 56, bottom = w < 700 ? 12 : 58, side = 20;
     const s = Math.min((w - side * 2) / W, (h - top - bottom) / H);
@@ -50,8 +61,8 @@ if (typeof document !== "undefined") (function () {
     tl.width = Math.round(tw * dpr); tl.height = Math.round(th * dpr);
     tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  const X = (x) => view.ox + x * view.s;
-  const Y = (y) => view.oy + y * view.s;
+  const X = (x) => view.ox + (x - F().origin[0]) * view.s;
+  const Y = (y) => view.oy + (y - F().origin[1]) * view.s;
 
   // ---- colour scales ----
   function mix(a, b, f) {
@@ -82,7 +93,7 @@ if (typeof document !== "undefined") (function () {
     const si = seriesIndex(R, state.t);
     const s = view.s;
 
-    for (const r of plan.rooms) {
+    for (const r of RM()) {
       const [x0, y0, x1, y1] = r.rect;
       let fill = r.kind === "outdoor" ? palette["floor-out"] : palette.floor;
       if (r.kind !== "outdoor") {
@@ -122,13 +133,14 @@ if (typeof document !== "undefined") (function () {
     ctx.strokeStyle = palette.wall;
     ctx.lineWidth = Math.max(2, s * 0.14);
     ctx.lineCap = "square";
-    for (const r of plan.rooms) {
+    for (const r of RM()) {
       if (r.kind === "outdoor") continue;
       const [x0, y0, x1, y1] = r.rect;
       ctx.strokeRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s);
     }
     // door gaps
     for (const d of plan.doors) {
+      if (!roomOnFloor(d.a)) continue;
       const a = rooms[d.a], b = rooms[d.b];
       const outdoor = a.kind === "outdoor" || b.kind === "outdoor";
       ctx.strokeStyle = outdoor ? palette["floor-out"] : palette.floor;
@@ -157,7 +169,7 @@ if (typeof document !== "undefined") (function () {
     }
     // room labels
     ctx.textAlign = "center";
-    for (const r of plan.rooms) {
+    for (const r of RM()) {
       const [x0, y0, x1, y1] = r.rect;
       const fs = Math.max(9, Math.min(13, s * 0.42));
       ctx.font = `600 ${fs}px Segoe UI, system-ui`;
@@ -209,21 +221,32 @@ if (typeof document !== "undefined") (function () {
   function drawFurniture() {
     const s = view.s;
     ctx.fillStyle = palette.desk;
-    for (const [x, y] of plan.spots.desk) ctx.fillRect(X(x - 0.9), Y(y - 0.75), 1.8 * s, 0.6 * s);
-    for (const k of plan.big_desks || []) for (const [x, y] of plan.spots[k] || []) ctx.fillRect(X(x - 1), Y(y - 0.9), 2 * s, 0.6 * s);
-    for (const f of plan.furniture || []) { const [fx, fy, fw, fh] = f.rect; rr(X(fx), Y(fy), fw * s, fh * s, (f.radius || 0) * s); }
-    // parking bays
+    for (const [x, y] of plan.spots.desk) if (onFloor(x, y)) ctx.fillRect(X(x - 0.9), Y(y - 0.75), 1.8 * s, 0.6 * s);
+    for (const k of plan.big_desks || []) for (const [x, y] of plan.spots[k] || []) if (onFloor(x, y)) ctx.fillRect(X(x - 1), Y(y - 0.9), 2 * s, 0.6 * s);
+    for (const f of plan.furniture || []) { const [fx, fy, fw, fh] = f.rect; if (onFloor(fx, fy)) rr(X(fx), Y(fy), fw * s, fh * s, (f.radius || 0) * s); }
+    // parking bays (in the basement)
     ctx.strokeStyle = rgba(palette.muted, 0.45);
     ctx.lineWidth = 1;
-    for (const [x, y] of plan.parking.spots) ctx.strokeRect(X(x - 1.1), Y(y - 2.3), 2.2 * s, 4.6 * s);
-    ctx.setLineDash([6, 6]);
-    const lot = plan.rooms.find((r) => r.kind === "outdoor");
-    if (lot) { ctx.beginPath(); ctx.moveTo(X(lot.rect[0] + 1), Y(plan.parking.lane_y)); ctx.lineTo(X(lot.rect[2] - 1), Y(plan.parking.lane_y)); ctx.stroke(); }
-    ctx.setLineDash([]);
+    const bays = plan.parking.spots.filter(([x, y]) => onFloor(x, y));
+    for (const [x, y] of bays) ctx.strokeRect(X(x - 1.1), Y(y - 2.3), 2.2 * s, 4.6 * s);
+    if (bays.length) {
+      ctx.setLineDash([6, 6]);
+      ctx.beginPath(); ctx.moveTo(X(F().origin[0] + 1), Y(plan.parking.lane_y)); ctx.lineTo(X(F().origin[0] + F().size[0] - 1), Y(plan.parking.lane_y)); ctx.stroke();
+      ctx.setLineDash([]);
+    }
     ctx.fillStyle = palette.muted;
     ctx.font = `600 ${Math.max(9, s * 0.34)}px Segoe UI, system-ui`;
     ctx.textAlign = "left";
-    for (const l of plan.labels || []) ctx.fillText(l.text, X(l.at[0]), Y(l.at[1]));
+    for (const l of plan.labels || []) if (onFloor(l.at[0], l.at[1])) ctx.fillText(l.text, X(l.at[0]), Y(l.at[1]));
+    // lifts, stairs and the car ramp on this floor
+    for (const pt of plan.portals || []) {
+      const at = pt.at[F().id]; if (!at) continue;
+      const x = X(at[0]), y = Y(at[1]), r = Math.max(7, s * 0.5);
+      ctx.fillStyle = palette.panel; ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(x - r, y - r, 2 * r, 2 * r); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = palette.accent; ctx.font = `700 ${Math.max(8, r)}px Segoe UI`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(pt.kind === "lift" ? "⇅" : pt.kind === "ramp" ? "↗" : "▤", x, y + 0.5); ctx.textBaseline = "alphabetic"; ctx.textAlign = "left";
+    }
   }
   function rr(x, y, w, h, r) {
     ctx.beginPath();
@@ -233,11 +256,13 @@ if (typeof document !== "undefined") (function () {
 
   function drawCars() {
     const s = view.s, t = state.t;
-    const gate = plan.spots.gate[0];
+    const ramp = (plan.portals || []).find((p) => p.kind === "ramp");
+    const gate = ramp ? ramp.at[plan.parking.floor || "G"] || plan.spots.gate[0] : plan.spots.gate[0];
     for (const c of R.cars) {
       const out = c.out == null ? Infinity : c.out;
       if (t < c.in || t >= out + 25) continue;
       const bay = plan.parking.spots[c.bay];
+      if (!onFloor(bay[0], bay[1])) continue;
       let x = bay[0], y = bay[1];
       const lane = plan.parking.lane_y;
       const path = [[gate[0], gate[1]], [gate[0], lane], [bay[0], lane], [bay[0], bay[1]]];
@@ -265,7 +290,7 @@ if (typeof document !== "undefined") (function () {
     hits = [];
     for (const p of Object.values(IX.people)) {
       const at = personAt(p, t);
-      if (!at) continue;
+      if (!at || !onFloor(at.x, at.y)) continue;
       hits.push({ p, x: X(at.x), y: Y(at.y) });
       const sel = state.sel && state.sel.type === "person" && state.sel.id === p.id;
       ctx.beginPath();
@@ -712,8 +737,8 @@ if (typeof document !== "undefined") (function () {
     let best = null, bd = Math.max(9, view.s * 0.6);
     for (const h of hits) { const d = Math.hypot(h.x - mx, h.y - my); if (d < bd) { bd = d; best = h; } }
     if (best) return { type: "person", id: best.p.id };
-    const wx = (mx - view.ox) / view.s, wy = (my - view.oy) / view.s;
-    for (const r of plan.rooms) { const [x0, y0, x1, y1] = r.rect; if (wx > x0 && wx < x1 && wy > y0 && wy < y1) return { type: "room", id: r.id }; }
+    const wx = (mx - view.ox) / view.s + F().origin[0], wy = (my - view.oy) / view.s + F().origin[1];
+    for (const r of RM()) { const [x0, y0, x1, y1] = r.rect; if (wx > x0 && wx < x1 && wy > y0 && wy < y1) return { type: "room", id: r.id }; }
     return null;
   }
   cv.addEventListener("click", (ev) => {
@@ -755,5 +780,17 @@ if (typeof document !== "undefined") (function () {
   renderTicks();
   frame(true);
   requestAnimationFrame(loop);
-  window.__twin = { state, frame, showTab, IX, hits: () => hits };
+  function renderFloors() {
+    const count = {};
+    for (const p of Object.values(IX.people)) { const at = personAt(p, state.t); if (at) { const f = floorOf(at.x, at.y); count[f] = (count[f] || 0) + 1; } }
+    const html = [...FLOORS].sort((a, b) => b.level - a.level).map((f) => `<button data-floor="${f.id}" aria-pressed="${f.id === F().id}" title="${f.name}: ${count[f.id] || 0} people now">${f.id} <span class="muted num">(${count[f.id] || 0})</span></button>`).join("");
+    const box = $("floors"); if (!box) return;
+    if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+    box.style.display = FLOORS.length > 1 ? "" : "none";
+  }
+  function setFloor(f) { state.floor = f; fit(); frame(true); }
+  if ($("floors")) $("floors").onclick = (e) => { const b = e.target.closest("button[data-floor]"); if (b) setFloor(b.dataset.floor); };
+  setInterval(renderFloors, 400);
+  renderFloors();
+  window.__twin = { state, frame, showTab, IX, hits: () => hits, setFloor, floorOf };
 })();

@@ -36,7 +36,17 @@
   }
   index();
 
-  const state = { t: 21.5 * 3600, mode: "gridsense", layer: "state", playing: false, speed: 300, sel: null };
+  const state = { t: 21.5 * 3600, mode: "gridsense", layer: "state", playing: false, speed: 300, sel: null, floor: "G" };
+  // floors: the house is double-storey with a roof; one floor is drawn at a time
+  const FLOORS = plan.floors && plan.floors.length ? plan.floors : [{ id: "G", name: "Ground floor", level: 0, origin: [0, 0], size: plan.size }];
+  C.setHops(plan.portal_hops);
+  const F = () => FLOORS.find((f) => f.id === state.floor) || FLOORS[0];
+  function floorOf(x, y) {
+    for (const f of FLOORS) { const [ox, oy] = f.origin; if (x >= ox && x <= ox + f.size[0] && y >= oy && y <= oy + f.size[1]) return f.id; }
+    return FLOORS[0].id;
+  }
+  const onFloor = (x, y) => floorOf(x, y) === F().id;
+  const roomOnFloor = (rid) => !rooms[rid] || (rooms[rid].floor || FLOORS[0].id) === F().id;
   try {
     const saved = JSON.parse(localStorage.getItem("home-twin") || "{}");
     if (saved.theme) document.documentElement.dataset.theme = saved.theme;
@@ -99,12 +109,12 @@
   function fit() {
     const dpr = window.devicePixelRatio || 1, w = cv.clientWidth, h = cv.clientHeight;
     cv.width = Math.round(w * dpr); cv.height = Math.round(h * dpr); ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const [W, Hh] = plan.size, top = 56, bottom = w < 700 ? 12 : 58, side = 20;
+    const [W, Hh] = F().size, top = 56, bottom = w < 700 ? 12 : 58, side = 20;
     const s = Math.min((w - side * 2) / W, (h - top - bottom) / Hh);
     view = { s, ox: (w - W * s) / 2, oy: top + (h - top - bottom - Hh * s) / 2 };
     tl.width = Math.round(tl.clientWidth * dpr); tl.height = Math.round(tl.clientHeight * dpr); tctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   }
-  const X = (x) => view.ox + x * view.s, Y = (y) => view.oy + y * view.s;
+  const X = (x) => view.ox + (x - F().origin[0]) * view.s, Y = (y) => view.oy + (y - F().origin[1]) * view.s;
 
   function tempColour(T) {
     const f = Math.max(0, Math.min(1, (T - 24) / 14));
@@ -118,7 +128,8 @@
     const S = M().series;
     ctx.clearRect(0, 0, w, h);
     const dark = !gridUp(t) && S.dark[i];
-    for (const r of plan.rooms) {
+    const RM = plan.rooms.filter((r) => roomOnFloor(r.id));
+    for (const r of RM) {
       const [x0, y0, x1, y1] = r.rect;
       let fill = r.kind === "outdoor" ? palette["floor-out"] : palette.floor;
       if (r.kind !== "outdoor") {
@@ -138,19 +149,48 @@
         ctx.strokeRect(X(x0) + 4, Y(y0) + 4, (x1 - x0) * s - 8, (y1 - y0) * s - 8); ctx.setLineDash([]);
       }
     }
-    for (const f of plan.furniture || []) { const [fx, fy, fw, fh] = f.rect; ctx.fillStyle = palette.desk; rr(X(fx), Y(fy), fw * s, fh * s, (f.radius || 0) * s); }
+    for (const f of plan.furniture || []) {
+      const [fx, fy, fw, fh] = f.rect; if (!onFloor(fx, fy)) continue;
+      ctx.fillStyle = palette.desk; rr(X(fx), Y(fy), fw * s, fh * s, (f.radius || 0) * s);
+      if (/solar panels/.test(f.what)) {
+        // panel cells glow with the solar output right now
+        const kw = S.pv_kw[i], g = Math.min(1, kw / 5);
+        ctx.fillStyle = rgba(palette.solar, 0.12 + 0.55 * g); ctx.fillRect(X(fx), Y(fy), fw * s, fh * s);
+        ctx.strokeStyle = palette.bg; ctx.lineWidth = 1;
+        for (let cx = fx + fw / 6; cx < fx + fw - 0.01; cx += fw / 6) { ctx.beginPath(); ctx.moveTo(X(cx), Y(fy)); ctx.lineTo(X(cx), Y(fy + fh)); ctx.stroke(); }
+        for (let cy = fy + fh / 3; cy < fy + fh - 0.01; cy += fh / 3) { ctx.beginPath(); ctx.moveTo(X(fx), Y(cy)); ctx.lineTo(X(fx + fw), Y(cy)); ctx.stroke(); }
+        ctx.fillStyle = palette.text; ctx.font = `600 ${Math.max(10, s * 0.4)}px Segoe UI`; ctx.textAlign = "center";
+        ctx.fillText(`Solar ${kw.toFixed(2)} kW`, X(fx + fw / 2), Y(fy + fh / 2));
+      } else if (/water tank/.test(f.what)) {
+        const lv = S.tank[i], r = fw * s / 2, cx = X(fx + fw / 2), cy = Y(fy + fh / 2);
+        ctx.save(); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.clip();
+        ctx.fillStyle = rgba(palette.water, 0.75); ctx.fillRect(cx - r, cy + r - 2 * r * lv, 2 * r, 2 * r * lv); ctx.restore();
+        ctx.fillStyle = palette.text; ctx.font = `600 ${Math.max(10, s * 0.38)}px Segoe UI`; ctx.textAlign = "center";
+        ctx.fillText(`Tank ${(lv * 100).toFixed(0)}%`, cx, cy + r + Math.max(12, s * 0.45));
+      }
+    }
     // walls and doors
     ctx.strokeStyle = palette.wall; ctx.lineWidth = Math.max(2, s * 0.14);
-    for (const r of plan.rooms) { if (r.kind === "outdoor") continue; const [x0, y0, x1, y1] = r.rect; ctx.strokeRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s); }
+    for (const r of RM) { if (r.kind === "outdoor") continue; const [x0, y0, x1, y1] = r.rect; ctx.strokeRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s); }
     for (const d of plan.doors) {
+      if (!roomOnFloor(d.a)) continue;
       const out = rooms[d.a].kind === "outdoor" || rooms[d.b].kind === "outdoor";
       ctx.strokeStyle = out ? palette["floor-out"] : palette.floor; ctx.lineWidth = Math.max(3, s * 0.18); ctx.beginPath();
       if (d.axis === "x") { ctx.moveTo(X(d.lo), Y(d.at)); ctx.lineTo(X(d.hi), Y(d.at)); } else { ctx.moveTo(X(d.at), Y(d.lo)); ctx.lineTo(X(d.at), Y(d.hi)); }
       ctx.stroke();
     }
     drawAppliances(t);
+    // stairs on this floor, saying where they lead
+    for (const pt of plan.portals || []) {
+      const at = pt.at[F().id]; if (!at) continue;
+      const x = X(at[0]), y = Y(at[1]), r = Math.max(7, s * 0.55);
+      ctx.fillStyle = palette["panel-2"]; ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(x - r, y - r, 2 * r, 2 * r); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = palette.accent; ctx.font = `700 ${Math.max(8, r)}px Segoe UI`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText("▤", x, y + 0.5); ctx.textBaseline = "alphabetic";
+    }
     // labels
-    for (const r of plan.rooms) {
+    for (const r of RM) {
       const [x0, y0, x1, y1] = r.rect, fs = Math.max(9, Math.min(13, s * 0.42));
       ctx.font = `600 ${fs}px Segoe UI, system-ui`; ctx.textAlign = "center";
       ctx.fillStyle = state.layer === "state" || r.kind === "outdoor" ? palette.muted : palette.text;
@@ -163,13 +203,13 @@
       if (state.layer === "temp" && S.temp[r.id]) { ctx.fillStyle = palette.text; ctx.fillText(S.temp[r.id][i].toFixed(1) + "°", X((x0 + x1) / 2), Y(y0) + fs * 2 + 7); }
       if (state.sel && state.sel.type === "room" && state.sel.id === r.id) { ctx.strokeStyle = palette.accent; ctx.lineWidth = 3; ctx.strokeRect(X(x0) + 1.5, Y(y0) + 1.5, (x1 - x0) * s - 3, (y1 - y0) * s - 3); }
     }
-    for (const l of plan.labels || []) { ctx.fillStyle = palette.muted; ctx.textAlign = "left"; ctx.fillText(l.text, X(l.at[0]), Y(l.at[1])); }
+    for (const l of plan.labels || []) { if (!onFloor(l.at[0], l.at[1])) continue; ctx.fillStyle = palette.muted; ctx.textAlign = "left"; ctx.fillText(l.text, X(l.at[0]), Y(l.at[1])); }
     if (dark) {
       ctx.fillStyle = "rgba(0,0,0,0.45)";
-      const [W, Hh] = plan.size; ctx.fillRect(X(0), Y(5), W * s, (Hh - 7.5) * s);
+      for (const r of RM) if (r.kind !== "outdoor") { const [x0, y0, x1, y1] = r.rect; ctx.fillRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s); }
       const why = (S.dark_reason && S.dark_reason[i] === "overload") ? "inverter overloaded" : "battery at cut-off";
       ctx.fillStyle = palette.outage; ctx.font = `700 ${Math.max(12, s * 0.62)}px Segoe UI, system-ui`; ctx.textAlign = "center";
-      ctx.fillText(`House dark — ${why}`, X(plan.size[0] / 2), Y(3.6));
+      ctx.fillText(`House dark — ${why}`, X(F().origin[0] + F().size[0] / 2), Y(F().origin[1] + 3.6));
     }
     drawPeople(t);
   }
@@ -192,7 +232,7 @@
   function drawAppliances(t) {
     const s = view.s, spin = (t / 2) % (Math.PI * 2);
     for (const a of H.appliances) {
-      if (a.kind === "light") continue;
+      if (a.kind === "light" || !roomOnFloor(a.room)) continue;
       const p = appPos(a); if (!p) continue;
       const on = live(a.id, t), wanted = cmdOn(a.id, t), x = X(p[0]), y = Y(p[1]);
       const col = on ? ({ fan: palette.text, ac: palette.ac, pump: palette.water, washer: palette.text, iron: palette.alert, fridge: palette.ok, tv: palette.people, router: palette.ok, microwave: palette.alert }[a.kind] || palette.text) : palette.muted;
@@ -216,7 +256,7 @@
   function drawPeople(t) {
     const r = Math.max(3.5, view.s * 0.3); hits = [];
     for (const p of Object.values(people)) {
-      const at = personAt(p, t); if (!at) continue;
+      const at = personAt(p, t); if (!at || !onFloor(at.x, at.y)) continue;
       hits.push({ p, x: X(at.x), y: Y(at.y) });
       const sel = state.sel && state.sel.type === "person" && state.sel.id === p.id;
       const asleep = /Asleep|nap/.test(C.labelAt(p, t));
@@ -350,7 +390,7 @@
       + `<optgroup label="People">${ps.map((p) => opt("person:" + p.id, `${p.name} · ${ROLE_NAMES[p.role]}`)).join("")}</optgroup>`
       + `<optgroup label="Rooms">${plan.rooms.filter((r) => r.kind !== "outdoor").map((r) => opt("room:" + r.id, r.name)).join("")}</optgroup>`
       + `<optgroup label="Appliances">${H.appliances.filter((a) => a.kind !== "light").map((a) => opt("app:" + a.id, `${a.kind === "ac" ? "AC" : a.kind} · ${rooms[a.room].name}`)).join("")}</optgroup>`;
-    $("find").onchange = (e) => { const v = e.target.value; const k = v.indexOf(":"); state.sel = v ? { type: v.slice(0, k), id: v.slice(k + 1) } : null; frame(true); };
+    $("find").onchange = (e) => { const v = e.target.value; const k = v.indexOf(":"); state.sel = v ? { type: v.slice(0, k), id: v.slice(k + 1) } : null; goToSel(); frame(true); };
   }
 
   // ---- day charts ----
@@ -445,8 +485,26 @@
 
   // ---- loop ----
   let lastPanel = 0;
+  function renderFloors() {
+    const count = {};
+    for (const p of Object.values(people)) { const at = personAt(p, state.t); if (at) { const f = floorOf(at.x, at.y); count[f] = (count[f] || 0) + 1; } }
+    const html = [...FLOORS].sort((a, b) => b.level - a.level).map((f) => `<button data-floor="${f.id}" aria-pressed="${f.id === F().id}" title="${esc(f.name)}: ${count[f.id] || 0} people now">${f.id} <span class="muted num">(${count[f.id] || 0})</span></button>`).join("");
+    const box = $("floors"); if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+    box.style.display = FLOORS.length > 1 ? "" : "none";
+  }
+  function setFloor(f) { state.floor = f; fit(); frame(true); }
+  // picking something on another floor takes you to that floor
+  function goToSel() {
+    const sel = state.sel; if (!sel) return;
+    let f = null;
+    if (sel.type === "person") { const at = personAt(people[sel.id], state.t); if (at) f = floorOf(at.x, at.y); }
+    else if (sel.type === "room") f = rooms[sel.id] && rooms[sel.id].floor;
+    else if (sel.type === "app") f = rooms[APPS[sel.id].room] && rooms[APPS[sel.id].room].floor;
+    if (f && f !== state.floor) { state.floor = f; fit(); }
+  }
   function frame(force) {
     $("clock").textContent = C.clock(state.t); scrub.value = state.t;
+    renderFloors();
     draw(); renderTimeline(); drawFlow();
     const nowT = performance.now();
     if (force || nowT - lastPanel > 250) {
@@ -493,6 +551,7 @@
   }
   for (const b of document.querySelectorAll("#layers button")) b.onclick = () => { state.layer = b.dataset.layer; for (const x of document.querySelectorAll("#layers button")) x.setAttribute("aria-pressed", x === b); frame(true); };
   for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
+  $("floors").onclick = (e) => { const b = e.target.closest("button[data-floor]"); if (b) setFloor(b.dataset.floor); };
   $("only-key").onchange = () => renderLog(true);
   $("log").onclick = (e) => {
     const li = e.target.closest("li[data-msg]"); if (!li) return;
@@ -506,9 +565,9 @@
     let best = null, bd = Math.max(9, view.s * 0.6);
     for (const hh of hits) { const d = Math.hypot(hh.x - mx, hh.y - my); if (d < bd) { bd = d; best = hh; } }
     if (best) return { type: "person", id: best.p.id };
-    for (const a of H.appliances) { const p = appPos(a); if (p && Math.hypot(X(p[0]) - mx, Y(p[1]) - my) < Math.max(8, view.s * 0.45)) return { type: "app", id: a.id }; }
-    const wx = (mx - view.ox) / view.s, wy = (my - view.oy) / view.s;
-    for (const r of plan.rooms) { const [x0, y0, x1, y1] = r.rect; if (wx > x0 && wx < x1 && wy > y0 && wy < y1) return { type: "room", id: r.id }; }
+    for (const a of H.appliances) { if (!roomOnFloor(a.room)) continue; const p = appPos(a); if (p && Math.hypot(X(p[0]) - mx, Y(p[1]) - my) < Math.max(8, view.s * 0.45)) return { type: "app", id: a.id }; }
+    const wx = (mx - view.ox) / view.s + F().origin[0], wy = (my - view.oy) / view.s + F().origin[1];
+    for (const r of plan.rooms) { if (!roomOnFloor(r.id)) continue; const [x0, y0, x1, y1] = r.rect; if (wx > x0 && wx < x1 && wy > y0 && wy < y1) return { type: "room", id: r.id }; }
     return null;
   }
   cv.addEventListener("click", (ev) => { state.sel = pick(ev); if (state.sel) showTab("inspect"); frame(true); });
@@ -544,5 +603,5 @@
     }
     return out;
   }
-  window.__home = { state, frame, showTab, hits: () => hits, hiddenRunning, get people() { return people; }, get modes() { return modes; }, season: () => season };
+  window.__home = { state, frame, showTab, setFloor, floorOf, hits: () => hits, hiddenRunning, get people() { return people; }, get modes() { return modes; }, season: () => season };
 })();

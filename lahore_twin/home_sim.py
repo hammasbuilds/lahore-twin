@@ -58,7 +58,7 @@ def appliances_for(plan) -> list[Appliance]:
     for rid in plan.ac_rooms:
         out.append(Appliance(f"ac:{rid}", "ac", rid, APPLIANCES["ac"][0], False))
     extra = [("fridge", "kitchen"), ("router", "lounge"), ("tv", "lounge"), ("pump", "yard"),
-             ("washer", "yard"), ("iron", "spine"), ("microwave", "kitchen")]
+             ("washer", "yard"), ("iron", "wash"), ("microwave", "kitchen")]
     for kind, rid in extra:
         w, ess, _ = APPLIANCES[kind]
         out.append(Appliance(kind, kind, rid, w, ess))
@@ -96,6 +96,8 @@ class HomeSim:
             e = RoomEnv(rid, r.kind, r.area, rid in self.plan.ac_rooms, temp=31.5 if sc.season.t_max > 36 else 26.0,
                         climate=sc.season, setpoint=HOME_SETPOINT, mass_scale=2.0,
                         ac_capacity_w=AC_THERMAL_W if rid in self.plan.ac_rooms else 0.0)
+            if rid in self.plan.raw.get("under_roof", []):
+                e.envelope *= 1.35          # top-floor rooms take the sun on the roof slab
             self.env[rid] = e
         self.ctrl = CONTROLLERS[mode](self.bus, sc, self.inverter, self.apps)
         self.cmd: dict[str, bool] = {a: False for a in self.apps}
