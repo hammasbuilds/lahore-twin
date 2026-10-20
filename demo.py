@@ -14,6 +14,7 @@ import time
 from lahore_twin.export import run_all, write
 from lahore_twin.office import clock
 from lahore_twin.rules import MODES
+from lahore_twin.summary import write as write_summary
 
 NAMES = {"schedule": "Fixed schedule", "pir": "Motion", "pir+co2": "Motion + CO2"}
 
@@ -78,6 +79,7 @@ def main() -> None:
 
     if not args.no_write:
         path = write(replay)
+        write_summary()                 # the overview cards in the app
         print(f"\nwrote {path} ({path.stat().st_size / 1e6:.2f} MB) - open viewer/index.html")
 
 

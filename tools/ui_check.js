@@ -5,7 +5,7 @@ const fs = require("fs");
 const { chromium } = require("playwright");
 
 const out = process.argv[2] || "ui-shots";
-const page_ = process.argv[3] || path.join(__dirname, "..", "viewer", "index.html");
+const page_ = process.argv[3] || path.join(__dirname, "..", "viewer", "office.html");
 fs.mkdirSync(out, { recursive: true });
 
 process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e && e.message ? e.message : e); process.exit(1); });
@@ -59,12 +59,26 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   await page.setViewportSize({ width: 1440, height: 900 }); await page.waitForTimeout(200);
   // a person, picked the way a user would: click their dot on the plan
   await setT("10:40");
-  // a real mouse click on the office boy's dot, then check the inspector names him
-  const dot = await page.evaluate(() => {
-    const r = document.getElementById("plan").getBoundingClientRect();
-    const h = window.__twin.hits().find((x) => x.p.role === "office_boy");
-    return h ? { x: r.left + h.x, y: r.top + h.y, name: h.p.name } : null;
+  // a user finds him by his floor: the floor buttons count who is where; go to his floor
+  const boyFloor = await page.evaluate(() => {
+    const T = window.__twin, p = Object.values(T.IX.people).find((q) => q.role === "office_boy");
+    const at = TwinCore.personAt(p, T.state.t);
+    return at ? T.floorOf(at.x, at.y) : null;
   });
+  if (!boyFloor) throw new Error("office boy not in the building at 10:40");
+  await page.click(`#floors button[data-floor="${boyFloor}"]`); await page.waitForTimeout(150);
+  // a real mouse click on the office boy's dot, then check the inspector names him
+  // when his dot overlaps a colleague's (he stops beside their desks), wait a little, as a user would
+  let dot = null;
+  for (let k = 0; k < 40 && !dot; k++) {
+    dot = await page.evaluate(() => {
+      const r = document.getElementById("plan").getBoundingClientRect();
+      const hs = window.__twin.hits(), h = hs.find((x) => x.p.role === "office_boy");
+      if (!h || hs.some((o) => o !== h && Math.hypot(o.x - h.x, o.y - h.y) < 14)) return null;
+      return { x: r.left + h.x, y: r.top + h.y, name: h.p.name };
+    });
+    if (!dot) { await page.evaluate(() => { window.__twin.state.t += 15; window.__twin.frame(true); }); await page.waitForTimeout(40); }
+  }
   if (!dot) throw new Error("office boy not on the plan at 10:40");
   await page.mouse.click(dot.x, dot.y); await page.waitForTimeout(250);
   const title = await page.textContent("#pane-inspect h3");

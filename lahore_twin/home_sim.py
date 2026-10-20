@@ -86,6 +86,7 @@ class HomeSim:
         self.bus = Bus(quiet=("voltage", "soc", "kw", "level", "temp", "load", "presence"))
         self.apps = {a.id: a for a in appliances_for(self.plan)}
         self.inverter = Inverter()
+        self.inverter.battery.capacity_kwh = max(1.0, sc.battery_kwh)
         if soc_start is not None:
             self.inverter.battery.soc = soc_start
         self.tank = RoofTank()
@@ -282,7 +283,7 @@ class HomeSim:
         sc = self.sc
         grid = sc.grid_up(t)
         volts = sc.voltage(t) if grid else 0.0
-        kwp = 6.0
+        kwp = sc.pv_kwp
         pv = kwp * sc.season.pv_kwh_per_kwp / sc.season.shape_integral_hours() * sc.season.clear_sky_shape(t) \
             * sc.cloud_factor(t)
         demand = self._demand(t)

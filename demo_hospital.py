@@ -16,6 +16,7 @@ from lahore_twin.export_hospital import run_all, write
 from lahore_twin.hospital import build, describe
 from lahore_twin.hospital_sim import MODES, HospitalSim
 from lahore_twin.plan import Plan
+from lahore_twin.summary import write as write_summary
 
 ROWS = [
     ("Door to triage, median (min)", "door_to_triage_min"),
@@ -96,6 +97,7 @@ def main() -> None:
     table({k: s.metrics() for k, s in sims.items()})
     if not a.no_write:
         p = write(replay)
+        write_summary()                 # the overview cards in the app
         print(f"\nwrote {p} ({p.stat().st_size / 1e6:.2f} MB) - open viewer/hospital.html")
     if a.days:
         spread(a.seed, a.days)

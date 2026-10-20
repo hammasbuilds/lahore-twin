@@ -75,8 +75,9 @@ class _Busy:
         self.iv.setdefault(pid, []).append((a, b))
 
 
-def build(plan: Plan, seed: int = 7, n_staff: int = 24, n_visitors: int = 4) -> Scenario:
+def build(plan: Plan, seed: int = 7, n_staff: int | None = None, n_visitors: int = 4) -> Scenario:
     rng = random.Random(seed)
+    n_staff = len(plan.spots["desk"]) if n_staff is None else n_staff     # one person per desk, every floor
     used_names: set[str] = set()
 
     def name(g: str) -> str:
@@ -205,6 +206,9 @@ def _calendar(plan, rng, people, busy, n_visitors, person_factory):
         if book("meet_s", s + rng.choice([0, 600]), rng.choice([1800, 2700]), rng.randint(2, 4),
                 rng.choice(titles), visitors=v):
             visitors_left -= v
+    if "f_meet" in plan.rooms:                   # the first-floor boardroom
+        for s in [hm("09:15"), hm("11:00"), hm("14:15"), hm("16:30")]:
+            book("f_meet", s + rng.choice([0, 900]), rng.choice([2700, 3600]), rng.randint(5, 8), rng.choice(titles))
     for booth in ("booth1", "booth2", "booth3"):
         t = hm("09:45") + rng.randint(0, 1800)
         while t < hm("17:00"):

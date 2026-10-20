@@ -14,6 +14,7 @@ import time
 
 from lahore_twin.export_home import MODES, run_all, write
 from lahore_twin.home import describe
+from lahore_twin.summary import write as write_summary
 
 NAMES = {"default": "Inverter default", "ups": "UPS circuit", "gridsense_eco": "GridSense eco",
          "gridsense": "GridSense"}
@@ -62,6 +63,7 @@ def main() -> None:
         other = "october" if a.season == "june" else "june"
         alt, _ = run_all(seed=a.seed, season=other, category=a.category)
         p = write(replay if a.season == "june" else alt, extra={"october": alt if a.season == "june" else replay})
+        write_summary()                 # the overview cards in the app
         print(f"\nwrote {p} ({p.stat().st_size / 1e6:.2f} MB) - open viewer/home.html")
 
 

@@ -46,13 +46,15 @@ def mode_replay(s: HospitalSim) -> dict:
     }
 
 
-def run_all(seed: int = 7) -> tuple[dict, dict[str, HospitalSim]]:
+def run_all(seed: int = 7, arrivals_pct: float = 100, ward_nurses: int | None = None,
+            alarm_delay: int = 15) -> tuple[dict, dict[str, HospitalSim]]:
     ed, ward = Plan.load("hospital_ed.json"), Plan.load("hospital_ward.json")
-    sc = build(ed, ward, seed=seed)
+    sc = build(ed, ward, seed=seed, arrivals_pct=arrivals_pct, ward_nurses=ward_nurses, alarm_delay=alarm_delay)
     sims = {m: HospitalSim(sc, ed, ward, m).run() for m in MODES}
     st = site()
     replay = {
         "meta": {"seed": seed, "t0": 0, "t1": 86400, "digest": source_digest("hospital"), "describe": describe(sc),
+                 "arrivals_pct": arrivals_pct, "alarm_delay": sc.alarm_delay,
                  "audit": list(sc.audit), "true_hand_hygiene": sc.true_hand_hygiene},
         "plans": {"ed": ed.to_json() | {"outline": ed.raw["outline"]},
                   "ward": ward.to_json() | {"outline": ward.raw["outline"]}},

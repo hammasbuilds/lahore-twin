@@ -198,7 +198,7 @@ class GridSense(Base):
         self.sun_prev: set[str] = set()
         self.sun_decided_at = None
         self.outage_began = None
-        self.kwp = 6.0
+        self.kwp = self.sc.pv_kwp
         self.pv_seen_kwh = 0.0
         self.pv_expected_kwh = 0.0
         from .home import learned_occupancy

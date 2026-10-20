@@ -34,7 +34,6 @@ from .plan import Plan, is_portal, path_length, seg_len
 MODES = ("today", "connected")
 PATIENT_ROOMS = {"bay", "hdu", "side", "cubicle", "resus", "treat"}
 COLOUR_PRIO = {"red": 0, "orange": 1, "yellow": 2, "green": 3, "blue": 4}
-ALARM_DELAY = 15
 SEARCH_ORDER = {"ed": ["store", "amb", "majors", "resus", "xray", "waiting", "minors", "m1", "m2", "m3", "m4", "m5", "m6",
                        "b_store"],
                 "ward": ["store", "corridor", "station", "bay_a", "bay_b", "bay_c", "hdu", "side1", "side2", "lobby"]}
@@ -558,7 +557,7 @@ class HospitalSim:
         rec = dict(t=al.t, bed=al.bed, kind=al.kind, dur=al.dur, annunciated=None, arrived=None, task=None)
         self.alarm_log.append(rec)
         if self.conn and al.kind != "critical":
-            rec["pending_until"] = al.t + ALARM_DELAY
+            rec["pending_until"] = al.t + self.sc.alarm_delay
             rec["cause"] = m.id
             return
         self._alarm_task(rec, m.id)
@@ -1002,7 +1001,7 @@ class HospitalSim:
             for rec in self.alarm_log:
                 if rec.get("pending_until") == t:
                     rec.pop("pending_until")
-                    if rec["dur"] > ALARM_DELAY:
+                    if rec["dur"] > self.sc.alarm_delay:
                         self._alarm_task(rec, rec["cause"])
                     else:
                         rec["hidden"] = True

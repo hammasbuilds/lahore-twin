@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traffic Twin</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%23f59e0b'/%3E%3Cpath d='M9 26l4-20M23 26l-4-20M16 8v3M16 15v3M16 22v3' stroke='%230b1220' stroke-width='2.4' fill='none'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="twin.css">
+<style>
+:root { --accent: #f59e0b; --road-major: #e8b04b; --road-mid: #c9d3e3; --road-minor: #7c8aa5; --road-edge: #0b1120; --road-tunnel: #5b6b8c;
+        --sig-red: #ef4444; --sig-amber: #f59e0b; --sig-green: #22c55e; --veh-moto: #a78bfa; --veh-car: #38bdf8; --veh-rick: #34d399; --veh-bus: #f472b6; }
+:root[data-theme="light"] { --accent: #b45309; --road-major: #d97706; --road-mid: #ffffff; --road-minor: #cbd5e1; --road-edge: #94a3b8; --road-tunnel: #94a3b8;
+        --sig-red: #dc2626; --sig-amber: #d97706; --sig-green: #16a34a; --veh-moto: #7c3aed; --veh-car: #0369a1; --veh-rick: #047857; --veh-bus: #be185d; }
+#stage { overflow: hidden; }
+canvas#plan { cursor: grab; touch-action: none; }
+canvas#plan.drag { cursor: grabbing; }
+#mini { position: absolute; right: 12px; bottom: 12px; width: 190px; height: 210px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); z-index: 2; cursor: pointer; }
+.zoom { position: absolute; right: 12px; top: 12px; z-index: 2; display: flex; flex-direction: column; gap: 6px; }
+.zoom .btn { width: 36px; padding: 6px 0; text-align: center; }
+.kpis.k3 { grid-template-columns: repeat(3, 1fr); }
+.kpi .v { font-size: 20px; }
+.hot li { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13px; list-style: none; }
+.hot { margin: 0; padding: 0; }
+.hot li:hover { background: var(--panel-2); }
+.note { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.loadtag { position: absolute; left: 12px; top: 12px; z-index: 2; font-size: 12px; color: var(--muted); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 4px 8px; }
+@media (max-width: 900px) { canvas#plan { aspect-ratio: 3 / 4; } #mini { width: 120px; height: 134px; } }
+</style>
+</head>
+<body data-module="traffic">
+<header>
+  <h1>Traffic Twin <span>· Lahore Twin, phase 4</span></h1>
+  <div class="clock num" id="clock">07:30</div>
+  <button class="btn" id="play" aria-label="Play">▶ Play</button>
+  <select id="speed" aria-label="Playback speed">
+    <option value="5">5×</option>
+    <option value="15" selected>15×</option>
+    <option value="60">60×</option>
+    <option value="180">180×</option>
+  </select>
+  <div class="seg" id="modes" role="group" aria-label="Signal rule set">
+    <button data-mode="fixed" aria-pressed="false" title="Every signal on a fixed cycle, the same split all morning">Fixed signals</button>
+    <button data-mode="adaptive" aria-pressed="true" title="Loop detectors 40 m back on every approach: green held while traffic keeps coming">Adaptive signals</button>
+  </div>
+  <button class="btn" id="follow-random" title="Ride along with a vehicle; the map loads around it">Follow a vehicle</button>
+  <div class="spacer"></div>
+  <a class="btn xlink" href="index.html" style="text-decoration:none">All modules</a>
+  <button class="btn" id="about-btn" aria-label="About this module">About</button>
+  <button class="btn" id="theme" aria-label="Toggle colour theme">Light</button>
+</header>
+<main>
+  <section id="stage">
+    <canvas id="plan" aria-label="Lahore road map: Gulberg, Kalma Chowk, Canal Road"></canvas>
+    <div class="loadtag num" id="loadtag"></div>
+    <div class="zoom"><button class="btn" id="zin" aria-label="Zoom in">+</button><button class="btn" id="zout" aria-label="Zoom out">−</button><button class="btn" id="zfit" aria-label="Show the whole area" title="Whole area">⤢</button></div>
+    <canvas id="mini" aria-label="Minimap: click to jump"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="tip" id="tip"></div>
+  </section>
+  <aside>
+    <div class="kpis k3">
+      <div class="kpi"><div class="v num" id="k-on">–</div><div class="l">On the road</div></div>
+      <div class="kpi"><div class="v num" id="k-speed">–</div><div class="l">Mean speed now</div></div>
+      <div class="kpi"><div class="v num" id="k-done">–</div><div class="l">Trips finished</div></div>
+    </div>
+    <div class="tabs" role="tablist">
+      <button role="tab" data-tab="hot" aria-selected="true">Hotspots</button>
+      <button role="tab" data-tab="follow" aria-selected="false">Follow</button>
+      <button role="tab" data-tab="junction" aria-selected="false">Junction</button>
+      <button role="tab" data-tab="compare" aria-selected="false">Compare</button>
+    </div>
+    <div class="pane on" id="pane-hot"></div>
+    <div class="pane" id="pane-follow"></div>
+    <div class="pane" id="pane-junction"><p class="muted">Click a signal on the map or a hotspot to see its phases.</p></div>
+    <div class="pane" id="pane-compare"></div>
+  </aside>
+</main>
+<footer>
+  <div class="timeline"><canvas id="tl"></canvas><input type="range" id="scrub" min="0" max="4499" step="1" value="0" aria-label="Time"></div>
+  <div class="ticks num" id="ticks"></div>
+</footer>
+<script>(function () { var q = new URLSearchParams(location.search).get("replay");
+  var src = q && /^runs\/[\w.-]+\.js$/.test(q) ? q : "traffic_replay.js";
+  document.write('<script src="' + src + '"><\/script>'); })();</script>
+<script src="about.js"></script>
+<script src="core.js"></script>
+<script src="traffic.js"></script>
+<script src="embed.js"></script>
+</body>
+</html>

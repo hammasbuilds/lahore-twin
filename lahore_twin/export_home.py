@@ -14,9 +14,11 @@ from .plan import Plan
 MODES = ("default", "ups", "gridsense_eco", "gridsense")
 
 
-def run_all(seed: int = 7, season: str = "june", category: str = "IV") -> tuple[dict, dict[str, HomeSim]]:
+def run_all(seed: int = 7, season: str = "june", category: str = "IV", pv_kwp: float = 6.0,
+            battery_kwh: float = 10.0) -> tuple[dict, dict[str, HomeSim]]:
     plan = Plan.load("home.json")
     sc = build(plan, SEASONS[season], seed=seed, category=category)
+    sc.pv_kwp, sc.battery_kwh = float(pv_kwp), float(battery_kwh)
     sims = {m: run_day(sc, m) for m in MODES}
     first = sims[MODES[0]]
     replay = {
@@ -24,6 +26,7 @@ def run_all(seed: int = 7, season: str = "june", category: str = "IV") -> tuple[
                  "category_hours": CATEGORIES[category], "t0": 0, "t1": 86400, "title": plan.name,
                  "sunrise": sc.season.sunrise, "sunset": sc.season.sunset, "peak": list(sc.season.peak),
                  "tariff": TARIFF, "day_factor": sc.day_factor, "forecast_factor": sc.forecast_factor,
+                 "pv_kwp": sc.pv_kwp, "battery_kwh": sc.battery_kwh,
                  "digest": source_digest("home")},
         "plan": plan.to_json() | {"ac_rooms": plan.ac_rooms, "fan_rooms": plan.raw.get("fan_rooms", [])},
         "appliances": [{"id": a.id, "kind": a.kind, "room": a.room, "watts": a.watts, "essential": a.essential}

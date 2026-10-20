@@ -28,7 +28,7 @@ aside { grid-template-rows: auto auto auto 1fr; }
 .strip-key i { display: inline-block; width: 14px; height: 8px; margin-right: 5px; vertical-align: 0; border-radius: 2px; }
 </style>
 </head>
-<body>
+<body data-module="home">
 <header>
   <h1>Home Twin <span>· Lahore Twin, phase 2</span></h1>
   <div class="clock num" id="clock">00:00</div>
@@ -51,7 +51,9 @@ aside { grid-template-rows: auto auto auto 1fr; }
   </div>
   <div class="seg" id="floors" role="group" aria-label="Floor"></div>
   <div class="spacer"></div>
-  <a class="btn" href="index.html" style="text-decoration:none">Office</a>
+  <a class="btn xlink" href="index.html" style="text-decoration:none">All modules</a>
+  <a class="btn xlink" href="office.html" style="text-decoration:none">Office</a>
+  <button class="btn" id="about-btn" aria-label="About this module">About</button>
   <button class="btn" id="theme" aria-label="Toggle colour theme">Light</button>
 </header>
 <main>
@@ -94,8 +96,12 @@ aside { grid-template-rows: auto auto auto 1fr; }
   <div class="timeline"><canvas id="tl"></canvas><input type="range" id="scrub" min="0" max="86399" step="1" value="0" aria-label="Time of day"></div>
   <div class="ticks num" id="ticks"></div>
 </footer>
-<script src="home_replay.js"></script>
+<script>(function () { var q = new URLSearchParams(location.search).get("replay");
+  var src = q && /^runs\/[\w.-]+\.js$/.test(q) ? q : "home_replay.js";
+  document.write('<script src="' + src + '"><\/script>'); })();</script>
+<script src="about.js"></script>
 <script src="core.js"></script>
 <script src="home.js"></script>
+<script src="embed.js"></script>
 </body>
 </html>

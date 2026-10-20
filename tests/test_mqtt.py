@@ -142,8 +142,11 @@ def test_an_echoing_broker_does_not_feed_the_building_its_own_readings():
     sim.run(hm("07:00"), hm("09:30"), on_tick=lambda t: client.poll(0))
     _wait(lambda: client.poll(0.05) >= 0 and False, timeout=0.5)
     assert bridge.sent > 100 and bridge.received == 0
-    assert sim.att.estimate_inside() == sim.series["roll_truth"][-1] or abs(
-        sim.att.estimate_inside() - sim.series["roll_truth"][-1]) <= 1
+    # compare with who is behind the badge doors now: the per-minute truth sample can be a
+    # minute old, and four late arrivals badged in together at 09:29
+    public = sim.plan.operations.get("public_rooms", ("parking", "lobby"))
+    truth = sum(1 for p in sim.people if p.on_site and p.room and p.room not in public)
+    assert abs(sim.att.estimate_inside() - truth) <= 1
     client.close()
 
 

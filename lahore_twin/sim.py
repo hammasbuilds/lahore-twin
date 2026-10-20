@@ -46,7 +46,11 @@ class Sim:
         # separate streams so a rule set can never change what happens elsewhere:
         # people and the gate are identical across rule sets; room sensors may differ
         self.rng_people = random.Random(seed * 1000 + 1)
-        self.rng_sense = random.Random(seed * 1000 + 2)
+        # three sensor streams, so one rule set's choices (a light it kept on, someone waving)
+        # cannot reshuffle another sensor's noise: motion misses stay matched across rule sets
+        self.rng_sense = random.Random(seed * 1000 + 2)          # motion-sensor misses
+        self.rng_wave = random.Random(seed * 1000 + 4)           # how soon someone waves at a dark room
+        self.rng_env = random.Random(seed * 1000 + 5)            # CO2 and temperature reading noise
         self.rng_gate = random.Random(seed * 1000 + 3)
         self.people: list[Person] = copy.deepcopy(scenario.people)
         self.by_id = {p.id: p for p in self.people}
@@ -396,7 +400,7 @@ class Sim:
                 continue
             if getattr(p, "dark_since", None) is None:
                 p.dark_since = t
-                p.wave_at = t + self.rng_sense.randint(5, 20)
+                p.wave_at = t + self.rng_wave.randint(5, 20)
             elif t - p.dark_since >= 30:
                 p.dark_since = None
                 self.metrics_acc["manual_on"] += 1
@@ -427,8 +431,8 @@ class Sim:
         occ = self._occupancy()
         for rid, env in self.env.items():
             if rid in self.plan.ac_rooms:
-                self.bus.publish(f"office/{rid}/co2", round(env.co2 + self.rng_sense.gauss(0, 10), 1))
-                self.bus.publish(f"office/{rid}/temp", round(env.temp + self.rng_sense.gauss(0, 0.15), 2))
+                self.bus.publish(f"office/{rid}/co2", round(env.co2 + self.rng_env.gauss(0, 10), 1))
+                self.bus.publish(f"office/{rid}/temp", round(env.temp + self.rng_env.gauss(0, 0.15), 2))
         s = self.series
         s["t"].append(t)
         s["light_kw"].append(round(sum(e.light_watts for r, e in self.env.items() if self.light[r]) / 1000, 3))

@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | built; review rounds next |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -854,3 +854,106 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   as a game map does. The UI check follows a porter and requires the view to move
   on its own; it requires the basement's spare pumps to be drawn.
 - *Test:* a floor change goes through exactly one hop at the stairs' cost.
+
+## Phase 4 — Lahore traffic (real roads)
+
+*User, 2026-10-20: the earlier traffic work (traffic-agents) was a square grid turned
+into traffic — wrong. Mimic real roads: bridges and flyovers, underpasses, small
+streets, single-lane and multi-lane, two-way and one-way; and a map that loads
+around the car as it drives, like an in-game map. Moved ahead of the remaining
+hospital rounds, which continue alongside.*
+
+### Research notes
+
+- **The roads come from OpenStreetMap**, Gulberg / Kalma Chowk / Canal Road
+  (31.490–31.530 N, 74.310–74.355 E), fetched 2026-10-18: 2,279 ways — trunk,
+  primary, secondary, tertiary, residential, living streets, service lanes and
+  link roads — with 337 one-way segments, 70 lane counts, 21 bridge segments
+  (Kalma Chowk Flyover, Ferozepur Road Flyover, Jinnah Bridge) and 13 tunnel
+  segments (the Canal Road underpasses). ODbL; attribution on the map.
+- **Signals are barely mapped**: 2 traffic-signal nodes in the whole area. Signals
+  are placed at at-grade junctions of tertiary-or-bigger roads and said to be
+  placed, not mapped. The Canal Road corridor is signal-free by design (U-turns
+  and underpasses), which the network reproduces because its underpasses share no
+  nodes with the roads above.
+- **Vehicle mix (Punjab Excise, registered in Lahore, 30 Sep 2024):** about 70%
+  motorcycles, 22% cars, 3% rickshaws; buses and vans make up the rest.
+- **Driving models:** the Intelligent Driver Model for following, MOBIL for lane
+  changes (politeness, threshold, safe deceleration); published values are for
+  highways (1.5 s headway, 2 m jam gap), so urban values are assumptions:
+  shorter headways for motorcycles, lower desired speeds by road class.
+- **Delay causes in Lahore (JICA peak-hour survey, Mall Road area):** signal
+  stops, lane encroachment and illegal parking.
+
+### Simulation model
+
+- Road graph: ways split at shared nodes into directed links with lanes (tag, or
+  a default by class), speed limit by class, layer (bridge +1, tunnel −1). Roads
+  on different layers never meet unless OSM joins them, so flyovers pass over.
+- Vehicles with a type (motorcycle, car, rickshaw, bus), IDM following per lane,
+  MOBIL-style lane changes; motorcycles take shorter gaps.
+- Trips between the network's edges and interior streets, routed by travel time;
+  a morning-peak demand curve.
+- Junctions: signals (fixed-time vs adaptive from loop detectors), priority to the
+  bigger road where unsignalised.
+- Outputs: travel time, delay per junction (the hotspot list phase 5 starts from),
+  queue lengths, stops per trip, throughput.
+
+### UI
+
+- A map drawn from the road geometry: lane markings, one-way arrows, flyovers
+  drawn above with a shadow, underpasses dashed below, road names.
+- **Streaming map**: the geometry is cut into tiles; only tiles near the camera
+  are drawn, fading in as they arrive, like a game map. **Follow a vehicle**: the
+  camera rides with it, a minimap shows where it is in the area.
+- Junction inspector (signal phases, queue), hotspot list, the rule sets side by
+  side, About panel, run-with-your-values (demand, signal plan).
+- Same shared tokens; road colours by class, red/amber/green for signals only.
+
+### Round log
+
+**Build (2026-10-20).**
+- *Network* (`roads.py`): 2,265 OSM ways → 5,395 road pieces, 9,698 directed links,
+  lanes from tags or class, layers for flyovers (+1) and underpasses (−1); the
+  largest strongly connected part kept. First load took 62 s (list membership in a
+  loop) → 0.24 s. Signal sites: 132 at first (every node of every divided-road
+  crossing), then 11 (secondary-only), then 39 → 33 controllers: two named roads,
+  one secondary or bigger, nodes within 45 m grouped.
+- *Found in the data*: OSM joins two residential streets to the middle of a flyover.
+  A node inside a raised span now connects only links on the same layer; a test
+  checks both directions. Printing a link recursed through its neighbours into a
+  MemoryError; `out` no longer appears in its repr.
+- *Simulation* (`traffic_sim.py`): IDM following, MOBIL-style lane changes, give way
+  to the bigger road, red and amber, spillback, a morning peak of 7,078 trips routed
+  on free-flow time; fixed vs adaptive (loop detectors) signals. Entry points: the
+  ends of big roads where the extract cuts them (the bounding box was useless — whole
+  ways come back from Overpass). 31 s per rule set.
+- *Viewer* (`traffic.html` / `traffic.js`): tiles stream in around the camera with a
+  fade, drag to pan, scroll to zoom, minimap, follow a vehicle (hops to another on
+  arrival), lane markings, one-way arrows, flyovers on top with a shadow, underpasses
+  dashed, signals per approach, hotspot list that flies to the junction. Replay
+  13.4 MB → 8.1 MB: whole-metre deltas every 4 s, routes stored once.
+- Adaptive vs fixed on the same trips: median delay 53 → 20 s, stops 3.7 → 2.2,
+  vehicle-hours stopped at signals 53 → 10. Known weaknesses for the rounds: ~550
+  vehicles still driving or never entered after 15 min of clearance; mean speed
+  34–37 km/h is fast for a Lahore peak; one Urdu-only road name.
+
+## One app (user request, 2026-10-20)
+
+- `viewer/index.html` is the shell: overview cards with each module's headline
+  numbers, About for every module (`about.js`), each module's own dashboard in a
+  frame, hash routing, one theme. Module pages hide their own navigation inside it
+  (`embed.js`) and keep an About button. `serve.py` serves the app and runs
+  **Run with your values** (`/api/run/<module>`, inputs range-checked, cached by
+  inputs, "Your run" label on the result). `run.bat` starts it; one Launchpad entry.
+- `tools/ui_check_app.js` uses the whole app through the server: every card, About,
+  module buttons and tabs, all four forms with typed values checked against the
+  result, an out-of-range input refused, phone width. It found: the traffic run's
+  label said "seed undefined"; the home form promised a minute for a 3–4 minute run;
+  plus three bugs in the check itself (a tab's internal name, reading the frame's
+  theme before the message arrived, a malformed select locator).
+- Office: the sensor noise split into three streams (motion misses, waving, CO₂ and
+  temperature readings), so one rule set's choices no longer reshuffle the other's
+  motion misses; the 20-day sweep went from 1 problem to 0.
+- Demo: `tools/demo_video.py` records a 41 s walkthrough (kept out of git) and 19
+  screenshots in `docs/screenshots/`, embedded in the README.

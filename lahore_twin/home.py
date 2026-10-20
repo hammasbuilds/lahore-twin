@@ -57,6 +57,8 @@ class HomeScenario:
     day_factor: float                            # 1 clear, ~0.8 hazy, ~0.45 overcast
     forecast_factor: float                       # what a day-ahead forecast said
     sags: list[tuple[int, int, float]]           # (start, end, volts)
+    pv_kwp: float = 6.0                          # panels on the roof
+    battery_kwh: float = 10.0                    # battery bank
 
     def grid_up(self, t: int) -> bool:
         return not any(o.covers(t) for o in self.outages)

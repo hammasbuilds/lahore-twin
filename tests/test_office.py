@@ -31,9 +31,13 @@ def day(plan):
 # ---- plan and routing ---------------------------------------------------
 
 def _crossing_ok(plan, a, b):
+    from lahore_twin.plan import is_portal
     ra, rb = plan.room_at(*a), plan.room_at(*b)
     if ra == rb:
         return True
+    if is_portal(a, b):                      # stairs, lift or ramp between floors
+        return any(plan.room_at(*p["at"][plan.floor_at(*a)]) == ra and plan.room_at(*p["at"][plan.floor_at(*b)]) == rb
+                   for p in plan.portals if plan.floor_at(*a) in p["at"] and plan.floor_at(*b) in p["at"])
     mid = ((a[0] + b[0]) / 2, (a[1] + b[1]) / 2)
     for d in plan.doors:
         if {d.a, d.b} == {ra, rb}:
@@ -473,6 +477,6 @@ def test_every_engine_module_belongs_to_a_replay_digest():
     """A module that feeds a replay but is missing from SOURCES would let that replay go stale silently."""
     from lahore_twin.export import SOURCES
     listed = {n for files in SOURCES.values() for n in files}
-    helpers = {"__init__.py", "mqtt.py", "live.py", "live_home.py", "solar_assistant.py"}          # not part of any replay
+    helpers = {"__init__.py", "mqtt.py", "live.py", "live_home.py", "solar_assistant.py", "summary.py"}          # not part of any replay
     for f in (ROOT / "lahore_twin").glob("*.py"):
         assert f.name in listed or f.name in helpers, f.name

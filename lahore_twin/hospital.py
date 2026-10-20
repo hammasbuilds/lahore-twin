@@ -121,6 +121,7 @@ class HospitalScenario:
     audit: tuple[int, int] = (10 * H, 11 * H)            # hand-hygiene audit on the ward (Today only)
     true_hand_hygiene: float = 0.35                      # MedSense measured 35.1% in an ICU
     audited_hand_hygiene: float = 0.70                   # assumption: staff wash more when watched
+    alarm_delay: int = 15                                # Connected: seconds a non-critical alarm waits
     names: dict = field(default_factory=dict)
 
 
@@ -145,7 +146,10 @@ def _trunc_exp(rng: random.Random, mean: float, lo: float, hi: float) -> int:
             return int(v)
 
 
-def build(ed_plan, ward_plan, seed: int = 7) -> HospitalScenario:
+def build(ed_plan, ward_plan, seed: int = 7, arrivals_pct: float = 100, ward_nurses: int | None = None,
+          alarm_delay: int = 15) -> HospitalScenario:
+    """arrivals_pct scales the ED's hourly arrivals; ward_nurses sets nurses per day shift on the
+    ward (the night shift has one fewer); alarm_delay is the Connected annunciation delay."""
     r_staff, r_pat = random.Random(seed * 101 + 1), random.Random(seed * 101 + 2)
     r_ward, r_alarm = random.Random(seed * 101 + 3), random.Random(seed * 101 + 4)
     r_misc = random.Random(seed * 101 + 5)
@@ -159,7 +163,11 @@ def build(ed_plan, ward_plan, seed: int = 7) -> HospitalScenario:
                 return n
 
     staff: list[Staff] = []
-    for unit, table in (("ed", ED_STAFF), ("ward", WARD_STAFF)):
+    ward_table = dict(WARD_STAFF)
+    if ward_nurses is not None:
+        n = max(1, int(ward_nurses))
+        ward_table["nurse"] = (n, n, max(1, n - 1))
+    for unit, table in (("ed", ED_STAFF), ("ward", ward_table)):
         for role, counts in table.items():
             for (shift, (s, e)), n in zip(SHIFTS.items(), counts):
                 for k in range(n):
@@ -172,6 +180,7 @@ def build(ed_plan, ward_plan, seed: int = 7) -> HospitalScenario:
 
     pats: list[EDPatient] = []
     for hour, rate in enumerate(ARRIVALS):
+        rate = rate * max(0.1, arrivals_pct / 100)
         t = hour * H + r_pat.expovariate(rate / H)
         while t < (hour + 1) * H:
             colour = r_pat.choices(COLOURS, COLOUR_MIX)[0]
@@ -247,7 +256,7 @@ def build(ed_plan, ward_plan, seed: int = 7) -> HospitalScenario:
                                      [(29, 33.5), (30, 33.5), (31, 33.5), (2.4, 3.5), (16.8, 13.5), (14.5, 21.5), (17.5, 25), (7.2, 31.5)]])
     put("wheelchair", "ward", ward_plan, [(wx + 36.5, wy + 13.5), (wx + 32.5, wy + 30)])
     del sh
-    return HospitalScenario(seed, staff, pats, wps, beds, alarms, calls, fridge, assets)
+    return HospitalScenario(seed, staff, pats, wps, beds, alarms, calls, fridge, assets, alarm_delay=int(alarm_delay))
 
 
 def describe(sc: HospitalScenario) -> str:

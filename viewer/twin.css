@@ -141,3 +141,11 @@ footer { border-top: 1px solid var(--line); background: var(--panel); padding: 8
   aside { border-left: 0; border-top: 1px solid var(--line); }
   body { overflow: auto; height: auto; }
 }
+/* inside the Lahore Twin shell: the shell owns navigation and the theme */
+.embed header .xlink, .embed header #theme { display: none; }
+.about-dlg { border: 1px solid var(--line); border-radius: 14px; background: var(--panel); color: var(--text); max-width: 720px; width: calc(100% - 32px); padding: 0; }
+.about-dlg::backdrop { background: rgba(0, 0, 0, .55); }
+.about-dlg .dlg-body { padding: 18px 22px; max-height: 72vh; overflow: auto; }
+.about-dlg .dlg-foot { display: flex; justify-content: flex-end; gap: 8px; padding: 10px 16px; border-top: 1px solid var(--line); }
+.about-dlg h2 { margin: 0 0 8px; font-size: 18px; }
+.about-dlg li { font-size: 13.5px; margin: 3px 0; }

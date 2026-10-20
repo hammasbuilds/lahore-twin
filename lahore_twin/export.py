@@ -27,6 +27,7 @@ SOURCES = {
     "hospital": ["bus.py", "hospital.py", "hospital_site.py", "hospital_sim.py", "office.py", "plan.py",
                  "export_hospital.py", "export.py", "../plans/hospital_ed.json", "../plans/hospital_ward.json",
                  "../plans/osm/lgh_campus.json"],
+    "traffic": ["roads.py", "traffic_sim.py", "export_traffic.py", "export.py", "../plans/osm/lahore_gulberg_roads.json"],
 }
 
 
@@ -43,13 +44,15 @@ def source_digest(product: str) -> str:
     return h.hexdigest()[:16]
 
 
-def run_all(seed: int = 7, plan_file: str = "office.json") -> tuple[dict, dict[str, Sim]]:
+def run_all(seed: int = 7, plan_file: str = "office.json", n_staff: int | None = None,
+            n_visitors: int = 4) -> tuple[dict, dict[str, Sim]]:
     plan = Plan.load(plan_file)
-    sc = build(plan, seed=seed)
+    sc = build(plan, seed=seed, n_staff=n_staff, n_visitors=n_visitors)
     sims = {mode: Sim(sc, mode).run() for mode in MODES}
     first = sims[MODES[0]]
     replay = {
         "meta": {"seed": seed, "t0": T0, "t1": T1, "title": plan.name,
+                 "staff": sum(p.role == "staff" for p in sc.people), "visitors": sum(p.role == "visitor" for p in sc.people),
                  "prayer": sc.prayer_times, "digest": source_digest("office")},
         "plan": plan.to_json() | {"ac_rooms": plan.ac_rooms},
         "bookings": [{"id": b.id, "room": b.room, "title": b.title, "start": b.start, "end": b.end,
