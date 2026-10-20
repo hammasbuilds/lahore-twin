@@ -1300,3 +1300,10 @@ a 5-minute pharmacy stop in the outer lane, and the ambulance sat behind it for 
 vehicle stopped for an errand with a siren within 40 m behind pulls off the road. Result: to the
 call 4:27 / 4:16 / 3:58 (−11%), to hospital 2:23 / 2:17 / 2:09 on the 9 calls every way finished,
 reds 10 / 11 / 0. The junction fixes are unchanged by this.
+
+**Round 3 — other evenings.** Seeds 11 and 23 next to 7. Firozpur Road / Wahdat Road is the worst
+junction every time; every fix cuts its 26–28 vehicle-hours to 9–13, and the U-turn conversion is
+lowest each time (+333–337 km driven). A fix can hurt: at Khayaban-e-Jamia Punjab / Main
+Boulevard Garden Town (seed 11) retiming and the underpass lose 3.0 against 2.8 today; only
+adaptive helps there. Ambulance to the call, green wave against no priority: −11% (seed 7),
+−10% (11), −9% (23); siren −3 to −4%. Recorded in the README as a range.

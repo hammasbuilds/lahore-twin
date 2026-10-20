@@ -216,7 +216,8 @@ then to the nearest hospital with an emergency department:
 | On to hospital, mean (9 calls every way finished) | 2:23 | 2:17 | 2:09 |
 | Red lights met | 10 | 11 | 0 |
 
-Field studies of signal preemption report 14–23% shorter emergency trips; this is 11%. The calls
+Field studies of signal preemption report 14–23% shorter emergency trips; this is 11% (9–11% over three
+evenings, seeds 7, 11 and 23). The calls
 are short (1.5–8 km, one to four signals), so there is less to gain than on a long corridor.
 
 ## How it works
