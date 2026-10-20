@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 7 of 10 done |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 8 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -1061,3 +1061,9 @@ hospital rounds, which continue alongside.*
   are focusable buttons (Enter or Space flies there), Shift + arrows pan a quarter
   screen, and the keys are listed in the module's About panel. The traffic UI check now
   opens a junction with Enter and pans with Shift + →.
+
+**Round 8 — Run with your values at the edges.**
+- Through the real server: 2,000 trips an hour simulated in 38 s, 12,000 in 104 s; the
+  12,000 replay (10,745 trips, 12.6 MB) opens in the viewer in 0.8 s with no errors and
+  is labelled "Your run · seed 5 · 12,000 trips/h". 50,000 and "lots" are refused with
+  their reasons. No change needed; recorded so the numbers can be checked later.
