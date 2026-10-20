@@ -50,6 +50,14 @@ dialog::backdrop { background: rgba(0, 0, 0, .55); }
 .runform input, .runform select { width: 100%; }
 input[type=number] { background: var(--panel-2); color: var(--text); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; font: inherit; font-size: 13px; }
 .runmsg { font-size: 13px; margin-top: 8px; }
+#demo-bar { position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%); z-index: 50; display: none; align-items: center; gap: 14px;
+  width: min(860px, calc(100% - 32px)); background: var(--panel); border: 1px solid var(--accent); border-radius: 14px; padding: 12px 16px; box-shadow: var(--shadow); }
+body.demo-on #demo-bar { display: flex; }
+#demo-bar .txt { flex: 1; min-width: 0; }
+#demo-bar b { display: block; font-size: 14px; color: var(--accent); }
+#demo-bar span { font-size: 13.5px; }
+#demo-bar .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--alert); animation: blink 1.2s infinite; flex: none; }
+@keyframes blink { 50% { opacity: .25; } }
 @media (max-width: 860px) {
   body { grid-template-columns: 1fr; grid-template-rows: auto 1fr; overflow: auto; height: auto; }
   nav.side { border-right: 0; border-bottom: 1px solid var(--line); }
@@ -68,6 +76,7 @@ input[type=number] { background: var(--panel-2); color: var(--text); border: 1px
   <div class="brand"><b>Lahore Twin</b><span>IoT simulation of a city, one building at a time</span></div>
   <ul class="navlist" id="nav"></ul>
   <div class="side-foot">
+    <button class="btn primary" data-demo>▶ Watch the demo</button>
     <button class="btn" id="about-all">About</button>
     <button class="btn" id="theme" aria-label="Toggle colour theme">Light</button>
   </div>
@@ -76,9 +85,11 @@ input[type=number] { background: var(--panel-2); color: var(--text); border: 1px
   <div class="overview" id="overview"></div>
   <iframe id="frame" title="Module"></iframe>
 </section>
+<div id="demo-bar" role="status" aria-live="polite"><i class="dot" aria-hidden="true"></i><div class="txt"><b id="demo-title"></b><span id="demo-text"></span></div><button class="btn" id="demo-stop">Stop</button></div>
 <dialog id="dlg"><div class="dlg-body" id="dlg-body"></div><div class="dlg-foot" id="dlg-foot"></div></dialog>
 <script src="summary.js"></script>
 <script src="about.js"></script>
 <script src="shell.js"></script>
+<script src="demo.js"></script>
 </body>
 </html>

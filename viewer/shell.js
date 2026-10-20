@@ -5,6 +5,7 @@
 "use strict";
 
 (function () {
+  window.__startHash = location.hash;          // demo.js reads it after routing has run
   const A = window.TWIN_ABOUT, SUM = window.TWIN_SUMMARY || {};
   const $ = (id) => document.getElementById(id);
   const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
@@ -49,6 +50,7 @@
   function renderOverview() {
     $("overview").innerHTML = `<h1>Lahore Twin</h1>
       <p class="lead">Six IoT systems for a city like Lahore, simulated end to end in one place: an office tower, a home on solar during load-shedding, a hospital, the city's traffic, a planner for jammed junctions, and city-wide sensors. Pick a module to open its dashboard, read what it does, or run it with your own values.</p>
+      <p><button class="btn primary" data-demo>▶ Watch the demo</button> <span class="muted" style="font-size:13px">every module simulated from real inputs and driven on its own, with captions</span></p>
       <div class="cards">${KEYS.map((k) => {
         const a = A[k], ready = a.status === "ready";
         return `<article class="card" data-card="${k}">

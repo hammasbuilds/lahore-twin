@@ -306,7 +306,9 @@
     const o = H.outages.find((x) => x.start <= state.t && state.t < x.end);
     $("k-grid").textContent = up ? "On" : "Off";
     $("k-grid").style.color = up ? "" : "var(--outage)";
-    $("k-grid-l").textContent = up ? `Grid · ${S.volts[i].toFixed(0)} V` : `Outage ${C.clock(o.start)}–${C.clock(o.end)}${o.published ? "" : " (unannounced)"}`;
+    // the minute series and the outage list can disagree for a moment at an outage's edge
+    $("k-grid-l").textContent = up ? `Grid · ${S.volts[i].toFixed(0)} V`
+      : o ? `Outage ${C.clock(o.start)}–${C.clock(o.end)}${o.published ? "" : " (unannounced)"}` : "Outage";
   }
 
   // ---- events ----
