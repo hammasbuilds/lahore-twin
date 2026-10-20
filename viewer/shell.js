@@ -27,7 +27,8 @@
       ["battery_kwh", "Battery (kWh)", "number", 10, 0, 20],
     ],
     traffic: [
-      ["seed", "Morning (seed)", "number", 7, 1, 999],
+      ["period", "Peak", "select", "evening", ["evening", "morning"]],
+      ["seed", "Day (seed)", "number", 7, 1, 999],
       ["per_hour", "Trips per hour", "number", 8000, 2000, 12000],
     ],
     hospital: [
@@ -121,7 +122,7 @@
         return;
       }
       const body = Object.fromEntries(new FormData(form).entries());
-      const how = { office: "about 20 seconds", hospital: "about a minute", traffic: "about a minute", home: "3–4 minutes: four controllers, each after a warm-up day" };
+      const how = { office: "about 20 seconds", hospital: "about a minute", traffic: "about 2½ minutes: the same hour under both signal plans", home: "3–4 minutes: four controllers, each after a warm-up day" };
       msg.textContent = `Simulating… (${how[key] || "a minute or two"})`;
       $("run-go").disabled = true;
       try {

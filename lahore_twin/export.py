@@ -27,7 +27,8 @@ SOURCES = {
     "hospital": ["bus.py", "hospital.py", "hospital_site.py", "hospital_sim.py", "office.py", "plan.py",
                  "export_hospital.py", "export.py", "../plans/hospital_ed.json", "../plans/hospital_ward.json",
                  "../plans/osm/lgh_campus.json"],
-    "traffic": ["roads.py", "traffic_sim.py", "export_traffic.py", "export.py", "../plans/osm/lahore_gulberg_roads.json"],
+    "traffic": ["roads.py", "traffic_sim.py", "export_traffic.py", "export.py", "../plans/osm/lahore_gulberg_roads.json",
+                "../plans/osm/lahore_gulberg_pois.json"],
 }
 
 

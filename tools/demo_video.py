@@ -38,7 +38,7 @@ def warm(base: str) -> None:
 
 def main() -> None:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--base", default="http://127.0.0.1:8860/")
+    ap.add_argument("--base", default="http://127.0.0.1:8861/")
     ap.add_argument("--out-video", default=str(Path.home() / "Desktop" / "lahore-twin-demo.mp4"))
     a = ap.parse_args()
     warm(a.base)
@@ -113,6 +113,11 @@ def main() -> None:
         f.click('#modes button[data-mode="gridsense"]')
         f.click(".tabs button[data-tab=compare]"); page.wait_for_timeout(700)
         shot("07-home-controllers-compare")
+        # who is home: ten minutes after the first guest walks in
+        t_guest = f.evaluate("() => { const g = (window.HOME.gate || []).find((e) => /^g/.test(e[1]) && e[2] === 'in'); return g ? g[0] + 600 : 18 * 3600; }")
+        set_time(f, "__home", t_guest)
+        f.click('#floors button[data-floor="G"]'); f.click(".tabs button[data-tab=people]"); page.wait_for_timeout(900)
+        shot("07b-home-who-is-home")
 
         # 5 hospital: ED board, ward floor, campus, comparison
         page.click('#nav button[data-go="hospital"]')
@@ -133,14 +138,24 @@ def main() -> None:
         f = wait_module("__traffic")
         page.wait_for_timeout(1200)
         shot("12-traffic-map")
-        f.click("#follow-random"); page.wait_for_timeout(400)
-        for _ in range(6):
+        # ride with someone on their way to a shop, then watch them pull in
+        f.evaluate("""() => { const X = window.__traffic, vs = X.vehiclesOf(X.state.mode);
+          const v = vs.find((x) => x.kind !== 'bus' && x.stops.some((s) => s[3] >= 0 && s[1] != null && s[1] - s[0] > 300 && s[0] > 1200));
+          const s = v.stops.find((e) => e[3] >= 0 && e[1] != null && e[1] - e[0] > 300 && e[0] > 1200);
+          X.state.t = s[0] - 50; X.follow(v.i); X.frame(true); }""")
+        page.wait_for_timeout(400)
+        for _ in range(8):
             f.evaluate("() => { window.__traffic.state.t += 8; window.__traffic.frame(true); }")
             page.wait_for_timeout(250)
         page.wait_for_timeout(800)
         shot("13-traffic-follow-vehicle")
+        f.click(".tabs button[data-tab=places]"); page.wait_for_timeout(400)
+        f.click("#pane-places li[data-poi] >> nth=0"); page.wait_for_timeout(1200)
+        shot("13b-traffic-places")
+        f.click('#modes button[data-mode="fixed"]')
         f.click(".tabs button[data-tab=hot]")
-        f.click("#pane-hot li[data-sig]"); page.wait_for_timeout(1200)
+        f.click("#pane-hot li[data-sig]"); page.wait_for_timeout(500)
+        f.click("#zin"); page.wait_for_timeout(1200)
         shot("14-traffic-junction")
         f.click(".tabs button[data-tab=compare]"); page.wait_for_timeout(800)
         shot("15-traffic-compare")

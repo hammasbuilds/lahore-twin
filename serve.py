@@ -33,7 +33,8 @@ INPUTS = {
              "pv_kwp": ("float", 6.0, 0.0, 12.0), "battery_kwh": ("float", 10.0, 1.0, 20.0)},
     "hospital": {"seed": ("int", 7, 1, 999), "arrivals_pct": ("int", 100, 50, 200),
                  "ward_nurses": ("int", 3, 1, 6), "alarm_delay": ("int", 15, 0, 30)},
-    "traffic": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000)},
+    "traffic": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000),
+                "period": ("choice", "evening", ("evening", "morning"))},
 }
 
 
@@ -59,10 +60,16 @@ def clean(module: str, raw: dict) -> dict:
     return out
 
 
+def run_key(module: str, p: dict) -> str:
+    """The cache name of a run. The code's digest is part of it: a run cached before a change
+    to the simulation would otherwise be served as if the current code had produced it."""
+    from lahore_twin.export import source_digest
+    return hashlib.sha256(json.dumps([module, p, source_digest(module)], sort_keys=True).encode()).hexdigest()[:12]
+
+
 def simulate(module: str, p: dict) -> str:
     """Run the module with inputs p; return the replay's path relative to viewer/."""
-    key = hashlib.sha256(json.dumps([module, p], sort_keys=True).encode()).hexdigest()[:12]
-    rel = f"runs/{module}-{key}.js"
+    rel = f"runs/{module}-{run_key(module, p)}.js"
     path = VIEWER / rel
     if path.exists():
         return rel
@@ -79,7 +86,7 @@ def simulate(module: str, p: dict) -> str:
         body = f"window.HOME_SCENARIOS = {scen};\nwindow.HOME = window.HOME_SCENARIOS[{json.dumps(p['season'])}];\n"
     elif module == "traffic":
         from lahore_twin.export_traffic import run_all
-        replay, _ = run_all(seed=p["seed"], per_hour=p["per_hour"])
+        replay, _ = run_all(seed=p["seed"], per_hour=p["per_hour"], period=p["period"])
         body = "window.TRAFFIC = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False) + ";\n"
     else:
         from lahore_twin.export_hospital import run_all

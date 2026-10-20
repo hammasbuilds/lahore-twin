@@ -42,7 +42,7 @@
     const bits = ["seed " + m.seed];
     if (m.pv_kwp != null) bits.push(`${m.pv_kwp} kWp`, `${m.battery_kwh} kWh`, m.category);
     if (m.arrivals_pct != null) bits.push(`${m.arrivals_pct}% arrivals`, `${m.alarm_delay} s alarm delay`);
-    if (m.per_hour != null) bits.push(`${Number(m.per_hour).toLocaleString("en")} trips/h`);
+    if (m.per_hour != null) bits.push(`${m.period ? m.period + " · " : ""}${Number(m.per_hour).toLocaleString("en")} trips/h`);
     if (m.staff != null) bits.push(`${m.staff} staff`);
     pill.textContent = "Your run · " + bits.filter(Boolean).join(" · ");
     pill.title = "Simulated with the values you entered";

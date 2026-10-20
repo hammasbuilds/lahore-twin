@@ -1085,3 +1085,101 @@ hospital rounds, which continue alongside.*
   acted and quote its own decision.
 - Launchpad's server on 8860 was the old static one (no API); replaced by `run.bat`
   (serve.py) on the same port.
+
+## Real-life logic (user request, 2026-10-20)
+
+- *Asked for:* people coming and going at home (school, office, university, father back,
+  grandparents and relatives visiting) and the IoT planned around it; thousands of cars
+  with real stops (shops, pharmacy, shopping), queues at red, real signal timing (about
+  60 s green, 30 s red), more signals where real ones are; the same real-life logic in
+  every module, Pakistani roads with underpasses and flyovers.
+
+**Home: who comes and goes.**
+- *Built:* labelled reasons for every absence (at the office, at university, school van),
+  the mother's market and pharmacy trip, evening tuition, the father's groceries;
+  neighbours in the morning, 2–4 relatives in the evening (father and Dadi sit with them),
+  Nana and Nani some afternoons (shares are assumptions). A beam counter on the gate
+  publishes `home/gate/count` on every crossing. New **People** tab: at home / out (and
+  why, since when) / visitors due, a head-count chart for the day, the gate log; click
+  anyone to inspect them.
+- *Found:* the mother's outing was added before her day was built, so `day_of` overwrote
+  it and she never left the house on any seed (0 of 12). *Fixed:* planned after her day;
+  a test now needs her market trip somewhere in 12 days. The old "people who go out are
+  not at home" test looked for the label `"Out"` exactly — with reasons on every label it
+  would have checked nobody; it now matches the prefix and only people out since morning.
+- *Found:* "Bath 2" and the "Wash area" were the same 2.5 × 3.5 m rectangle, with the
+  shower and the iron on the same point; their labels overprinted ("WBathrea"). *Fixed:*
+  a 1.7 m bathroom and a 1.8 m wash area, each with its own door onto the passage.
+- Checked in the browser: at 19:53 on day 7 the People tab says 9 at home, 0 out,
+  3 guests — the same as the gate counter — and the drawing-room fan is on for them.
+
+**Traffic: trips with reasons, real places, real signal plans.**
+- *Built:* 433 shops and amenities from OpenStreetMap (Overpass, 2026-10-20), 432 snapped
+  to the street they open onto. Evening (17:30) and morning (07:30) peaks with different
+  purposes: evening — home, shopping, mall, takeaway, dinner out, pharmacy, bank, fuel,
+  prayers, tuition pick-up; morning — work, school run, university, breakfast, fuel.
+  Drivers pick the most convenient of four places that sell it. Drop-offs, pick-ups,
+  pharmacy and takeaway stop in the kerb lane (blocking it, side friction as on Lahore's
+  roads); fuel, banks, shops and long stops pull off to park; trips to the mall, a
+  restaurant or the hospital end there. Rickshaws stop for passengers every 0.9–2.5 km
+  and wagons every 0.7–1 km, anywhere along the kerb.
+- Signals: a signal wherever two named through roads (tertiary or bigger) cross at grade
+  — 59 controllers, was 33. Fixed plan 60 s green for the bigger road, 30 s for the side
+  road, 3 s amber, 2 s all-red (a 100 s cycle); each junction starts at its own point of
+  the cycle, so a light can turn red as you reach it. Adaptive: 10 s minimum, at most
+  1.5 × the fixed green. Route choice uses each approach's own expected wait
+  (red² / 2·cycle). Fixed signals show countdown timers, as Lahore's do.
+- *Found:* "Shah Kamal Rd" and "Shah Kamal Road", and "Masood Faooqi Road", made one road
+  look like a crossing of two; a way named "Liberty Roundabout" was not tagged as one.
+  *Fixed:* names normalised (" Rd" → " Road", a spelling table), "Roundabout" in the name
+  counts as a roundabout; a repeated junction name gets "(2)".
+- *Found:* a motorcycle sat 5+ minutes behind a car stopped at the kerb for fuel — the
+  gridlock test's own scenario. Fuel stations have forecourts. *Fixed:* only drop-offs,
+  pharmacy and takeaway use the kerb; a driver stuck within 25 m of their stop does it
+  there.
+- *Found:* the acceleration pass walked all 15,000 lane lists every second. *Fixed:*
+  only links with vehicles on them — identical results, 31 s → 13 s for 20 minutes.
+- Viewer: shops on the map (hover: here now, visits this hour), a **Places** tab of the
+  busiest, parked vehicles beside the kerb, an "At shops and stops" KPI, the Follow panel
+  says why the trip is made and lists its stops with times, junction countdowns. Unnamed
+  places (13) are called after their street ("Fuel station on Firozpur Road").
+- Evening, 8,000 trips an hour (seed 7): 7,097 trips, 1,763 stops at real places, 322
+  trips ended at one, 1,996 passenger stops; median delay 105 s fixed / 60 s adaptive,
+  signal stops 90 → 21 vehicle-hours; nobody gridlocked. Worst junction: Firozpur Road /
+  Wahdat Road.
+
+**Office: going out and coming back.**
+- *Built:* staff step out and return through the badge doors: lunch at a dhaba (15%), the
+  bank (5%), the school pick-up (6%), client visits (8% of staff, 30% of managers); 3–6
+  couriers and food-delivery riders a day hand over at the reception counter (most food at
+  lunchtime) and never cross a badge door. All shares are assumptions.
+- *Found:* with that much coming and going the roll-call got worse — mean error 0.7–1.0 →
+  2.0 people, worst 7–9 (four days, against the committed code in a separate worktree).
+  Traced person by person: everyone missing from the estimate was inside with a phone; they
+  had tapped out of one floor's badge door and walked in behind a colleague at the other,
+  and the beam counted the group as one. The problem was always there; real-life traffic
+  made it show.
+- *Fixed (an IoT change, not a tweak):* phones on the office Wi-Fi. An access point sees a
+  phone 20–90 s after its owner arrives and drops it 5 minutes after they leave (93% of
+  people carry one). First rule tried — "latest evidence wins" — barely helped (2.0 → 1.0–2.0):
+  a stale badge-out outvoted a phone that had never left. The rule now: a phone on the Wi-Fi
+  means inside, except in the 5 minutes after a badge-out; off the Wi-Fi, a newer badge-in
+  decides. Mean error 0.2–0.4, worst 3, on four days. The attendance panel shows both
+  estimates and the chart draws both lines.
+- *Found:* "Run with your values" cached runs by their inputs alone, so after this round the
+  home, hospital and office runs came back in 0 s from the old code (no gate counter, no
+  outings). *Fixed:* the cache key includes the module's source digest; `tests/test_serve.py`
+  fails on the old key.
+- The overview card said "trips in the morning peak" for an evening run; it reads the
+  period now, and shows the shop stops instead of the road count.
+
+**Traffic sweep after the real-life changes** (`tools/sweep_traffic.py`, 3 days × 2 peaks ×
+3 loads × 2 rule sets, 45-minute runs).
+- Up to 8,000 trips an hour: 0 problems — nobody gridlocked, everyone entered, no parked car
+  moved, nobody over the speed limit, adaptive always ahead. Median delay 62–72 → 18–23 s at
+  4,000, 94–107 → 51–64 s at 8,000.
+- At 12,000 the fixed plan gridlocked in 4 of 6 runs (21–336 vehicles still 5+ min). Traced
+  every stuck queue to its head: one-lane North Avenue links packed end to end (58, 58, 31
+  vehicles) back from a red at Lane 24 — no shop stop, parked or held vehicle in any chain,
+  no simulator fault. Adaptive signals never gridlocked. The sweep now reports overload
+  outcomes at 12,000 separately from problems; they are what the junction planner is for.

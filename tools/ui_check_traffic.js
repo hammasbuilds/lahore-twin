@@ -62,6 +62,45 @@ const fail = (m) => { throw new Error(m); };
   await page.click("#play"); await page.waitForTimeout(3000); await page.click("#play");
   if (j1 === await page.textContent("#pane-junction")) fail("junction panel did not update while playing");
   await shot("04-junction");
+  // a trip with a reason: ride to someone's shop stop, and the Follow panel says where and why
+  const stopV = await T(() => {
+    const X = window.__traffic, vs = X.vehiclesOf(X.state.mode);
+    const v = vs.find((x) => x.stops.some((s) => s[3] >= 0 && s[1] != null && s[1] - s[0] > 120));
+    const s = v.stops.find((e) => e[3] >= 0 && e[1] != null && e[1] - e[0] > 120);
+    X.state.t = s[0] + 60; X.follow(v.i); X.frame(true);
+    return { i: v.i, purpose: v.purpose, parked: X.vehAt(v, X.state.t).parked };
+  });
+  await page.waitForTimeout(400);
+  const fol = await page.textContent("#pane-follow");
+  if (!fol.includes(stopV.purpose) || !/Stops on the way/.test(fol)) fail(`Follow panel does not show the trip's purpose and stops: ${fol.slice(0, 200)}`);
+  if (!/parked at|stopped at the kerb/.test(fol)) fail(`a vehicle at its shop is not shown as stopped there: ${fol.slice(0, 200)}`);
+  console.log(`followed ${stopV.purpose} trip #${stopV.i + 1}, ${stopV.parked ? "parked off the road" : "at the kerb"}`);
+  await shot("04b-follow-shop");
+  const held = await page.textContent("#k-held");
+  if (!/^\d/.test(held.trim())) fail(`"At shops and stops" shows ${held}`);
+  // the Places tab lists the busiest places; a click flies there and opens the place
+  await page.click(".tabs button[data-tab=places]"); await page.waitForTimeout(200);
+  if ((await page.locator("#pane-places li[data-poi]").count()) < 5) fail("Places lists fewer than 5 places");
+  await page.click("#pane-places li[data-poi] >> nth=0"); await page.waitForTimeout(300);
+  if (!/Here now/.test(await page.textContent("#pane-places"))) fail("clicking a place did not open it");
+  const near = await T(() => { const X = window.__traffic; return X.state.cam.z >= 2.9; });
+  if (!near) fail("clicking a place did not fly to it");
+  // hovering a shop on the map says what it is and how busy it is
+  const poiHit = await T(() => { const X = window.__traffic; X.frame(true); return X.hits().find((h) => h.type === "poi"); });
+  if (!poiHit) fail("no shops drawn on the map at street zoom");
+  const box = await page.locator("#plan").boundingBox();
+  await page.mouse.move(box.x + poiHit.x, box.y + poiHit.y); await page.waitForTimeout(200);
+  if (!/visits this hour/.test(await page.textContent("#tip"))) fail("hovering a shop shows no tooltip");
+  await shot("04c-places");
+  // fixed signals count down to their next change, second by second
+  await page.click('#modes button[data-mode="fixed"]');
+  await page.click(".tabs button[data-tab=hot]"); await page.click("#pane-hot li[data-sig]");
+  const cds = [];
+  for (let k = 0; k < 3; k++) {
+    cds.push(await T(() => { const X = window.__traffic; X.frame(true); const m = document.querySelector("#pane-junction b .num"); X.state.t += 1; return m ? +m.textContent : null; }));
+  }
+  if (cds.some((c) => c == null) || !(cds[0] > cds[1] || cds[1] > cds[2])) fail(`junction countdown is not counting: ${cds}`);
+  console.log(`countdown ${cds.join(" → ")}`);
   // both rule sets compare; a signal on the map opens its phases
   await page.click('#modes button[data-mode="fixed"]'); await page.click(".tabs button[data-tab=compare]");
   if ((await page.locator("#pane-compare tr").count()) < 10) fail("comparison table too short");

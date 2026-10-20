@@ -57,8 +57,8 @@ def build() -> dict:
         f, a = traffic["modes"]["fixed"]["metrics"], traffic["modes"]["adaptive"]["metrics"]
         out["traffic"] = {"stats": [
             [f"{f['delay_median_s']:.0f} → {a['delay_median_s']:.0f} s", "median delay (fixed → adaptive)"],
-            [f"{len(traffic['roads']):,}", "pieces of real road"],
-            [f"{traffic['meta']['trips']:,}", "trips in the morning peak"],
+            [f"{traffic['meta']['trips']:,}", f"trips in the {traffic['meta'].get('period', 'morning')} peak"],
+            [f"{f.get('errand_stops', 0):,}", "stops at real shops and amenities"],
         ]}
     return out
 

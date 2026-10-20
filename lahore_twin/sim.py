@@ -54,6 +54,11 @@ class Sim:
         self.rng_gate = random.Random(seed * 1000 + 3)
         self.people: list[Person] = copy.deepcopy(scenario.people)
         self.by_id = {p.id: p for p in self.people}
+        # phones on the office Wi-Fi: most staff carry one that joins on its own (assumption: 93%)
+        self.rng_wifi = random.Random(seed * 1000 + 6)
+        self.phone = {p.id for p in self.people if p.role not in ("visitor", "courier") and self.rng_wifi.random() < 0.93}
+        self.wifi_on: dict[str, bool] = {}
+        self.wifi_due: dict[str, int] = {}
         for p in self.people:
             p.pos = p.entry
         self.bus = Bus()
@@ -75,7 +80,7 @@ class Sim:
         self.cars: list[dict] = []
         self.dev_changes: list[list] = []
         self.series = {"t": [], "light_kw": [], "ac_kw": [], "out_temp": [], "on_site": [],
-                       "roll_truth": [], "roll_counter": [], "roll_register": [], "roll_estimate": [],
+                       "roll_truth": [], "roll_counter": [], "roll_register": [], "roll_estimate": [], "roll_wifi": [],
                        "kwh": [],
                        "occ": {r: [] for r in self.env}, "temp": {r: [] for r in self.env},
                        "co2": {r: [] for r in self.env}}
@@ -210,6 +215,10 @@ class Sim:
         p.mode = "idle"
         if s is None:
             return
+        if s.kind == "out":                 # stepped out of the building; back at the next stay
+            p.on_site, p.away, p.room = False, True, None
+            self._label(p, t, s.label)
+            return
         if s.kind == "leave":
             if p.role == "guard":
                 self.bus.publish("office/guard_post/clock", {"person": p.id, "dir": "out"}, None,
@@ -236,6 +245,13 @@ class Sim:
     def _step_person(self, p: Person, t: int) -> None:
         if p.gone:
             return
+        if getattr(p, "away", False):
+            if not (p.idx + 1 < len(p.day) and p.day[p.idx + 1].t <= t):
+                return
+            p.away, p.on_site = False, True             # back through the gate
+            p.pos = tuple(self.plan.spots["gate"][0])
+            p.room = self.plan.room_at(*p.pos)
+            self._label(p, t, "Back")
         if not p.on_site:
             if t < p.arrive:
                 return
@@ -265,6 +281,24 @@ class Sim:
             self._leave_lunch(p)
             p.mode = "walking"
             self._walk(p, p.desk, t, _home(p))
+
+    def _wifi(self, t: int) -> None:
+        """Access points see a phone 20-90 s after its owner comes in (it wakes and joins) and
+        drop it 5 minutes after it last answered. The forecourt is out of range."""
+        for p in self.people:
+            if p.id not in self.phone:
+                continue
+            here = p.on_site and p.room not in (None, "parking")
+            on = self.wifi_on.get(p.id, False)
+            if here == on:
+                self.wifi_due.pop(p.id, None)
+                continue
+            due = self.wifi_due.setdefault(p.id, t + (self.rng_wifi.randint(20, 90) if here else 300))
+            if t >= due:
+                self.wifi_on[p.id] = here
+                del self.wifi_due[p.id]
+                self.bus.publish("office/wifi/presence", {"person": p.id, "on": here}, None,
+                                 f"Wi-Fi: {p.name}'s phone {'joined' if here else 'left'}")
 
     def _room_change(self, p: Person, old: str | None, new: str, t: int) -> None:
         """Badge readers and beam counters sit on every door marked gate=badge.
@@ -449,6 +483,7 @@ class Sim:
         s["roll_counter"].append(self.att.counted_inside)
         s["roll_register"].append(self.att.register_inside())
         s["roll_estimate"].append(self.att.estimate_inside())
+        s["roll_wifi"].append(self.att.estimate_with_wifi(t))
         self.att.rollcall_tick(t)
 
     # ---- run ------------------------------------------------------------
@@ -470,6 +505,7 @@ class Sim:
             if t % SAMPLE_DT == 0:
                 self._report(t)
             if t % 5 == 0:
+                self._wifi(t)
                 self._people_in_the_dark(t)
                 self._people_too_warm(t)
                 self.auto.tick(t)
@@ -498,7 +534,7 @@ class Sim:
     def metrics(self) -> dict:
         m = self.metrics_acc
         staff = [p for p in self.people if p.role in ("staff", "manager")]
-        truly_in = {p.id for p in self.people if p.id in self.truth.present_secs and p.role != "visitor"}
+        truly_in = {p.id for p in self.people if p.id in self.truth.present_secs and p.role not in ("visitor", "courier")}
         register = set(self.att.checkin) - {p.id for p in self.people if p.role == "visitor"}
         tg_true = [t for t, _ in self.truth.tailgates]
         caught = sum(1 for t in tg_true if any(abs(a - t) <= 6 for a in self.att.tailgate_alerts))
@@ -541,9 +577,11 @@ class Sim:
             d = [abs(s[key][i] - s["roll_truth"][i]) for i in idx]
             return round(sum(d) / max(len(d), 1), 2), max(d, default=0)
         (cm, cx), (rm, rx), (em, ex) = err("roll_counter"), err("roll_register"), err("roll_estimate")
+        wm, wx = err("roll_wifi")
         return {"rollcall_counter_mean_err": cm, "rollcall_counter_max_err": cx,
                 "rollcall_register_mean_err": rm, "rollcall_register_max_err": rx,
-                "rollcall_estimate_mean_err": em, "rollcall_estimate_max_err": ex}
+                "rollcall_estimate_mean_err": em, "rollcall_estimate_max_err": ex,
+                "rollcall_wifi_mean_err": wm, "rollcall_wifi_max_err": wx}
 
     def replay_mode(self) -> dict:
         """Device timeline, log and series for this rule set."""
@@ -573,4 +611,5 @@ class Sim:
 
 def _home(p: Person) -> str:
     return {"staff": "At desk", "manager": "In cabin", "receptionist": "At reception",
-            "office_boy": "In pantry", "guard": "At guard post", "cleaner": "In store room"}.get(p.role, "Here")
+            "office_boy": "In pantry", "guard": "At guard post", "cleaner": "In store room",
+            "courier": "At reception"}.get(p.role, "Here")

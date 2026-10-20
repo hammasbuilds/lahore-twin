@@ -18,6 +18,7 @@ ROLE_COLOURS = {
     "manager": "#e879f9",
     "receptionist": "#34d399",
     "office_boy": "#fbbf24",
+    "courier": "#fb923c",
     "guard": "#60a5fa",
     "cleaner": "#2dd4bf",
     "visitor": "#f87171",

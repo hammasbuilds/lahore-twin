@@ -35,7 +35,8 @@ HOT_AWAKE = 32.0
 TARIFF = {"offpeak": 42.0, "peak": 50.0, "export": 11.0}
 
 HOME_COLOURS = {"father": "#60a5fa", "mother": "#f472b6", "grandmother": "#c084fc",
-                "school": "#fbbf24", "student": "#34d399", "helper": "#2dd4bf"}
+                "school": "#fbbf24", "student": "#34d399", "helper": "#2dd4bf",
+                "relative": "#fb923c", "grandparent": "#e879f9"}
 
 
 @dataclass
@@ -116,6 +117,7 @@ class HomeSim:
         self.dev_changes: list[list] = []
         self.trips_log: list[dict] = []
         self.labels: list[list] = []
+        self.gate: list[list] = []                   # [t, person, "in" | "out", people home after]
         self.served: set[str] = set()
         self.last_result = None
         self.house_kw = 0.0
@@ -168,6 +170,7 @@ class HomeSim:
             p.on_site = True
             p.pos = p.entry
             p.room = self.plan.room_at(*p.pos)
+            self._gate(p, t, "in")
         while p.idx + 1 < len(p.day) and p.day[p.idx + 1].t <= t:
             p.idx += 1
             s = p.day[p.idx]
@@ -177,7 +180,7 @@ class HomeSim:
                 free = [tuple(x) for x in self.plan.spots[s.pool] if tuple(x) not in taken]
                 spot = self.rng_people.choice(free) if free else s.spot
             p.target = spot
-            p.leaving = s.kind == "leave" or s.label == "Out"
+            p.leaving = s.kind == "leave" or s.label.startswith("Out")
             self._label(p, t, s.label)
             pts = self.plan.route(p.pos, spot)
             if len(pts) >= 2 and path_length(pts) > 0.05:
@@ -195,11 +198,19 @@ class HomeSim:
             if done and getattr(p, "leaving", False):
                 p.on_site = False
                 p.away = True
+                self._gate(p, t, "out")
                 if p.day[p.idx].kind == "leave":
                     p.gone = True
                 p.room = None
         elif not p.on_site:
             return
+
+    def _gate(self, p: Person, t: int, way: str) -> None:
+        """The gate's beam counter: who came in or went out, and how many are home now."""
+        home = sum(1 for q in self.people if q.on_site)
+        self.gate.append([t, p.id, way, home])
+        self.bus.publish("home/gate/count", home, None,
+                         f"Gate: {p.name} {'came in' if way == 'in' else 'went out'} — {home} at home")
 
     def _off_site_return(self, p: Person, t: int) -> None:
         # someone "Out" comes back when their next stay begins: re-enter from the street
@@ -208,6 +219,7 @@ class HomeSim:
             p.on_site = True
             p.pos = self.plan.spots["street"][0]
             p.room = self.plan.room_at(*p.pos)
+            self._gate(p, t, "in")
 
     # ---- wants: what the people in each room would switch on -------------
 

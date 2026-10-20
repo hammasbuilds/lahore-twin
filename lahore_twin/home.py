@@ -161,7 +161,7 @@ def build(plan: Plan, season: Season, seed: int = 7, category: str = "IV") -> Ho
     def j(base, spread=600):
         return base + rng.randint(-spread, spread)
 
-    def day_of(pe, wake, out_at=None, back_at=None, nap=True, bed=hm("23:00"), prays=0.6):
+    def day_of(pe, wake, out_at=None, back_at=None, nap=True, bed=hm("23:00"), prays=0.6, out_label="Out"):
         sleep = pe.desk
         d = [Stay(0, sleep, "Asleep")]
         if rng.random() < prays:
@@ -171,7 +171,7 @@ def build(plan: Plan, season: Season, seed: int = 7, category: str = "IV") -> Ho
         d.append(Stay(wake, plan.spots[bath][0], "Bath", pool=bath))
         d.append(Stay(wake + 900, plan.spots["dining_seat"][0], "Breakfast", pool="dining_seat"))
         if out_at:
-            d.append(Stay(out_at, street, "Out"))
+            d.append(Stay(out_at, street, out_label))
             d.append(Stay(back_at, plan.spots["sofa"][0], "Home, resting", pool="sofa"))
         if nap and season.t_max > 34:
             d.append(Stay(hm("14:45"), sleep, "Afternoon nap"))
@@ -187,10 +187,27 @@ def build(plan: Plan, season: Season, seed: int = 7, category: str = "IV") -> Ho
         return d
 
     father.day = day_of(father, j(hm("06:45")), j(hm("08:20")), j(hm("17:45"), 1200), nap=False,
-                        bed=j(hm("23:15")))
-    uni.day = day_of(uni, j(hm("07:15")), j(hm("08:40")), j(hm("15:45"), 1200), bed=j(hm("23:30")))
+                        bed=j(hm("23:15")), out_label="Out — at the office")
+    uni.day = day_of(uni, j(hm("07:15")), j(hm("08:40")), j(hm("15:45"), 1200), bed=j(hm("23:30")),
+                     out_label="Out — at university")
     for k in (k1, k2):
-        k.day = day_of(k, j(hm("06:30"), 300), hm("07:20"), j(hm("14:15"), 300), bed=j(hm("22:15")), prays=0.4)
+        k.day = day_of(k, j(hm("06:30"), 300), hm("07:20"), j(hm("14:15"), 300), bed=j(hm("22:15")), prays=0.4,
+                       out_label="Out — school van to school")
+
+    def outing(pe, start, end, why, back_to="sofa", back_label="Home, resting"):
+        """Leave for an errand and come back: the stays already planned around it stay put."""
+        pe.day = [s for s in pe.day if not (start <= s.t < end)]
+        pe.day += [Stay(start, street, f"Out — {why}"), Stay(end, plan.spots[back_to][0], back_label, pool=back_to)]
+        pe.day.sort(key=lambda s: s.t)
+
+    # an ordinary Lahore day has errands and evening tuition (assumption: shares below)
+    if rng.random() < 0.8:
+        t_tu = j(hm("16:45"), 600)
+        for k in (k1, k2):                      # siblings go to the same academy together
+            outing(k, t_tu, t_tu + 6600, "evening tuition")
+    if rng.random() < 0.5:
+        g0 = j(hm("19:35"), 600)
+        outing(father, g0, g0 + rng.randint(1800, 2700), "groceries")
     mother.day = day_of(mother, j(hm("06:15")), bed=j(hm("23:00")))
     mother.day += [Stay(hm("07:00"), plan.spots["stove"][0], "Making breakfast"),
                    Stay(hm("07:40"), plan.spots["sofa"][0], "In the lounge", pool="sofa"),
@@ -199,11 +216,44 @@ def build(plan: Plan, season: Season, seed: int = 7, category: str = "IV") -> Ho
                    Stay(hm("14:15"), plan.spots["sofa"][0], "In the lounge", pool="sofa"),
                    Stay(hm("19:30"), plan.spots["stove"][0], "Cooking dinner")]
     mother.day.sort(key=lambda s: s.t)
+    # only once her day is planned: an outing added before it was overwritten, and she never went out
+    if rng.random() < 0.7:
+        outing(mother, j(hm("10:45"), 900), j(hm("11:55"), 600), "market and pharmacy")
     dadi.day = day_of(dadi, j(hm("06:00")), bed=j(hm("22:00")), prays=0.95)
-    dadi.day += [Stay(hm("09:30"), plan.spots["drawing_seat"][0], "Visitors in the drawing room",
-                      pool="drawing_seat"),
+    neighbours = rng.random() < 0.4               # some mornings the neighbours drop in
+    dadi.day += [Stay(hm("09:30"), plan.spots["drawing_seat"][0],
+                      "With the neighbours" if neighbours else "Reading in the drawing room", pool="drawing_seat"),
                  Stay(hm("11:00"), plan.spots["sofa"][0], "In the lounge", pool="sofa")]
     dadi.day.sort(key=lambda s: s.t)
+    # visitors: relatives in the evening, the other grandparents some afternoons (assumption)
+    guests = []
+    def visitor(role, g, arrive, leave, label):
+        pid = f"g{len(guests) + 1}"
+        v = person(pid, role, g, plan.spots["drawing_seat"][0], arrive=arrive, leave=leave)
+        v.name = f"{rng.choice(FIRST[g])} {rng.choice(LAST)}"
+        v.entry = street
+        v.day = [Stay(arrive, plan.spots["drawing_seat"][0], label, pool="drawing_seat"),
+                 Stay(leave, street, "Leaving", kind="leave")]
+        guests.append(v)
+        return v
+    if neighbours:
+        for k in range(rng.randint(1, 2)):
+            visitor("relative", "f", hm("09:25") + k * 40, hm("10:50"), "Visiting — neighbours")
+    if rng.random() < 0.6:
+        a0, a1 = j(hm("19:30"), 1200), j(hm("21:45"), 1200)
+        for k in range(rng.randint(2, 4)):
+            visitor("relative", rng.choice("fm"), a0 + k * 20, a1, "Visiting — relatives")
+        for host in (father, dadi):             # the family sits with the guests
+            if not any(s.label.startswith("Out") and a0 <= s.t < a1 for s in host.day):
+                host.day = [s for s in host.day if not (a0 + 300 <= s.t < a1)]
+                host.day += [Stay(a0 + 300, plan.spots["drawing_seat"][0], "With the guests", pool="drawing_seat"),
+                             Stay(a1 + 120, plan.spots["sofa"][0], "In the lounge", pool="sofa")]
+                host.day.sort(key=lambda s: s.t)
+    if rng.random() < 0.3:
+        b0 = j(hm("16:00"), 1200)
+        for g in ("m", "f"):
+            visitor("grandparent", g, b0 + (30 if g == "f" else 0), b0 + rng.randint(5400, 9000), "Visiting — Nana and Nani")
+
     helper.day = [Stay(hm("09:00"), plan.spots["kitchen_work"][0], "Washing dishes"),
                   Stay(hm("09:40"), plan.spots["washer"][0], "Laundry"),
                   Stay(hm("11:00"), plan.spots["clothesline"][0], "Hanging clothes"),
@@ -265,7 +315,7 @@ def learned_occupancy(plan: Plan, season: Season, seed: int, days: int = 4) -> d
         for p in sc.people:
             stays = sorted(p.day, key=lambda s: s.t)
             for s, nxt in zip(stays, stays[1:] + [None]):
-                if s.label in ("Out", "Leaving") or s.kind == "leave":
+                if s.label.startswith("Out") or s.label == "Leaving" or s.kind == "leave":
                     continue
                 room = plan.room_at(*s.spot)
                 if room is None:

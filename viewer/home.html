@@ -24,6 +24,14 @@ aside { grid-template-rows: auto auto auto 1fr; }
 .kpis.k3 { grid-template-columns: repeat(3, 1fr); }
 .gauge { height: 6px; background: var(--line); border-radius: 3px; margin-top: 6px; overflow: hidden; }
 .gauge i { display: block; height: 100%; border-radius: 3px; }
+.who { list-style: none; margin: 0 0 10px; padding: 0; }
+.who li { display: grid; grid-template-columns: 10px 1fr auto; gap: 8px; align-items: baseline; padding: 5px 2px; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+.who li:hover, .who li:focus-visible { background: var(--panel-2); }
+.who li i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
+.who .sub { color: var(--muted); font-size: 12px; }
+.gate li { grid-template-columns: 44px 18px 1fr auto; cursor: default; }
+.headcount { display: flex; gap: 14px; font-size: 13px; margin: 2px 0 6px; flex-wrap: wrap; }
+.headcount b { font-size: 22px; margin-right: 4px; }
 .strip-key { display: flex; gap: 12px; font-size: 11.5px; color: var(--muted); margin: 4px 0 8px; flex-wrap: wrap; }
 .strip-key i { display: inline-block; width: 14px; height: 8px; margin-right: 5px; vertical-align: 0; border-radius: 2px; }
 </style>
@@ -76,6 +84,7 @@ aside { grid-template-rows: auto auto auto 1fr; }
     </div>
     <div class="tabs" role="tablist">
       <button role="tab" data-tab="events" aria-selected="true">Events</button>
+      <button role="tab" data-tab="people" aria-selected="false">People</button>
       <button role="tab" data-tab="inspect" aria-selected="false">Inspector</button>
       <button role="tab" data-tab="day" aria-selected="false">Day</button>
       <button role="tab" data-tab="compare" aria-selected="false">Compare</button>
@@ -84,6 +93,7 @@ aside { grid-template-rows: auto auto auto 1fr; }
       <div class="filter"><label><input type="checkbox" id="only-key" checked> Decisions and alerts only</label><span class="spacer"></span><span id="log-count" class="num"></span></div>
       <ul class="log" id="log"></ul>
     </div>
+    <div class="pane" id="pane-people"></div>
     <div class="pane" id="pane-inspect">
       <label class="find"><span class="muted">Find</span><select id="find" aria-label="Find a person, room or appliance"></select></label>
       <div id="inspect-body"><p class="muted">Pick someone or something above, or click the plan or an event, to see its state and why.</p></div>

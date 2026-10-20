@@ -9,7 +9,7 @@ if (typeof document !== "undefined") (function () {
   const plan = R.plan;
   const rooms = Object.fromEntries(plan.rooms.map((r) => [r.id, r]));
   const MODE_NAMES = { schedule: "Fixed schedule", pir: "Motion", "pir+co2": "Motion + CO₂" };
-  const ROLE_NAMES = { staff: "Staff", manager: "Manager", receptionist: "Receptionist", office_boy: "Office boy", guard: "Guard", cleaner: "Cleaner", visitor: "Visitor" };
+  const ROLE_NAMES = { staff: "Staff", manager: "Manager", receptionist: "Receptionist", office_boy: "Office boy", guard: "Guard", cleaner: "Cleaner", visitor: "Visitor", courier: "Courier / rider" };
 
   const state = {
     t: R.meta.t0 + 3600 * 2.5, mode: "pir+co2", layer: "state", playing: false, speed: 60,
@@ -158,12 +158,12 @@ if (typeof document !== "undefined") (function () {
         if (d.axis === "x") {
           ctx.fillRect(X(d.lo) - 8, Y(d.at) - 4, 6, 8);
           ctx.textAlign = "right";
-          if (s >= 12) ctx.fillText("badge reader", X(d.lo) - 11, Y(d.at) + fs + 4);
+          if (s >= 12) readerLabel(X(d.lo) - 11, Y(d.at) + fs + 4, fs);
         } else {
           const secureLeft = rooms[d.b].rect[2] <= d.at + 1e-6;
           ctx.fillRect(X(d.at) - 3, Y(d.hi) + 3, 6, 6);
           ctx.textAlign = secureLeft ? "right" : "left";
-          if (s >= 12) ctx.fillText("badge reader", X(d.at) + (secureLeft ? -6 : 6), Y(d.hi) + fs + 4);
+          if (s >= 12) readerLabel(X(d.at) + (secureLeft ? -6 : 6), Y(d.hi) + fs + 4, fs);
         }
       }
     }
@@ -214,6 +214,19 @@ if (typeof document !== "undefined") (function () {
     drawPeople();
   }
 
+  // a door's "badge reader" text is left out where it would print over a room's name
+  function readerLabel(x, y, fs) {
+    const w = ctx.measureText("badge reader").width, align = ctx.textAlign;
+    const bx0 = align === "right" ? x - w : x, bx1 = bx0 + w, by0 = y - fs, by1 = y + 2;
+    const s = view.s, lf = Math.max(9, Math.min(13, s * 0.42));
+    for (const r of RM()) {
+      if (r.kind === "corridor") continue;
+      const [x0, y0, x1] = r.rect, cx = X((x0 + x1) / 2), half = Math.min((x1 - x0) * s / 2, 60);
+      const ly0 = Y(y0) + 4, ly1 = Y(y0) + lf + 6;
+      if (bx0 < cx + half && bx1 > cx - half && by0 < ly1 && by1 > ly0) return;
+    }
+    ctx.fillText("badge reader", x, y);
+  }
   function shortName(r) {
     return (plan.short_names || {})[r.id] || r.name;
   }
@@ -462,18 +475,19 @@ if (typeof document !== "undefined") (function () {
       return `<tr><td>${esc(p.name)}<div class="muted" style="font-size:11.5px">${ROLE_NAMES[p.role]}</div></td><td class="num ${late ? "flag" : ""}">${sysIn ? clock(reg.in) : "—"}</td><td class="num">${reg.out != null && reg.out <= t ? clock(reg.out) : "—"}</td><td>${status}</td></tr>`;
     });
     const S = M.series, si = seriesIndex(R, t);
-    const est = S.roll_estimate[si], truth = S.roll_truth[si];
+    const wifi = S.roll_wifi ? S.roll_wifi[si] : null, est = wifi != null ? wifi : S.roll_estimate[si], truth = S.roll_truth[si];
     const off = est - truth;
     $("pane-attendance").innerHTML = `
       <h3>Evacuation roll-call</h3>
       <div class="kpis rc">
-        <div class="kpi"><div class="v num">${est}</div><div class="l">Estimated inside the badge line</div></div>
+        <div class="kpi"><div class="v num">${est}</div><div class="l">Estimated inside${wifi != null ? " (badges + Wi-Fi)" : " the badge line"}</div></div>
         <div class="kpi"><div class="v num ${off ? "flag" : ""}">${truth}</div><div class="l">Truly inside (simulator)</div></div>
       </div>
       <div class="row"><span class="muted">Badge register says inside</span><span class="num">${S.roll_register[si]}</span></div>
       <div class="row"><span class="muted">Door counters say inside</span><span class="num">${S.roll_counter[si]}</span></div>
+      ${wifi != null ? `<div class="row"><span class="muted">Badges alone estimate</span><span class="num">${S.roll_estimate[si]}</span></div>` : ""}
       <canvas class="chart" id="rc-chart" style="height:110px"></canvas>
-      <p class="muted" style="font-size:12px">Estimate = badge register + entries nobody badged for (tailgates) − exits nobody tapped out for. Door counters drift as missed counts pile up, so they are re-zeroed to the estimate after 15 minutes of disagreement.</p>
+      <p class="muted" style="font-size:12px">${wifi != null ? "Badges + Wi-Fi: a phone on the office Wi-Fi means its owner is in the building, whatever the doors last said (people tap out of one floor and walk in behind a colleague at the other); in the 5 minutes after a badge-out the departing phone is not trusted yet; without a phone, the badge decides. " : ""}Badges alone = register + entries nobody badged for (tailgates) − exits nobody tapped out for. Door counters drift as missed counts pile up, so they are re-zeroed to the badge estimate after 15 minutes of disagreement.</p>
       <h3>Today</h3>
       <div class="row"><span class="muted">Checked in (badge or reception)</span><span class="num">${inSys}</span></div>
       <div class="row"><span class="muted">Arrived (simulator truth)</span><span class="num">${onSite}</span></div>
@@ -492,7 +506,7 @@ if (typeof document !== "undefined") (function () {
     const g = c.getContext("2d");
     g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const S = IX.modes[state.mode].series;
-    const max = Math.max(...S.roll_truth, ...S.roll_estimate, 1) * 1.1;
+    const max = Math.max(...S.roll_truth, ...S.roll_estimate, ...(S.roll_wifi || []), 1) * 1.1;
     const xs = (t) => (w * (t - R.meta.t0)) / (R.meta.t1 - R.meta.t0);
     const ys = (v) => h - 22 - (h - 30) * (v / max);   // leave the bottom strip for the legend
     const line = (arr, col, width, dash) => {
@@ -502,12 +516,15 @@ if (typeof document !== "undefined") (function () {
     };
     line(S.roll_counter, palette.muted, 1, [3, 3]);
     line(S.roll_truth, palette.people, 3);
-    line(S.roll_estimate, palette.accent, 1.5);
+    line(S.roll_estimate, palette.muted, 1.2);
+    if (S.roll_wifi) line(S.roll_wifi, palette.accent, 1.8);
     g.strokeStyle = palette.text; g.globalAlpha = 0.5;
     g.beginPath(); g.moveTo(xs(state.t), 0); g.lineTo(xs(state.t), h - 14); g.stroke(); g.globalAlpha = 1;
     g.font = "11px Segoe UI, system-ui"; g.textAlign = "left";
-    [["truth", palette.people], ["estimate", palette.accent], ["counters", palette.muted]].forEach(([n, col], i) => {
-      g.fillStyle = col; g.fillRect(6 + i * 80, h - 9, 10, 3); g.fillStyle = palette.muted; g.fillText(n, 20 + i * 80, h - 4);
+    let kx = 6;
+    [["truth", palette.people], ["badges + Wi-Fi", palette.accent], ["badges", palette.muted], ["counters ┄", palette.muted]].forEach(([n, col]) => {
+      g.fillStyle = col; g.fillRect(kx, h - 9, 10, 3); g.fillStyle = palette.muted; g.fillText(n, kx + 14, h - 4);
+      kx += 14 + g.measureText(n).width + 14;
     });
   }
 

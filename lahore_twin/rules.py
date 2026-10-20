@@ -344,11 +344,15 @@ class Attendance:
         self.unexplained_out = 0              # counted exits with no badge-out
         self.out_beams: list[list] = []
         self.out_creds: list[list] = []
+        # the latest evidence per person: (time, inside?) from a badge tap, and from Wi-Fi
+        self.badge_seen: dict[str, tuple[int, bool]] = {}
+        self.wifi_seen: dict[str, tuple[int, bool]] = {}
         bus.subscribe("office/gate/badge", self._on_badge)
         bus.subscribe("office/gate/beam", self._on_beam)
         bus.subscribe("office/reception/manual", self._on_manual)
         bus.subscribe("office/guard_post/clock", self._on_clock)
         bus.subscribe("office/lobby/kiosk", self._on_kiosk)
+        bus.subscribe("office/wifi/presence", self._on_wifi)
 
     def _first_in(self, pid: str, t: int, how: str, cause: int) -> None:
         if pid in self.checkin:
@@ -371,8 +375,10 @@ class Attendance:
                 # here and is settled when it is.
                 self.unexplained_out -= 1
             self.inside[pid] = True
+            self.badge_seen[pid] = (m.t, True)
             self._first_in(pid, m.t, "badge", m.id)
         else:
+            self.badge_seen[pid] = (m.t, False)
             self.out_creds.append([m.t, pid, False, gate])
             if not self.inside.get(pid) and self.unidentified > 0:
                 self.unidentified -= 1        # tapping out while not "inside": the unbadged entry
@@ -390,7 +396,11 @@ class Attendance:
         pid = m.payload
         self.creds.append([m.t, pid, False, "manual"])     # manual: valid at the main gate
         self.inside[pid] = True
+        self.badge_seen[pid] = (m.t, True)
         self._first_in(pid, m.t, "manual at reception", m.id)
+
+    def _on_wifi(self, m: Message) -> None:
+        self.wifi_seen[m.payload["person"]] = (m.t, m.payload["on"])
 
     def _on_kiosk(self, m: Message) -> None:
         pass     # visitor kiosk check-in; the gate tap still happens with a visitor card
@@ -410,6 +420,23 @@ class Attendance:
         """Best evacuation count: the register, plus entries nobody badged for, minus
         exits nobody badged for (people who forget to tap out on the way home)."""
         return max(0, self.register_inside() + self.unidentified - self.unexplained_out)
+
+    def estimate_with_wifi(self, t: int) -> int:
+        """Badges and phones together. A phone on the Wi-Fi means its owner is in the building,
+        whatever the badge doors last said: someone who tapped out of one floor's door and
+        walked in behind a colleague at the other never left. The exception is the 5 minutes
+        after a badge-out, before the access points let a departed phone go. A phone that is
+        off the Wi-Fi defers to a newer badge-in (it has not joined yet, or has no phone)."""
+        n = 0
+        for pid in self.badge_seen.keys() | self.wifi_seen.keys():
+            b, w = self.badge_seen.get(pid), self.wifi_seen.get(pid)
+            if w is None:
+                n += b[1]
+            elif w[1]:
+                n += not (b and not b[1] and b[0] > w[0] and t - b[0] < 330)
+            else:
+                n += bool(b and b[1] and b[0] > w[0])
+        return n
 
     def rollcall_tick(self, t: int) -> None:
         """Door counters drift (every missed count accumulates), so when they have

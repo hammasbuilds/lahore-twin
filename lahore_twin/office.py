@@ -139,6 +139,13 @@ def build(plan: Plan, seed: int = 7, n_staff: int | None = None, n_visitors: int
     person("b1", "office_boy", hm("07:55"), hm("18:10"), desk=plan.spots["pantry"][0], g="m")
     person("g1", "guard", hm("07:00"), hm("19:45"), desk=plan.spots["guard_post"][0], g="m")
     person("c1", "cleaner", hm("07:05"), hm("17:00"), desk=plan.spots["store_spot"][0])
+    # couriers and food-delivery riders hand over at the reception counter and go (assumption:
+    # 3-6 a day, most of the food at lunchtime); they never pass a badge door
+    for k in range(rng.randint(3, 6)):
+        food = rng.random() < 0.6
+        a = int(rng.uniform(hm("12:40"), hm("13:35")) if food else rng.uniform(hm("10:00"), hm("16:30")))
+        c = person(f"d{k + 1}", "courier", a, a + rng.randint(120, 300), desk=plan.spots["reception_counter"][0], g="m")
+        c.errand = "Food delivery" if food else "Parcel delivery"
 
     # parking: first come, first served; the rest park on the street and walk in
     drivers = sorted((p for p in people if p.car_bay == -1), key=lambda p: p.arrive)
@@ -243,6 +250,9 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
             add(b.start - lead, b.end, Stay(b.start - lead, _seat(plan, b, i), f"{b.title} ({plan.rooms[b.room].name})"),
                 force=True)
 
+    if p.role == "courier":
+        return [Stay(p.arrive, home, f"{p.errand} at reception"), Stay(p.leave, p.entry, "Leaving", kind="leave")]
+
     if p.role == "visitor":
         start = p.arrive
         mtg = min(events, key=lambda e: e[0]) if events else None
@@ -281,8 +291,29 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
         if p.arrive < t - 300 and p.leave > t + 900 and rng.random() < 0.45:
             add(t - 240, t + 660, Stay(t - 240, plan.spots["prayer_spot"][0], f"{name} prayer", pool="prayer_spot"))
 
+    # going out and coming back (assumptions, per person per day): lunch at a dhaba, a client
+    # visit, the bank, the school pick-up. They badge out through the door and back in.
+    gate = plan.spots["gate"][0]
+    lunch_out = False
+
+    def out(a, b, why):
+        return add(a, b, Stay(a, gate, f"Out — {why}", kind="out"))
+    if p.role in ("staff", "manager"):
+        if rng.random() < (0.3 if p.role == "manager" else 0.08):
+            a = rng.randint(hm("10:30"), hm("13:00"))
+            out(a, a + rng.randint(5400, 10800), "client visit")
+        if p.role == "staff" and rng.random() < 0.05:
+            a = rng.randint(hm("10:30"), hm("12:00"))
+            out(a, a + rng.randint(1800, 3000), "the bank")
+        if p.role == "staff" and rng.random() < 0.06:
+            a = rng.randint(hm("13:10"), hm("13:30"))
+            out(a, a + rng.randint(3000, 4200), "school pick-up")
+        if rng.random() < 0.15:
+            a = rng.randint(hm("12:55"), hm("13:20"))
+            lunch_out = out(a, a + rng.randint(2400, 3300), "lunch outside")
+
     # lunch: try a preferred time, slide forward until it fits
-    if p.role not in ("visitor",) and p.arrive < hm("12:30") and p.leave > hm("14:30"):
+    if p.role not in ("visitor",) and not lunch_out and p.arrive < hm("12:30") and p.leave > hm("14:30"):
         want = rng.randint(hm("12:55"), hm("13:40"))
         if p.role == "office_boy":
             want = hm("14:10")
@@ -322,4 +353,5 @@ def _day_for(plan, rng, p: Person, bookings, busy) -> list[Stay]:
 
 def _home_label(p: Person) -> str:
     return {"staff": "At desk", "manager": "In cabin", "receptionist": "At reception",
-            "office_boy": "In pantry", "guard": "At guard post", "cleaner": "In store room"}.get(p.role, "Here")
+            "office_boy": "In pantry", "guard": "At guard post", "cleaner": "In store room",
+            "courier": "At reception"}.get(p.role, "Here")

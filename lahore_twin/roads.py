@@ -37,6 +37,15 @@ LANE_W = 3.2
 # pieces, and one road under two names would look like a crossing to signal_sites
 URDU_NAMES = {"ایم ایم عالم روڈ": "MM Alam Road", "علی زیب روڈ": "Ali Zaib Road",
               "چوہدری علی انور روڈ": "Chaudhary Ali Anwar Road"}
+# one road mapped under two spellings would also look like a crossing of two roads
+SPELLINGS = {"Masood Faooqi Road": "Masood Farooqui Road"}
+
+
+def clean_name(name: str) -> str:
+    name = URDU_NAMES.get(name, name)
+    if name.endswith(" Rd"):
+        name = name[:-3] + " Road"
+    return SPELLINGS.get(name, name)
 
 
 @dataclass
@@ -117,7 +126,7 @@ def load(path: str = str(OSM)) -> Network:
         per_dir = (total if oneway else max(1, total // 2)) if total else dl
         layer = int(t.get("layer", 1 if t.get("bridge") else -1 if t.get("tunnel") else 0) or 0)
         name = t.get("name:en") or t.get("name") or ""
-        name = URDU_NAMES.get(name, name)
+        name = clean_name(name)
         ns = w["nodes"]
         cut = [i for i, n in enumerate(ns) if i in (0, len(ns) - 1) or use[n] > 1]
         for i0, i1 in zip(cut, cut[1:]):
@@ -135,7 +144,7 @@ def load(path: str = str(OSM)) -> Network:
                 p = pts[::-1] if back else pts
                 a, b = (seg[-1], seg[0]) if back else (seg[0], seg[-1])
                 links.append(Link(len(links), a, b, p, length, cls, per_dir, kmh / 3.6, rank, layer, name,
-                                  oneway, road, t.get("junction") == "roundabout", back))
+                                  oneway, road, t.get("junction") == "roundabout" or "Roundabout" in name, back))
     by_a: dict[int, list[Link]] = {}
     for lk in links:
         by_a.setdefault(lk.a, []).append(lk)
@@ -220,15 +229,16 @@ def junctions(net: Network) -> dict[int, list[Link]]:
 
 def signal_sites(net: Network) -> list[list[int]]:
     """Signalised junctions as groups of nodes: mapped signals, plus at-grade crossings of
-    two differently named roads, one secondary or bigger and the other at least tertiary
-    (not roundabouts, not under a flyover).
+    two differently named roads, both tertiary or bigger (not roundabouts, not under a
+    flyover). Lahore signals the crossings of its named through roads, the MM Alam Road and
+    Jail Road kind as well as the boulevards; a back street meeting one gives way instead.
     A divided road crossing another makes up to four OSM nodes a few metres apart; nodes
     within 45 m are one junction with one controller."""
     sites = []
     for n, arriving in junctions(net).items():
         big = [lk for lk in arriving if lk.rank >= 3 and not lk.roundabout and "_link" not in lk.cls and lk.name]
         crossing = (len({lk.name for lk in big}) >= 2 and len({lk.layer for lk in big}) == 1
-                    and max((lk.rank for lk in big), default=0) >= 4)
+                    and max((lk.rank for lk in big), default=0) >= 3)
         if n in net.signals_osm or crossing:
             sites.append(n)
     groups: list[list[int]] = []

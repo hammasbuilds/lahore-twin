@@ -63,6 +63,22 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   const title = await page.textContent("#inspect-body h3");
   if (!title.includes(dot.name)) throw new Error(`clicked ${dot.name}, inspector shows ${title}`);
   await shot("11-person");
+  // who is home: the head count matches the gate counter; clicking someone opens them
+  const g = await page.evaluate(() => { const G = window.HOME.gate; const e = G.find((x) => /^g/.test(x[1]) && x[2] === "in") || G[Math.floor(G.length / 2)]; return { t: e[0] + 300, n: G.filter((x) => x[0] <= e[0] + 300).slice(-1)[0][3], guest: /^g/.test(e[1]) }; });
+  await page.evaluate((t) => { window.__home.state.t = t; window.__home.frame(true); }, g.t);
+  await page.click(".tabs button[data-tab=people]"); await page.waitForTimeout(300);
+  const homeNow = +(await page.textContent("#pane-people .headcount b"));
+  if (homeNow !== g.n) throw new Error(`People tab says ${homeNow} at home, the gate counter ${g.n}`);
+  const ppl = await page.textContent("#pane-people");
+  if (g.guest && !/visiting/i.test(ppl)) throw new Error("guests are in but the People tab shows no visitor");
+  if (!/Gate counter/.test(ppl) || !/went out|came in/.test(ppl)) throw new Error("no gate log in the People tab");
+  await shot("11b-people");
+  const who = await page.locator("#pane-people li[data-person]").first().getAttribute("data-person");
+  await page.click("#pane-people li[data-person] >> nth=0"); await page.waitForTimeout(250);
+  const ins = await page.textContent("#inspect-body h3");
+  const whoName = await page.evaluate((id) => window.HOME.people.find((p) => p.id === id).name, who);
+  if (!ins.includes(whoName)) throw new Error(`clicked ${whoName} in People, inspector shows ${ins}`);
+  console.log(`people: ${homeNow} at home at ${Math.floor(g.t / 3600)}:${String(Math.floor(g.t % 3600 / 60)).padStart(2, "0")}${g.guest ? " with guests" : ""}; clicked ${whoName}`);
   await page.focus("#find"); await page.selectOption("#find", "app:pump"); await page.waitForTimeout(200); await shot("12-pump");
   const t0 = await page.evaluate(() => window.__home.state.t);
   await page.keyboard.press("ArrowRight"); await page.waitForTimeout(100);

@@ -480,3 +480,65 @@ def test_every_engine_module_belongs_to_a_replay_digest():
     helpers = {"__init__.py", "mqtt.py", "live.py", "live_home.py", "solar_assistant.py", "summary.py"}          # not part of any replay
     for f in (ROOT / "lahore_twin").glob("*.py"):
         assert f.name in listed or f.name in helpers, f.name
+
+
+def test_a_phone_on_the_wifi_outvotes_a_stale_badge_out():
+    bus = Bus()
+    att = Attendance(bus, {"a": _P("a"), "b": _P("b"), "c": _P("c")}, "corr1")
+    bus.now = 100
+    for pid in "abc":
+        bus.publish("office/gate/badge", {"person": pid, "dir": "in", "gate": "corr1"})
+    bus.now = 160
+    for pid in "ab":                        # c has no phone on the Wi-Fi
+        bus.publish("office/wifi/presence", {"person": pid, "on": True})
+    assert att.estimate_with_wifi(170) == 3
+    # a taps out of one floor's door and walks in behind a colleague at the other
+    bus.now = 2000
+    bus.publish("office/gate/badge", {"person": "a", "dir": "out", "gate": "corr1"})
+    assert att.register_inside() == 2
+    assert att.estimate_with_wifi(2010) == 2       # just tapped out: the phone is not trusted yet
+    assert att.estimate_with_wifi(2400) == 3       # still on the Wi-Fi after 5 minutes: never left
+    # b leaves without tapping out: the phone drops off and takes b with it
+    bus.now = 3000
+    bus.publish("office/wifi/presence", {"person": "b", "on": False})
+    assert att.register_inside() == 2 and att.estimate_with_wifi(3010) == 2
+    # c, phone-less, is whatever the badge says
+    bus.now = 4000
+    bus.publish("office/gate/badge", {"person": "c", "dir": "out", "gate": "corr1"})
+    assert att.estimate_with_wifi(4010) == 1
+
+
+def test_wifi_halves_the_rollcall_error_when_people_come_and_go(plan):
+    """Lunch outside, client visits, the bank, the school pick-up and moving between floors:
+    the badges alone drift about two people off; badges with phones stay within one."""
+    for seed in (7, 11):
+        s = Sim(build(plan, seed=seed), "pir+co2").run()
+        m = s.metrics()
+        assert m["rollcall_wifi_mean_err"] < 0.6
+        assert m["rollcall_wifi_mean_err"] < m["rollcall_estimate_mean_err"] / 2
+        assert m["rollcall_wifi_max_err"] <= m["rollcall_estimate_max_err"]
+
+
+def test_people_who_step_out_are_out_and_come_back(plan):
+    s = Sim(build(plan, seed=7), "pir+co2")
+    outs = [(p, st) for p in s.people for st in p.day if st.kind == "out"]
+    assert outs and any("lunch outside" in st.label for _, st in outs)
+    seen = {}
+    orig = s._wifi
+
+    def watch(t):
+        orig(t)
+        for p, st in outs:
+            back = next(x.t for x in p.day if x.t > st.t)
+            if st.t + 600 < t < back - 60:
+                seen.setdefault(p.id, set()).add(p.on_site)
+    s._wifi = watch
+    s.run()
+    assert seen and all(v == {False} for v in seen.values()), seen
+    # they came back: on site again later, and the register saw them badge back in
+    for p, st in outs:
+        ins = [m.t for m in s.bus.log if m.topic == "office/gate/badge" and m.payload["person"] == p.id
+               and m.payload["dir"] == "in" and m.t > st.t]
+        assert ins or not p.has_badge, p.name
+    couriers = [p for p in s.people if p.role == "courier"]
+    assert couriers and s.metrics()["missing_from_register"] == []

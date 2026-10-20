@@ -68,6 +68,10 @@ def main() -> None:
     print(f"    door counters                {a['rollcall_counter_mean_err']} / {a['rollcall_counter_max_err']}")
     print(f"    badge register               {a['rollcall_register_mean_err']} / {a['rollcall_register_max_err']}")
     print(f"    register + tailgate entries  {a['rollcall_estimate_mean_err']} / {a['rollcall_estimate_max_err']}")
+    print(f"    badges + phones on Wi-Fi     {a['rollcall_wifi_mean_err']} / {a['rollcall_wifi_max_err']}")
+    outs = sorted({st.label[6:] for p in sims["pir+co2"].people for st in p.day if st.label.startswith("Out — ")})
+    riders = [p for p in sims["pir+co2"].people if p.role == "courier"]
+    print(f"  went out and came back: {', '.join(outs) or 'nobody'}; {len(riders)} couriers and food riders at reception")
 
     print("\nAlerts under Motion + CO2")
     for msg in sims["pir+co2"].bus.log:

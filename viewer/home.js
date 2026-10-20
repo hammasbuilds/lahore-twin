@@ -15,7 +15,7 @@
   const rooms = Object.fromEntries(plan.rooms.map((r) => [r.id, r]));
   const APPS = Object.fromEntries(H.appliances.map((a) => [a.id, a]));
   const MODE_NAMES = { default: "Inverter default", ups: "UPS circuit", gridsense_eco: "GridSense eco", gridsense: "GridSense" };
-  const ROLE_NAMES = { father: "Father", mother: "Mother", grandmother: "Dadi", school: "School child", student: "University student", helper: "Helper" };
+  const ROLE_NAMES = { father: "Father", mother: "Mother", grandmother: "Dadi", school: "School child", student: "University student", helper: "Helper", relative: "Relative visiting", grandparent: "Nana / Nani visiting" };
 
   // ---- index (rebuilt when the season changes) ----
   let people = {}, modes = {};
@@ -100,7 +100,7 @@
     const label = C.labelAt(p, t);
     const at = C.personAt({ ...p, gone: Infinity }, t) || (p.trips.length ? null : null);
     if (!at) return null;
-    if ((label === "Out" || label === "Leaving") && !at.moving) return null;
+    if ((label.startsWith("Out") || label === "Leaving") && !at.moving) return null;
     return at;
   }
 
@@ -395,6 +395,55 @@
     $("find").onchange = (e) => { const v = e.target.value; const k = v.indexOf(":"); state.sel = v ? { type: v.slice(0, k), id: v.slice(k + 1) } : null; goToSel(); frame(true); };
   }
 
+  // ---- people: who is home, who is out and why, the gate counter ----
+  function statusAt(p, t) {
+    if (t < p.arrive) return { where: "due", label: p.role === "relative" || p.role === "grandparent" ? "Visiting later" : "Not here yet" };
+    if (t >= p.gone) return { where: "left", label: "Gone home" };
+    const label = C.labelAt(p, t);
+    const at = personAt(p, t);
+    if (!at) return { where: "out", label: label.replace(/^Out — /, "") };
+    return { where: "home", label, room: roomAt(at.x, at.y), moving: at.moving };
+  }
+  function homeCount(t) {
+    const g = H.gate || [];
+    const i = C.bisectRight(g, t, (e) => e[0]) - 1;
+    return i >= 0 ? g[i][3] : H.people.filter((p) => p.arrive === 0).length;
+  }
+  function sinceOut(pid, t) {
+    const g = H.gate || [];
+    for (let i = C.bisectRight(g, t, (e) => e[0]) - 1; i >= 0; i--) if (g[i][1] === pid) return g[i][2] === "out" ? g[i][0] : null;
+    return null;
+  }
+  let lastPeople = "";
+  function renderPeople() {
+    const t = state.t, ps = Object.values(people).map((p) => ({ p, s: statusAt(p, t) }));
+    const home = ps.filter((x) => x.s.where === "home"), out = ps.filter((x) => x.s.where === "out");
+    const guests = home.filter((x) => x.p.role === "relative" || x.p.role === "grandparent").length;
+    const li = (x, right) => `<li data-person="${x.p.id}" tabindex="0"><i style="background:${x.p.colour}"></i><span>${esc(x.p.name)} <span class="sub">· ${ROLE_NAMES[x.p.role]}</span><br><span class="sub">${esc(x.s.label)}</span></span><span class="sub num">${right}</span></li>`;
+    let html = `<div class="headcount"><span><b class="num">${home.length}</b>at home</span><span><b class="num">${out.length}</b>out</span>${guests ? `<span><b class="num">${guests}</b>guests</span>` : ""}</div>`;
+    if (H.gate) html += `<canvas class="chart" id="c-home" style="height:90px" aria-label="People at home through the day"></canvas>`;
+    html += `<h3>At home</h3><ul class="who">${home.map((x) => li(x, esc(x.s.moving ? "walking" : x.s.room))).join("") || '<li class="sub">Nobody</li>'}</ul>`;
+    html += `<h3>Out</h3><ul class="who">${out.map((x) => { const s = sinceOut(x.p.id, t); return li(x, s != null ? "since " + C.clock(s) : ""); }).join("") || '<li class="sub">Everyone is home</li>'}</ul>`;
+    const later = ps.filter((x) => x.s.where === "due" || x.s.where === "left");
+    if (later.length) html += `<h3>Visitors</h3><ul class="who">${later.map((x) => li(x, x.s.where === "due" ? "due " + C.clock(x.p.arrive) : "left")).join("")}</ul>`;
+    if (H.gate) {
+      const g = H.gate.filter((e) => e[0] <= t).slice(-14).reverse();
+      html += `<h3>Gate counter</h3><ul class="who gate">${g.map(([tt, pid, way, n]) => `<li><span class="num sub">${C.clock(tt)}</span><span style="color:${way === "in" ? "var(--ok)" : "var(--muted)"}">${way === "in" ? "→" : "←"}</span><span>${esc(people[pid].name)} <span class="sub">${way === "in" ? "came in" : "went out"}</span></span><span class="sub num">${n} home</span></li>`).join("") || '<li class="sub">No one has come or gone yet today</li>'}</ul>`;
+      html += `<p class="muted" style="font-size:12px">A beam counter on the gate reports every crossing on home/gate/count. Fans and lights follow each room's presence; the drawing room comes on when guests sit down.</p>`;
+    }
+    if (html !== lastPeople) { lastPeople = html; $("pane-people").innerHTML = html; }   // rebuild only on change, so a click lands
+    if (H.gate) drawHomeCount();
+  }
+  function drawHomeCount() {
+    const c = chartBase("c-home", 0, Math.max(4, ...H.gate.map((e) => e[3])) + 1, true);
+    if (!c) return;
+    const { g, xs, ys } = c;
+    g.strokeStyle = palette.people; g.lineWidth = 2; g.beginPath();
+    let n = homeCount(0); g.moveTo(xs(0), ys(n));
+    for (const [tt, , , m] of H.gate) { g.lineTo(xs(tt), ys(n)); g.lineTo(xs(tt), ys(m)); n = m; }
+    g.lineTo(xs(86400), ys(n)); g.stroke(); now(c);
+  }
+
   // ---- day charts ----
   function renderDay() {
     $("pane-day").innerHTML = `<h3>Power, kW</h3><div class="strip-key"><span><i style="background:var(--solar)"></i>Solar</span><span><i style="background:var(--text)"></i>House load</span><span><i style="background:var(--grid)"></i>Grid (below 0 = export)</span><span><i style="background:rgba(248,113,113,.35)"></i>Outage</span></div><canvas class="chart" id="c-power"></canvas>
@@ -403,12 +452,12 @@
       <p class="muted" style="font-size:12px">Feeder category ${H.meta.category}: ${H.meta.category_hours} h of published load-shedding. ${H.meta.season}; solar ${H.meta.day_factor >= 0.95 ? "clear day" : H.meta.day_factor >= 0.7 ? "hazy day" : "overcast day"} (forecast said ${(H.meta.forecast_factor * 100).toFixed(0)}% of clear sky).</p>`;
     drawDay();
   }
-  function chartBase(id, lo, hi) {
+  function chartBase(id, lo, hi, plain) {
     const c = document.getElementById(id); if (!c) return null;
     const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight;
     c.width = w * dpr; c.height = h * dpr; const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
     const L = 30, B = 16, top = 6, xs = (t) => L + (w - L - 4) * t / 86400, ys = (v) => top + (h - B - top) * (1 - (v - lo) / (hi - lo));
-    for (const o of H.outages) {
+    for (const o of plain ? [] : H.outages) {
       g.fillStyle = rgba(palette.outage, o.published ? 0.22 : 0.14);
       g.fillRect(xs(o.start), top, xs(o.end) - xs(o.start), h - B - top);
     }
@@ -513,6 +562,7 @@
       lastPanel = nowT; renderLog(force);
       if ($("pane-inspect").classList.contains("on")) renderInspector();
       if ($("pane-day").classList.contains("on")) drawDay();
+      if ($("pane-people").classList.contains("on")) renderPeople();
     }
   }
   let prev = null;
@@ -541,7 +591,7 @@
   function showTab(name) {
     for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.tab === name);
     for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === "pane-" + name);
-    if (name === "day") renderDay(); if (name === "compare") renderCompare(); if (name === "inspect") renderInspector();
+    if (name === "day") renderDay(); if (name === "compare") renderCompare(); if (name === "inspect") renderInspector(); if (name === "people") renderPeople();
   }
 
   $("play").onclick = () => { if (state.t >= 86399) state.t = 0; setPlaying(!state.playing); };
@@ -555,6 +605,12 @@
   for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
   $("floors").onclick = (e) => { const b = e.target.closest("button[data-floor]"); if (b) setFloor(b.dataset.floor); };
   $("only-key").onchange = () => renderLog(true);
+  function pickPerson(e) {
+    const li = e.target.closest("li[data-person]"); if (!li) return;
+    if (e.type === "keydown" && e.key !== "Enter" && e.key !== " ") return;
+    state.sel = { type: "person", id: li.dataset.person }; goToSel(); showTab("inspect"); frame(true);
+  }
+  $("pane-people").onclick = pickPerson; $("pane-people").onkeydown = pickPerson;
   $("log").onclick = (e) => {
     const li = e.target.closest("li[data-msg]"); if (!li) return;
     const m = M().byId[+li.dataset.msg];

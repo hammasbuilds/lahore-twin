@@ -109,3 +109,54 @@ def test_a_metre_long_stub_does_not_freeze_the_road(net):
     # is a vehicle that has not moved for five minutes
     assert m["not_yet_entered"] == 0, m
     assert m["gridlocked"] == 0, m
+
+
+def test_fixed_signals_run_the_real_plan(runs):
+    """The bigger road gets 60 s of green, the side road 30 s, then 3 s amber and 2 s all-red."""
+    _, sims = runs
+    s = sims["fixed"]
+    timed = 0
+    for sg in s.signals:
+        assert sorted(sg.greens) in ([30, 60], [45, 45])
+        for (t0, ph0, st0), (t1, ph1, st1) in zip(sg.log, sg.log[1:]):
+            if st0 == "green":
+                assert t1 - t0 == sg.greens[ph0] and st1 == "amber"
+                timed += 1
+            elif st0 == "amber":
+                assert t1 - t0 == 3 and st1 == "allred"
+            else:
+                assert t1 - t0 == 2 and st1 == "green" and ph1 != ph0
+    assert timed > 50
+    # not one synchronised city: junctions change at different moments
+    assert len({sg.log[0][0] for sg in s.signals if sg.log}) > 10
+
+
+def test_people_stop_at_real_places_and_pull_off_to_park(runs):
+    trips, sims = runs
+    s = sims["adaptive"]
+    shops = [v for v in s.vehicles if any(e[3] >= 0 for e in v.stop_log)]
+    assert len(shops) > 0.05 * len(s.vehicles)
+    parked = 0
+    for v in shops:
+        for (t, ri, pos, lane), nxt in zip(v.samples, v.samples[1:]):
+            if lane == -1 and nxt[3] == -1:        # off the road: it does not move until it pulls out
+                parked += 1
+                assert (nxt[1], nxt[2]) == (ri, pos)
+        for start, end, label, poi in v.stop_log:
+            assert end is None or end - start >= 15
+    assert parked > 0
+    # the time at the shop is not counted as traffic delay
+    m = s.metrics()
+    assert m["errand_stops"] > 0 and m["delay_median_s"] < 600
+    # a trip that ends at a place (the mall, a restaurant) is finished there, not driven off the map
+    ended = [v for v in s.vehicles if v.stop_log and v.stop_log[-1][1] is None]
+    assert ended and all(v.done == v.stop_log[-1][0] for v in ended)
+
+
+def test_the_evening_has_shopping_and_the_morning_the_school_run(net):
+    eve = make_demand(net, seed=5, minutes=10, per_hour=6000, period="evening")
+    morn = make_demand(net, seed=5, minutes=10, per_hour=6000, period="morning")
+    pe = {t.purpose for t in eve}
+    pm = {t.purpose for t in morn}
+    assert {"shopping", "pharmacy", "home"} <= pe and "school run" not in pe
+    assert {"school run", "work"} <= pm and "shopping" not in pm

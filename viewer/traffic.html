@@ -17,8 +17,14 @@ canvas#plan.drag { cursor: grabbing; }
 #mini { position: absolute; right: 12px; bottom: 12px; width: 190px; height: 210px; border: 1px solid var(--line); border-radius: 10px; background: var(--panel); box-shadow: var(--shadow); z-index: 2; cursor: pointer; }
 .zoom { position: absolute; right: 12px; top: 12px; z-index: 2; display: flex; flex-direction: column; gap: 6px; }
 .zoom .btn { width: 36px; padding: 6px 0; text-align: center; }
-.kpis.k3 { grid-template-columns: repeat(3, 1fr); }
-.kpi .v { font-size: 20px; }
+.kpis.k4 { grid-template-columns: repeat(4, 1fr); }
+.kpis.k4 .l { font-size: 11px; }
+.kpi .v { font-size: 18px; }
+.stoplist { margin: 4px 0 10px; padding: 0; list-style: none; font-size: 13px; }
+.stoplist li { display: grid; grid-template-columns: 92px 1fr; gap: 8px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.stoplist li.now { color: var(--accent); font-weight: 600; }
+.bar { height: 6px; background: var(--accent); border-radius: 3px; opacity: .7; margin-top: 3px; }
+.cnt { font-weight: 700; font-variant-numeric: tabular-nums; }
 .hot li { display: grid; grid-template-columns: 1fr auto; gap: 8px; padding: 7px 0; border-bottom: 1px solid var(--line); cursor: pointer; font-size: 13px; list-style: none; }
 .hot { margin: 0; padding: 0; }
 .hot li:hover, .hot li:focus-visible { background: var(--panel-2); }
@@ -51,7 +57,7 @@ canvas#plan.drag { cursor: grabbing; }
 </header>
 <main>
   <section id="stage">
-    <canvas id="plan" aria-label="Lahore road map: Gulberg, Kalma Chowk, Canal Road"></canvas>
+    <canvas id="plan" aria-label="Lahore road map: Gulberg, Kalma Chowk, Canal Road, with its shops and amenities"></canvas>
     <div class="loadtag num" id="loadtag"></div>
     <div class="zoom"><button class="btn" id="zin" aria-label="Zoom in">+</button><button class="btn" id="zout" aria-label="Zoom out">−</button><button class="btn" id="zfit" aria-label="Show the whole area" title="Whole area">⤢</button></div>
     <canvas id="mini" aria-label="Minimap: click to jump"></canvas>
@@ -59,20 +65,23 @@ canvas#plan.drag { cursor: grabbing; }
     <div class="tip" id="tip"></div>
   </section>
   <aside>
-    <div class="kpis k3">
+    <div class="kpis k4">
       <div class="kpi"><div class="v num" id="k-on">–</div><div class="l">On the road</div></div>
       <div class="kpi"><div class="v num" id="k-speed">–</div><div class="l">Mean speed now</div></div>
+      <div class="kpi"><div class="v num" id="k-held">–</div><div class="l">At shops and stops</div></div>
       <div class="kpi"><div class="v num" id="k-done">–</div><div class="l">Trips finished</div></div>
     </div>
     <div class="tabs" role="tablist">
       <button role="tab" data-tab="hot" aria-selected="true">Hotspots</button>
       <button role="tab" data-tab="follow" aria-selected="false">Follow</button>
       <button role="tab" data-tab="junction" aria-selected="false">Junction</button>
+      <button role="tab" data-tab="places" aria-selected="false">Places</button>
       <button role="tab" data-tab="compare" aria-selected="false">Compare</button>
     </div>
     <div class="pane on" id="pane-hot"></div>
     <div class="pane" id="pane-follow"></div>
     <div class="pane" id="pane-junction"><p class="muted">Click a signal on the map or a hotspot to see its phases.</p></div>
+    <div class="pane" id="pane-places"></div>
     <div class="pane" id="pane-compare"></div>
   </aside>
 </main>

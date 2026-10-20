@@ -12,8 +12,8 @@
       about: "a working day for 36 staff with desks and 6 visitors" },
     { key: "hospital", glob: "__hosp", inputs: { seed: 7, arrivals_pct: 120, ward_nurses: 3, alarm_delay: 15 },
       about: "a full day with 120% emergency arrivals, 3 ward nurses a shift and a 15 s alarm delay" },
-    { key: "traffic", glob: "__traffic", inputs: { seed: 7, per_hour: 9000 },
-      about: "a morning peak of 9,000 trips an hour" },
+    { key: "traffic", glob: "__traffic", inputs: { seed: 7, per_hour: 8000, period: "evening" },
+      about: "an evening peak of 8,000 trips an hour, with people stopping at real shops" },
     { key: "home", glob: "__home", inputs: { seed: 3, season: "june", category: "V", pv_kwp: 6, battery_kwh: 10 },
       about: "a June day with 6 hours of load-shedding, 6 kWp of solar and a 10 kWh battery — four controllers, each after a warm-up day" },
   ];
@@ -89,13 +89,19 @@
       await wait(8000);
     },
     async traffic(w) {
-      const u = ui(w), G = "__traffic";
-      w[G].state.t = 20 * 60; w[G].frame(true);
-      caption("Lahore traffic · the map", "Real roads from OpenStreetMap: Gulberg, Kalma Chowk, Garden Town and the Canal Road.");
+      const u = ui(w), G = "__traffic", T = w[G];
+      T.state.t = 20 * 60; T.frame(true);
+      caption("Lahore traffic · the map", "Real roads from OpenStreetMap: Gulberg, Kalma Chowk, Garden Town and the Canal Road, with its real shops and amenities.");
       await wait(5000);
-      u.click("#follow-random");
-      caption("Riding along", "The camera follows one vehicle; the map streams in around it like a game map.");
-      u.play(15); await wait(12000); u.pause();
+      // ride with someone who is about to stop at a shop
+      const vs = T.vehiclesOf(T.state.mode);
+      const v = vs.find((x) => { const s = x.stops.find((e) => e[3] >= 0 && e[1] != null && e[0] > T.state.t + 40 && e[0] < T.state.t + 160); return s && T.vehAt(x, T.state.t); });
+      if (v) { T.follow(v.i); caption("Riding along", `${v.purpose[0].toUpperCase() + v.purpose.slice(1)}: the camera follows this ${v.kind} to its stop; the map streams in around it like a game map.`); }
+      else { u.click("#follow-random"); caption("Riding along", "The camera follows one vehicle; the map streams in around it like a game map."); }
+      u.play(15); await wait(14000); u.pause();
+      u.click(".tabs button[data-tab=places]");
+      caption("Where people stop", "The busiest shops and amenities this hour, and who is parked at each.");
+      await wait(6000);
       u.click(".tabs button[data-tab=hot]"); u.click("#pane-hot li[data-sig]");
       caption("The worst junction", "Signals change on every approach; the panel counts who is waiting.");
       u.play(15); await wait(7000); u.pause();
@@ -123,6 +129,15 @@
         caption("Home · the bedrooms", "Night: GridSense keeps a battery reserve for the next power cut.");
       }
       await wait(9000); u.pause();
+      // who is home: the evening the relatives come, or the afternoon the children are back
+      const gate = w.HOME.gate || [];
+      const guest = gate.find((g) => g[2] === "in" && /^g/.test(g[1]));
+      const tShow = guest ? guest[0] + 600 : 18 * 3600;
+      w[G].state.t = tShow; w[G].frame(true); u.click('#floors button[data-floor="G"]');
+      u.click(".tabs button[data-tab=people]");
+      const n = gate.filter((g) => g[0] <= tShow).slice(-1)[0];
+      caption("Who is home", `${hhmm(tShow)} — ${n ? n[3] : "everyone"} at home${guest ? ", guests in the drawing room" : ""}. The gate counter logs every coming and going; fans and lights follow the people.`);
+      await wait(8000);
       u.click(".tabs button[data-tab=compare]");
       caption("The result", "Four ways to run the same house through the same load-shedding.");
       await wait(8000);

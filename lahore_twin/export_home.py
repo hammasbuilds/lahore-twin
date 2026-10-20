@@ -39,6 +39,7 @@ def run_all(seed: int = 7, season: str = "june", category: str = "IV", pv_kwp: f
                     "arrive": p.arrive, "leave": p.leave} for p in first.people],
         "trips": first.trips_log,
         "labels": first.labels,
+        "gate": first.gate,
         "modes": {m: s.replay() for m, s in sims.items()},
     }
     return replay, sims

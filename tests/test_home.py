@@ -227,7 +227,8 @@ def test_people_who_go_out_are_not_at_home(plan):
 
     s._physics = watch
     s.run()
-    out = [p.id for p in s.people if any(st.label == "Out" for st in p.day)]
+    # out since the morning (office, school, university), not someone leaving for an errand at 10:30
+    out = [p.id for p in s.people if any(st.label.startswith("Out") and st.t < hm("09:30") for st in p.day)]
     assert out and all(seen[pid] is False for pid in out), seen
 
 
@@ -264,3 +265,35 @@ def test_no_decisions_are_made_on_an_unknown_grid_state(plan):
     s = HomeSim(sc, "gridsense").run()
     first = [m.text for m in s.bus.log if m.t == 0]
     assert not any("pre-cool" in x or "fill the tank" in x for x in first), first
+
+
+def test_the_gate_counts_everyone_in_and_out(day):
+    """The beam counter's head count always equals the people actually on site."""
+    sc, sims = day
+    s = sims["gridsense"]
+    home = sum(1 for p in sc.people if p.arrive == 0)
+    for t, pid, way, n in s.gate:
+        home += 1 if way == "in" else -1
+        assert n == home, (t, pid, way, n, home)
+    ways = {(pid, way) for _, pid, way, _ in s.gate}
+    # the school children leave in the morning and come back
+    kids = [p.id for p in sc.people if p.role == "school"]
+    assert all((k, "out") in ways and (k, "in") in ways for k in kids)
+    assert any(m.topic == "home/gate/count" for m in s.bus.log)
+
+
+def test_a_day_has_errands_and_visitors(plan):
+    """Over a dozen days: the mother's market trip (an early bug overwrote it, so she never
+    went out), groceries, tuition, and relatives or grandparents coming and going."""
+    why, guests = set(), 0
+    for seed in range(1, 13):
+        sc = build(plan, JUNE, seed=seed)
+        why |= {(p.role, st.label) for p in sc.people for st in p.day if st.label.startswith("Out")}
+        visitors = [p for p in sc.people if p.role in ("relative", "grandparent")]
+        guests += len(visitors)
+        for v in visitors:                           # they arrive, sit in the drawing room, and leave
+            assert 0 < v.arrive < v.leave < 86400
+            assert v.day[-1].kind == "leave"
+    assert ("mother", "Out — market and pharmacy") in why
+    assert ("father", "Out — groceries") in why and ("school", "Out — evening tuition") in why
+    assert guests >= 12

@@ -1,5 +1,5 @@
-/* Traffic Twin viewer: real Lahore roads from OpenStreetMap, the morning peak
- * replayed from window.TRAFFIC. The map is cut into tiles and streams in around
+/* Traffic Twin viewer: real Lahore roads from OpenStreetMap, a peak hour replayed
+ * from window.TRAFFIC, with the real shops and amenities people stop at. The map is cut into tiles and streams in around
  * the camera like a game map; "Follow a vehicle" rides along with one, and the
  * minimap shows where it is. Vehicles drive on the left, as in Pakistan.
  */
@@ -8,7 +8,17 @@
 (function () {
   const R = window.TRAFFIC;
   const C = TwinCore;
-  const T0 = 7.5 * 3600;                       // the replay starts at 07:30
+  const T0 = R.meta.start != null ? R.meta.start : 7.5 * 3600;     // 17:30 for the evening, 07:30 for the morning
+  const PERIOD = R.meta.period || "morning";
+  const POIS = (R.pois || []).map(([x, y, k, name], i) => ({ i, x, y, kind: (R.poi_kinds || [])[k], name }));
+  // what each kind of place is, for the map and its key
+  const POI_GROUP = { shop: "shop", mall: "shop", marketplace: "shop", supermarket: "shop", bakery: "food",
+    restaurant: "food", fast_food: "food", cafe: "food", pharmacy: "health", clinic: "health", hospital: "health",
+    school: "school", college: "school", university: "school", bank: "bank", fuel: "fuel", place_of_worship: "mosque" };
+  const POI_NAMES = { shop: "Shops and markets", food: "Food", health: "Pharmacy, clinic, hospital", school: "School, college, university", bank: "Bank", fuel: "Fuel", mosque: "Mosque" };
+  const POI_COL = { shop: "#ec4899", food: "#f97316", health: "#ef4444", school: "#3b82f6", bank: "#14b8a6", fuel: "#eab308", mosque: "#a855f7" };
+  const KIND_TITLE = { fuel: "fuel station", place_of_worship: "mosque", fast_food: "fast food", marketplace: "market" };
+  const KIND_LABEL = (k) => KIND_TITLE[k] || (k || "").replace("_", " ");
   const LANE_W = 3.2;
   const KIND_NAMES = { motorcycle: "Motorcycle", car: "Car", rickshaw: "Rickshaw", bus: "Bus / van" };
   const KIND_SIZE = { motorcycle: [2.0, 0.8], car: [4.5, 1.8], rickshaw: [2.8, 1.4], bus: [11, 2.5] };
@@ -33,17 +43,23 @@
   const TILE = R.meta.tile;
 
   // ---- vehicles (decoded lazily per rule set) ----
-  const decoded = {};
+  const decoded = {}, visitsOf = {};
+  function stopAt(v, t) { for (const s of v.stops) if (s[0] <= t && (s[1] == null ? t <= s[0] + 1 : t < s[1])) return s; return null; }
   function vehiclesOf(mode) {
     if (decoded[mode]) return decoded[mode];
-    const out = R.modes[mode].vehicles.map(([ki, t0, ts, done, deltas, lanes], i) => {
+    const out = R.modes[mode].vehicles.map(([ki, t0, ts, done, deltas, lanes, stops], i) => {
       const route = R.routes[i];
       const cum = new Array(deltas.length); let acc = 0;
       for (let k = 0; k < deltas.length; k++) { acc += deltas[k]; cum[k] = acc; }          // metres along the route
       const prefix = [0]; for (const lid of route) prefix.push(prefix[prefix.length - 1] + links[lid].len);
-      return { i, kind: R.kinds[ki], t0, ts, done, route, cum, lanes, prefix };
+      const purpose = R.trip_purpose ? R.purposes[R.trip_purpose[i]] : "";
+      return { i, kind: R.kinds[ki], t0, ts, done, route, cum, lanes, prefix, stops: stops || [], purpose };
     });
     decoded[mode] = out;
+    // visits per place over the hour
+    const visits = new Array(POIS.length).fill(0);
+    for (const v of out) for (const s of v.stops) if (s[3] >= 0) visits[s[3]]++;
+    visitsOf[mode] = visits;
     return out;
   }
   function vehAt(v, t) {
@@ -66,9 +82,11 @@
     }
     // lane: Pakistan drives on the left, so lanes sit to the left of the centre line
     let lane = 0; for (const [kk, ln] of v.lanes) { if (kk <= k) lane = ln; else break; }
-    const off = lk.oneway ? (lane + 0.5 - lk.lanes / 2) * LANE_W : (lane + 0.5) * LANE_W;
+    // lane -1: pulled off the road beside the kerb, at the shop's parking
+    const parked = lane < 0, ln = parked ? lk.lanes - 1 + 1.4 : lane;
+    const off = lk.oneway ? (ln + 0.5 - lk.lanes / 2) * LANE_W : (ln + 0.5) * LANE_W;
     x += hy * off; y += -hx * off;
-    return { x, y, hx, hy, link: v.route[j], speed: k + 1 < v.cum.length ? (v.cum[k + 1] - v.cum[k]) / R.meta.sample : 0, driven: d };
+    return { x, y, hx, hy, link: v.route[j], speed: parked ? 0 : k + 1 < v.cum.length ? (v.cum[k + 1] - v.cum[k]) / R.meta.sample : 0, driven: d, parked };
   }
 
   // ---- state ----
@@ -211,6 +229,7 @@
       }
     }
     hits = [];
+    drawPois();
     drawSignals();
     drawVehicles();
     drawMini();
@@ -225,13 +244,42 @@
       ctx.beginPath(); ctx.moveTo(sx + hx * a, sy + hy * a); ctx.lineTo(sx - hx * a - hy * a * 0.7, sy - hy * a + hx * a * 0.7); ctx.lineTo(sx - hx * a + hy * a * 0.7, sy - hy * a - hx * a * 0.7); ctx.fill();
     }
   }
+  function drawPois() {
+    const z = state.cam.z; if (z < 0.7) return;
+    const x0 = WX(-20), x1 = WX(W + 20), y0 = WY(-20), y1 = WY(H + 20), r = Math.max(3, Math.min(7, z * 1.8));
+    ctx.textAlign = "left"; ctx.textBaseline = "middle"; ctx.font = "11px Segoe UI, system-ui";
+    for (const p of POIS) {
+      if (p.x < x0 || p.x > x1 || p.y < y0 || p.y > y1) continue;
+      const sx = SX(p.x), sy = SY(p.y), g = POI_GROUP[p.kind] || "shop";
+      ctx.fillStyle = POI_COL[g]; ctx.strokeStyle = palette.bg; ctx.lineWidth = 1.5;
+      ctx.beginPath(); if (ctx.roundRect) ctx.roundRect(sx - r, sy - r, 2 * r, 2 * r, 2); else ctx.rect(sx - r, sy - r, 2 * r, 2 * r); ctx.fill(); ctx.stroke();
+      if (z > 2.2 && p.name) { ctx.lineWidth = 3; ctx.strokeStyle = palette["floor-out"]; ctx.strokeText(p.name, sx + r + 3, sy); ctx.fillStyle = palette.muted; ctx.fillText(p.name, sx + r + 3, sy); }
+      hits.push({ type: "poi", id: p.i, x: sx, y: sy, r: Math.max(7, r + 2) });
+    }
+  }
+  function hereNow(pi) {
+    let n = 0; for (const v of vehiclesOf(state.mode)) { const s = v.stops.length && stopAt(v, state.t); if (s && s[3] === pi) n++; } return n;
+  }
   function signalState(sig, phase, t) {
     const log = R.modes[state.mode].signals[String(sig.id)] || [];
     let ph = 0, st = "green";
     const i = C.bisectRight(log, t, (e) => e[0]) - 1;
     if (i >= 0) { ph = log[i][1]; st = log[i][2]; }
-    if (ph !== phase) return "red";
+    if (ph !== phase || st === "allred") return "red";
     return st;
+  }
+  // seconds until this phase's light changes, for the countdown on Lahore's signal heads (fixed plan only)
+  function countdown(sig, phase, t) {
+    if (state.mode !== "fixed" || !sig.greens) return null;
+    const log = R.modes.fixed.signals[String(sig.id)] || [];
+    const i = C.bisectRight(log, t, (e) => e[0]) - 1;
+    const [since, ph, st] = i >= 0 ? log[i] : [0, 0, "green"];
+    const el = t - since, other = 1 - ph;
+    if (ph === phase && st === "green") return Math.max(0, Math.ceil(sig.greens[ph] - el));
+    // red: what is left of the other phase's green, then its amber and the all-red
+    if (st === "green") return Math.max(0, Math.ceil(sig.greens[ph] - el)) + 5;
+    if (st === "amber") return Math.max(0, Math.ceil(3 - el)) + 2 + (ph === phase ? sig.greens[other] + 5 : 0);
+    return Math.max(0, Math.ceil(2 - el)) + (ph === phase ? sig.greens[other] + 5 : 0);
   }
   function drawSignals() {
     const z = state.cam.z, t = state.t;
@@ -249,6 +297,12 @@
           ctx.fillStyle = st === "green" ? palette["sig-green"] : st === "amber" ? palette["sig-amber"] : palette["sig-red"];
           ctx.strokeStyle = palette.bg; ctx.lineWidth = 1.5;
           ctx.beginPath(); ctx.arc(SX(x), SY(y), Math.max(3, z * 1.2), 0, 7); ctx.fill(); ctx.stroke();
+          const cd = z > 2.4 ? countdown(sig, ph, t) : null;
+          if (cd != null) {
+            const ty = SY(y) - Math.max(10, z * 3);
+            ctx.font = "700 11px Segoe UI, system-ui"; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+            ctx.lineWidth = 3; ctx.strokeStyle = palette.bg; ctx.strokeText(String(cd), SX(x), ty); ctx.fillText(String(cd), SX(x), ty);
+          }
         }));
       }
       hits.push({ type: "signal", id: sig.id, x: sx, y: sy, r: Math.max(10, z * 12) });
@@ -263,7 +317,7 @@
       const p = vehAt(v, t); if (!p) continue;
       if (p.x < x0 || p.x > x1 || p.y < y0 || p.y > y1) continue;
       const sx = SX(p.x), sy = SY(p.y), sel = state.follow === v.i;
-      ctx.fillStyle = col[v.kind];
+      ctx.fillStyle = col[v.kind]; ctx.globalAlpha = p.parked ? 0.6 : 1;
       if (z < 0.6) {
         ctx.fillRect(sx - 1, sy - 1, sel ? 5 : 2.2, sel ? 5 : 2.2);
       } else {
@@ -275,6 +329,7 @@
         ctx.fillRect(-l / 2, -wd / 2, l, wd); ctx.strokeRect(-l / 2, -wd / 2, l, wd);
         ctx.restore();
       }
+      ctx.globalAlpha = 1;
       if (sel) { ctx.strokeStyle = palette.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, Math.max(9, z * 5), 0, 7); ctx.stroke(); }
       hits.push({ type: "veh", id: v.i, x: sx, y: sy, r: Math.max(6, z * 3) });
     }
@@ -310,6 +365,7 @@
     const ser = R.modes[state.mode].series, i = Math.max(0, Math.min(ser.length - 1, Math.floor(state.t / 60)));
     $("k-on").textContent = ser[i] ? ser[i][1].toLocaleString("en") : "–";
     $("k-speed").textContent = ser[i] ? ser[i][2].toFixed(0) + " km/h" : "–";
+    $("k-held").textContent = ser[i] && ser[i][4] != null ? ser[i][4].toLocaleString("en") : "–";
     const vs = vehiclesOf(state.mode); let done = 0; for (const v of vs) if (v.done != null && v.done <= state.t) done++;
     $("k-done").textContent = done.toLocaleString("en");
   }
@@ -320,7 +376,7 @@
       const sig = R.signal_sites.find((s) => s.name === name);
       html += `<li data-sig="${sig ? sig.id : ""}" tabindex="0" role="button" aria-label="Fly to ${esc(name)}"><span>${esc(name)}</span><b class="num">${vh.toFixed(2)} veh-h</b></li>`;
     }
-    html += `</ul><p class="note">${R.signal_sites.length} signals. OpenStreetMap maps only a couple of signals here, so signals are placed at at-grade crossings of named secondary-or-bigger roads; the Canal Road corridor runs signal-free through its underpasses.</p>`;
+    html += `</ul><p class="note">${R.signal_sites.length} signals. OpenStreetMap maps only a couple of signals here, so a signal stands wherever two named through roads (tertiary or bigger) cross at grade, as Lahore signals them; back streets give way instead, and the Canal Road corridor runs signal-free through its underpasses. Fixed plan: the main road 60 s green, the side road 30 s, 3 s amber and 2 s all-red.</p>`;
     $("pane-hot").innerHTML = html;
   }
   function renderFollow() {
@@ -330,7 +386,11 @@
     const total = v.prefix[v.prefix.length - 1];
     const roadsOn = []; for (const lid of v.route) { const n = roads[links[lid].road].name; if (n && roadsOn[roadsOn.length - 1] !== n) roadsOn.push(n); }
     let html = (hopNote ? `<p class="note">${esc(hopNote)}</p>` : "") + `<h3>${KIND_NAMES[v.kind]} #${v.i + 1}</h3>`;
-    html += `<div class="row"><span>Status</span><b>${p ? (p.speed < 0.5 ? "stopped" : "moving") : v.done != null && state.t >= v.done ? "arrived" : "not on the road yet"}</b></div>`;
+    const cur = stopAt(v, state.t), place = (s) => (s[3] >= 0 && POIS[s[3]] ? (POIS[s[3]].name || KIND_LABEL(POIS[s[3]].kind)) : "the kerb");
+    const status = cur ? (cur[1] == null ? `arrived at ${place(cur)}` : p && p.parked ? `parked at ${place(cur)}` : `stopped at the kerb: ${cur[2]}`)
+      : p ? (p.speed < 0.5 ? "stopped" : "moving") : v.done != null && state.t >= v.done ? "arrived" : "not on the road yet";
+    html += `<div class="row"><span>Why</span><b>${esc(v.purpose || "—")}</b></div>`;
+    html += `<div class="row"><span>Status</span><b>${esc(status)}</b></div>`;
     if (p) {
       const r = roads[links[p.link].road];
       html += `<div class="row"><span>On</span><b>${esc(r.name || r.cls.replace("_", " "))}${r.bridge ? " (flyover)" : r.tunnel ? " (underpass)" : ""}</b></div>`;
@@ -339,6 +399,12 @@
     }
     html += `<div class="row"><span>Set off</span><b class="num">${C.clock(T0 + v.t0)}</b></div>`;
     if (v.done != null) html += `<div class="row"><span>Arrives</span><b class="num">${C.clock(T0 + v.done)} (${Math.round((v.done - v.t0) / 60)} min)</b></div>`;
+    if (v.stops.length) {
+      html += `<h3>Stops on the way</h3><ul class="stoplist">` + v.stops.map((s) => {
+        const now = cur === s, when = s[1] == null ? C.clock(T0 + s[0]) : `${C.clock(T0 + s[0])}–${C.clock(T0 + s[1])}`;
+        return `<li class="${now ? "now" : ""}"><span class="num">${when}</span><span>${esc(s[2])}${s[3] >= 0 ? " · " + esc(place(s)) : ""}${s[1] == null ? " (trip ends)" : ""}</span></li>`;
+      }).join("") + `</ul>`;
+    }
     html += `<h3>Route</h3><p class="note">${roadsOn.map(esc).join(" → ") || "local streets"}</p>`;
     html += `<button class="btn" id="stop-follow">Stop following</button>`;
     box.innerHTML = html;
@@ -359,15 +425,38 @@
       const p = vehAt(v, state.t);
       if (p && p.speed < 0.5 && appr.has(p.link)) queued[appr.get(p.link)]++;
     }
-    html += sig.phases.map((ids, ph) => `<div class="row"><span>Phase ${ph + 1} · ${ids.length} approach${ids.length > 1 ? "es" : ""} · <span class="num">${queued[ph]}</span> waiting</span><b>${signalState(sig, ph, state.t)}</b></div>`).join("");
+    html += sig.phases.map((ids, ph) => { const cd = countdown(sig, ph, state.t), st = signalState(sig, ph, state.t);
+      return `<div class="row"><span>Phase ${ph + 1}${sig.greens ? ` · ${sig.greens[ph]} s green` : ""} · <span class="num">${queued[ph]}</span> waiting</span><b>${st}${cd != null ? ` · <span class="num">${cd}</span> s` : ""}</b></div>`; }).join("");
     html += `<div class="row"><span>In this state for</span><b class="num">${Math.round(state.t - since)} s</b></div>`;
-    html += `<h3>Last changes</h3>` + log.map(([t, ph, st]) => `<div class="row"><span class="num muted">${C.clock(T0 + t)}</span><span>phase ${ph + 1} ${st}</span></div>`).join("");
-    html += `<p class="note">${state.mode === "fixed" ? `Fixed: ${32} s green per phase, 3 s amber, all morning.` : "Adaptive: green held while the loop detectors 40 m back see vehicles, 8 s minimum, 55 s maximum, ends after a 3 s gap."}</p>`;
+    html += `<h3>Last changes</h3>` + log.map(([t, ph, st]) => `<div class="row"><span class="num muted">${C.clock(T0 + t)}</span><span>phase ${ph + 1} ${st === "allred" ? "all-red" : st}</span></div>`).join("");
+    const g = sig.greens || [32, 32];
+    html += `<p class="note">${state.mode === "fixed" ? `Fixed: ${g[0]} s / ${g[1]} s green (the bigger road gets the long one), 3 s amber, 2 s all-red, a ${g[0] + g[1] + 10} s cycle all ${PERIOD}. The number beside each light counts down to its next change, as on Lahore's signal heads.` : `Adaptive: green held while the loop detectors 40 m back see vehicles, 10 s minimum, at most ${Math.round(g[0] * 1.5)} s / ${Math.round(g[1] * 1.5)} s, ends after a 3 s gap. No countdown: the green lasts as long as traffic keeps coming.`}</p>`;
     box.innerHTML = html;
+  }
+  // ---- places: where people stop this hour ----
+  let lastPlaces = "";
+  function renderPlaces() {
+    vehiclesOf(state.mode);
+    const visits = visitsOf[state.mode];
+    let html = "";
+    if (state.place != null) {
+      const p = POIS[state.place];
+      const here = vehiclesOf(state.mode).filter((v) => { const s = v.stops.length && stopAt(v, state.t); return s && s[3] === p.i; });
+      html += `<h3>${esc(p.name || KIND_LABEL(p.kind))}</h3><div class="row"><span>What</span><b>${esc(KIND_LABEL(p.kind))}</b></div>`
+        + `<div class="row"><span>Here now</span><b class="num">${here.length}</b></div><div class="row"><span>Visits this hour</span><b class="num">${visits[p.i]}</b></div>`
+        + (here.length ? `<p class="note">${here.slice(0, 6).map((v) => `${KIND_NAMES[v.kind]} #${v.i + 1} (${esc(v.purpose)})`).join(", ")}${here.length > 6 ? "…" : ""}</p>` : "");
+    }
+    const top = POIS.map((p) => [visits[p.i], p]).filter(([n]) => n > 0).sort((a, b) => b[0] - a[0]).slice(0, 15);
+    const max = top.length ? top[0][0] : 1;
+    html += `<h3>Busiest places this hour · ${MODE_NAMES[state.mode]}</h3><p class="note">Real shops and amenities from OpenStreetMap; a visit is a vehicle pulling in, or stopping at the kerb outside. Click one to fly there.</p><ul class="hot">`
+      + top.map(([n, p]) => `<li data-poi="${p.i}" tabindex="0" role="button" aria-label="Fly to ${esc(p.name || KIND_LABEL(p.kind))}"><span>${esc(p.name || KIND_LABEL(p.kind))} <span class="muted">· ${esc(KIND_LABEL(p.kind))}</span><div class="bar" style="width:${(100 * n / max).toFixed(0)}%;background:${POI_COL[POI_GROUP[p.kind] || "shop"]}"></div></span><b class="num">${n}</b></li>`).join("")
+      + `</ul><p class="note">${POIS.length} places mapped in this area. OpenStreetMap lists only a few of the area's pharmacies, so pharmacy trips crowd onto those few.</p>`;
+    if (html !== lastPlaces) { lastPlaces = html; $("pane-places").innerHTML = html; }
   }
   const ROWS = [["Trips", "trips"], ["Finished", "completed"], ["Median travel time, s", "travel_time_median_s"], ["Median delay, s", "delay_median_s"],
     ["Mean delay, s", "delay_mean_s"], ["Total delay, vehicle-hours", "delay_total_veh_h"], ["Stops per trip", "stops_mean"], ["Mean speed, km/h", "speed_mean_kmh"],
-    ["Stopped at signals, vehicle-hours", "signal_delay_veh_h"], ["Still driving at the end", "still_driving"], ["Gridlocked (still for 5+ min)", "gridlocked"], ["Never got onto the road", "not_yet_entered"]];
+    ["Stopped at signals, vehicle-hours", "signal_delay_veh_h"], ["Still driving at the end", "still_driving"], ["Gridlocked (still for 5+ min)", "gridlocked"], ["Never got onto the road", "not_yet_entered"],
+    ["Stops at shops and amenities", "errand_stops"], ["Trips that ended at one", "ended_at_a_place"], ["Rickshaw and wagon passenger stops", "passenger_stops"]];
   function renderCompare() {
     const f = R.modes.fixed.metrics, a = R.modes.adaptive.metrics;
     let html = `<h3>Same vehicles, same morning</h3><table class="cmp"><tr><th></th><th>Fixed</th><th>Adaptive</th></tr>`;
@@ -377,7 +466,11 @@
       const bx = dir && x !== y && (dir < 0 ? x < y : x > y), by = dir && x !== y && !bx;
       html += `<tr><td>${label}</td><td class="num ${bx ? "best" : ""}">${x}</td><td class="num ${by ? "best" : ""}">${y}</td></tr>`;
     }
-    html += `</table><p class="note">${R.meta.trips.toLocaleString("en")} trips in an hour of morning peak (07:30–08:30) plus 15 minutes to clear, on ${roads.length.toLocaleString("en")} pieces of real road. Vehicle mix from Lahore's registrations: about 65% motorcycles, 25% cars, 5% rickshaws, 5% buses and vans. Driving parameters are urban assumptions. Green = better.</p>`;
+    html += `</table><p class="note">${R.meta.trips.toLocaleString("en")} trips in an hour of ${PERIOD} peak (${C.clock(T0)}–${C.clock(T0 + 3600)}) plus 15 minutes to clear, on ${roads.length.toLocaleString("en")} pieces of real road. Vehicle mix from Lahore's registrations: about 65% motorcycles, 25% cars, 5% rickshaws, 5% buses and vans. The delay leaves out the time spent at a shop. Driving parameters, trip purposes and stop times are assumptions. Green = better.</p>`;
+    if (f.purposes) {
+      const tot = Object.values(f.purposes).reduce((x, y) => x + y, 0);
+      html += `<h3>Why people drove</h3><table class="cmp">` + Object.entries(f.purposes).map(([k, n]) => `<tr><td>${esc(k)}</td><td class="num">${n.toLocaleString("en")}</td><td class="num muted">${(100 * n / tot).toFixed(0)}%</td></tr>`).join("") + `</table>`;
+    }
     $("pane-compare").innerHTML = html;
   }
   function renderTimeline() {
@@ -392,6 +485,7 @@
   function renderLegend() {
     const col = KCOL();
     $("legend").innerHTML = Object.entries(KIND_NAMES).map(([k, n]) => `<span><i class="sq" style="background:${col[k]}"></i>${n}</span>`).join("")
+      + Object.entries(POI_NAMES).map(([g, n]) => `<span><i class="sq" style="background:${POI_COL[g]}"></i>${n}</span>`).join("")
       + `<span><i style="background:${palette["sig-green"]}"></i>Signal</span><span><i class="sq" style="background:${palette["road-major"]}"></i>Main road</span><span><i class="sq" style="border:1.5px dashed ${palette["road-tunnel"]};background:transparent"></i>Underpass</span><span>Flyovers drawn on top · drive on the left</span>`;
     const out = []; for (let m = 0; m <= R.meta.t1 / 60; m += 15) out.push(`<span>${C.clock(T0 + m * 60)}</span>`); $("ticks").innerHTML = out.join("");
   }
@@ -424,6 +518,7 @@
       lastPanel = now;
       if ($("pane-follow").classList.contains("on")) renderFollow();
       if ($("pane-junction").classList.contains("on")) renderJunction();
+      if ($("pane-places").classList.contains("on")) renderPlaces();
     }
   }
   let prev = null;
@@ -443,7 +538,7 @@
   function showTab(name) {
     for (const b of document.querySelectorAll(".tabs button")) b.setAttribute("aria-selected", b.dataset.tab === name);
     for (const p of document.querySelectorAll(".pane")) p.classList.toggle("on", p.id === "pane-" + name);
-    if (name === "compare") renderCompare(); if (name === "hot") renderHot();
+    if (name === "compare") renderCompare(); if (name === "hot") renderHot(); if (name === "places") { lastPlaces = ""; renderPlaces(); }
     frame(true);
   }
   function follow(i) {
@@ -462,11 +557,19 @@
   for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
   // ride along with someone who still has a long way to go; when they arrive, hop to another
   function pickLong() {
-    const vs = vehiclesOf(state.mode).filter((v) => { const p = vehAt(v, state.t); return p && v.prefix[v.prefix.length - 1] - p.driven > 1500; });
-    return vs.length ? vs[Math.floor(Math.random() * vs.length)].i : null;
+    const vs = vehiclesOf(state.mode).filter((v) => { const p = vehAt(v, state.t); return p && !p.parked && v.prefix[v.prefix.length - 1] - p.driven > 1500; });
+    // most of the time, ride with someone who has a stop to make: that is where the city shows
+    const errand = vs.filter((v) => v.stops.some((s) => s[0] > state.t + 30 && s[3] >= 0));
+    const pool = errand.length && Math.random() < 0.7 ? errand : vs;
+    return pool.length ? pool[Math.floor(Math.random() * pool.length)].i : null;
   }
   $("follow-random").onclick = () => { const i = pickLong(); if (i != null) follow(i); };
   $("pane-follow").onclick = (e) => { if (e.target.id === "stop-follow") follow(null); };
+  $("pane-places").onclick = (e) => {
+    const li = e.target.closest("li[data-poi]"); if (!li) return;
+    const p = POIS[+li.dataset.poi]; state.place = p.i; lastPlaces = ""; flyTo(p.x, p.y, 3); showTab("places");
+  };
+  $("pane-places").onkeydown = (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.closest("li[data-poi]")) { e.preventDefault(); e.target.click(); } };
   // a keyboard user opens a hotspot with Enter or Space
   $("pane-hot").onkeydown = (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.closest("li[data-sig]")) { e.preventDefault(); e.target.click(); } };
   $("pane-hot").onclick = (e) => {
@@ -491,6 +594,7 @@
     const h = pickAt(e), tip = $("tip"); if (!h) { tip.style.display = "none"; return; }
     const rect = cv.getBoundingClientRect();
     if (h.type === "veh") { const v = vehiclesOf(state.mode)[h.id], p = vehAt(v, state.t); tip.innerHTML = `<b>${KIND_NAMES[v.kind]}</b><br><span class="muted">${p ? (p.speed * 3.6).toFixed(0) + " km/h · click to follow" : ""}</span>`; }
+    else if (h.type === "poi") { const p = POIS[h.id]; vehiclesOf(state.mode); tip.innerHTML = `<b>${esc(p.name || KIND_LABEL(p.kind))}</b><br><span class="muted">${esc(KIND_LABEL(p.kind))} · ${hereNow(p.i)} here now · ${visitsOf[state.mode][p.i]} visits this hour</span>`; }
     else { const s = R.signal_sites.find((x) => x.id === h.id); tip.innerHTML = `<b>${esc(s.name)}</b><br><span class="muted">signal · click for phases</span>`; }
     tip.style.display = "block"; tip.style.left = (e.clientX - rect.left + 14) + "px"; tip.style.top = (e.clientY - rect.top + 14) + "px";
   });
@@ -499,6 +603,7 @@
     if (wasDrag) return;
     const h = pickAt(e);
     if (h && h.type === "veh") follow(h.id);
+    else if (h && h.type === "poi") { state.place = h.id; showTab("places"); }
     else if (h && h.type === "signal") { state.sel = h.id; showTab("junction"); }
   });
   cv.addEventListener("mouseleave", () => { $("tip").style.display = "none"; });

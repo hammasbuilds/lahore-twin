@@ -2,15 +2,15 @@ window.TWIN_SUMMARY = {
  "office": {
   "stats": [
    [
-    "29%",
+    "31%",
     "less light + AC energy (motion + CO₂)"
    ],
    [
-    "46",
+    "52",
     "people on three floors"
    ],
    [
-    "9/11",
+    "11/17",
     "tailgates caught"
    ]
   ]
@@ -18,15 +18,15 @@ window.TWIN_SUMMARY = {
  "home": {
   "stats": [
    [
-    "94 → 0",
+    "93 → 0",
     "minutes dark (default → GridSense)"
    ],
    [
-    "Rs 357",
+    "Rs 385",
     "eco bill for the day"
    ],
    [
-    "533",
+    "416",
     "too-hot sleep, person-min"
    ]
   ]
@@ -50,16 +50,16 @@ window.TWIN_SUMMARY = {
  "traffic": {
   "stats": [
    [
-    "35 → 12 s",
+    "105 → 60 s",
     "median delay (fixed → adaptive)"
    ],
    [
-    "5,395",
-    "pieces of real road"
+    "7,097",
+    "trips in the evening peak"
    ],
    [
-    "7,078",
-    "trips in the morning peak"
+    "1,763",
+    "stops at real shops and amenities"
    ]
   ]
  }
