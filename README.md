@@ -15,7 +15,7 @@ simulated one without changing the rules.
 | **Office tower** | 3 floors (basement car park, ground, first), 46 people, badge doors, lights, AC, CO₂ | motion + CO₂ uses **29.5% less** light and AC energy than a fixed timetable; 9 of 11 tailgates caught, no false alarms | ready |
 | **Home + GridSense** | double-storey house with roof solar (6 kWp), 10 kWh battery, a day of load-shedding | GridSense keeps the house lit through every cut (**94 → 0** dark minutes); its eco setting costs about the same as the inverter default | ready |
 | **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2 | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
-| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes; 7,078 trips | adaptive signals cut median delay **54 → 20 s** and stops per trip **3.9 → 2.3** | ready |
+| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes; 7,078 trips | adaptive signals cut median delay **35 → 12 s** and stops per trip **2.9 → 1.9** | ready |
 | Junction planner | tests underpasses, U-turns and signal plans at the worst junctions; ambulance green wave | | planned |
 | City systems | smog sensors, underpass flooding alarms, smart streetlights | | planned |
 
@@ -125,15 +125,18 @@ Hospital, same patients and events:
 Badges and sensors do not add doctors, so emergency waits barely move; a one-hour audit
 reports hand hygiene at about twice its true rate, while counting dispensers reports it as it is.
 
-Traffic, the same 7,078 trips in an hour of morning peak:
+Traffic, the same 7,078 trips in an hour of morning peak. Drivers pick routes on free-flow
+time plus an expected wait at each signal, so flyovers and underpasses carry what they carry on
+the real road (Ferozepur Road Flyover 1,269 trips, Kalma Chowk Flyover 1,215, Model Town
+Underpass 619):
 
 | | Fixed signals | Adaptive signals |
 |---|---|---|
-| Trips finished | 7,078 | 7,078 |
-| Median delay, s | 54.3 | 19.5 |
-| Stops per trip | 3.92 | 2.27 |
-| Stopped at signals, vehicle-hours | 68.0 | 13.9 |
-| Mean speed, km/h | 33.7 | 37.0 |
+| Trips finished | 7,077 | 7,078 |
+| Median delay, s | 35.0 | 12.3 |
+| Stops per trip | 2.92 | 1.88 |
+| Stopped at signals, vehicle-hours | 35.7 | 6.1 |
+| Mean speed, km/h | 35.0 | 37.2 |
 
 Over three other mornings at 4,000, 8,000 and 12,000 trips an hour (`tools/sweep_traffic.py`),
 nobody is gridlocked, nobody exceeds the road's or the vehicle's speed, and adaptive signals

@@ -50,7 +50,7 @@ window.TWIN_SUMMARY = {
  "traffic": {
   "stats": [
    [
-    "54 → 20 s",
+    "35 → 12 s",
     "median delay (fixed → adaptive)"
    ],
    [

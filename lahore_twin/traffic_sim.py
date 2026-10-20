@@ -105,8 +105,12 @@ def build_signals(net: Network) -> list[Signal]:
 
 def make_demand(net: Network, seed: int = 7, minutes: int = 60, per_hour: int = 3000) -> list[Trip]:
     """Trips for a morning peak: through traffic between the area's edges on the big roads,
-    trips into and out of the residential streets, and local trips; routed by free-flow time."""
+    trips into and out of the residential streets, and local trips. Drivers choose by free-flow
+    time plus an expected wait at every signal (half a fixed cycle), so a flyover or underpass
+    that skips the lights is worth its detour, as it is to a Lahore driver."""
     rng = random.Random(seed * 31 + 7)
+    signalled = {lid for sg in build_signals(net) for ph in sg.phases for lid in ph}
+    wait = (FIXED_GREEN + AMBER) / 2
     outs: dict[int, list[Link]] = {}
     pieces: dict[int, set] = {}
     for lk in net.links:
@@ -132,7 +136,7 @@ def make_demand(net: Network, seed: int = 7, minutes: int = 60, per_hour: int = 
                 if d > dist.get(n, math.inf):
                     continue
                 for lk in outs.get(n, ()):
-                    nd = d + lk.length / lk.speed
+                    nd = d + lk.length / lk.speed + (wait if lk.id in signalled else 0.0)
                     if nd < dist.get(lk.b, math.inf):
                         dist[lk.b], prev[lk.b] = nd, lk
                         heapq.heappush(q, (nd, lk.b))
@@ -168,7 +172,8 @@ def make_demand(net: Network, seed: int = 7, minutes: int = 60, per_hour: int = 
         if len(route) < 2:
             continue
         kind = rng.choices(list(KINDS), [k[0] for k in KINDS.values()])[0]
-        trips.append(Trip(int(t), kind, route, dist[d]))
+        free = sum(net.links[lid].length / net.links[lid].speed for lid in route)   # the delay baseline: no waits
+        trips.append(Trip(int(t), kind, route, free))
     return trips
 
 

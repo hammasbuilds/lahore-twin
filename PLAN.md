@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 4 of 10 done |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 5 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -1025,3 +1025,19 @@ hospital rounds, which continue alongside.*
 - *Added:* `tools/ui_check_traffic.js` — panning streams new tiles, a drag does not
   start following, following hops on arrival and says so, a hotspot opens its live
   junction, the comparison fills, a full redraw stays under 60 ms, light theme, phone.
+
+**Round 5 — do the flyovers carry what they should?**
+- *Counted:* trips per flyover and underpass. Kalma Chowk Flyover 1,180, Model Town
+  Underpass 563 — but Ferozepur Road Flyover only 54. Routes were chosen on free-flow
+  time, which ignores signal waits, so a flyover looked no faster than the signalled
+  road under it. *Fixed:* routing adds half a fixed cycle (17.5 s) for every signalled
+  approach — the trade a Lahore driver makes. Ferozepur Road Flyover 54 → 1,269 trips,
+  now the busiest raised road; the delay baseline stays pure free-flow time (the
+  routing cost must not become the yardstick). Delays fall under both rule sets
+  (fixed median 54 → 35 s, adaptive 20 → 12 s); adaptive still about a third of fixed.
+- *Found by the traffic UI check:* "junction panel did not update while playing" — an
+  adaptive junction holding one phase showed the same text for 45 simulated seconds.
+  *Fixed:* the panel is live — vehicles waiting on each phase's approaches and how long
+  the current state has lasted.
+- Unused raised pieces (Ali Zaib Road and Tipu Road underpasses, a Wahdat Road flyover
+  piece) stay unused: no trip's best route crosses them in this demand.

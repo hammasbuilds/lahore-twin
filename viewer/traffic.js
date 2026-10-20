@@ -349,7 +349,18 @@
     if (!sig) return;
     const log = (R.modes[state.mode].signals[String(sig.id)] || []).filter((e) => e[0] <= state.t).slice(-8).reverse();
     let html = `<h3>${esc(sig.name)}</h3>`;
-    html += sig.phases.map((ids, ph) => `<div class="row"><span>Phase ${ph + 1} · ${ids.length} approach${ids.length > 1 ? "es" : ""}</span><b>${signalState(sig, ph, state.t)}</b></div>`).join("");
+    // live: how long the current state has lasted, and who is queued on each phase's approaches
+    const all = R.modes[state.mode].signals[String(sig.id)] || [];
+    const i = C.bisectRight(all, state.t, (e) => e[0]) - 1, since = i >= 0 ? all[i][0] : 0;
+    const queued = sig.phases.map(() => 0);
+    const appr = new Map(); sig.phases.forEach((ids, ph) => ids.forEach((lid) => appr.set(lid, ph)));
+    for (const v of vehiclesOf(state.mode)) {
+      if (state.t < v.ts || (v.done != null && state.t >= v.done)) continue;
+      const p = vehAt(v, state.t);
+      if (p && p.speed < 0.5 && appr.has(p.link)) queued[appr.get(p.link)]++;
+    }
+    html += sig.phases.map((ids, ph) => `<div class="row"><span>Phase ${ph + 1} · ${ids.length} approach${ids.length > 1 ? "es" : ""} · <span class="num">${queued[ph]}</span> waiting</span><b>${signalState(sig, ph, state.t)}</b></div>`).join("");
+    html += `<div class="row"><span>In this state for</span><b class="num">${Math.round(state.t - since)} s</b></div>`;
     html += `<h3>Last changes</h3>` + log.map(([t, ph, st]) => `<div class="row"><span class="num muted">${C.clock(T0 + t)}</span><span>phase ${ph + 1} ${st}</span></div>`).join("");
     html += `<p class="note">${state.mode === "fixed" ? `Fixed: ${32} s green per phase, 3 s amber, all morning.` : "Adaptive: green held while the loop detectors 40 m back see vehicles, 8 s minimum, 55 s maximum, ends after a 3 s gap."}</p>`;
     box.innerHTML = html;
