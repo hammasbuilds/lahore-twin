@@ -260,13 +260,21 @@ class TrafficSim:
                     for ln in self.lanes[other.id]:
                         if ln and other.length - ln[0].pos < 25 and ln[0].v > 1.0:
                             return to_end - 1.0, 0.0
-        # the next link's queue
-        tl = min(v.lane, nxt.lanes - 1)
-        lane2 = self.lanes[nxt.id][tl]
-        if lane2:
-            rear = lane2[-1]
-            return to_end + rear.pos - rear.L, rear.v
-        return to_end + nxt.length, v.v
+        # the queue ahead, looking along the route past short links: OSM splits roads into
+        # stubs a metre long, and stopping at the end of an empty stub froze a whole avenue
+        dist, lane, ri = to_end, v.lane, v.ri + 1
+        while ri < len(v.route) and dist < 100:
+            nl = self.links[v.route[ri]]
+            lane = min(lane, nl.lanes - 1)
+            lane2 = self.lanes[nl.id][lane]
+            if lane2:
+                rear = lane2[-1]
+                return dist + rear.pos - rear.L, rear.v
+            if ri > v.ri + 1 and not self.green(self.links[v.route[ri - 1]].id):
+                return dist - 1.0, 0.0              # a red light at the end of a stub ahead
+            dist += nl.length
+            ri += 1
+        return dist + 50.0, v.v
 
     def step(self, t: int) -> None:
         self.tick_signals(t)

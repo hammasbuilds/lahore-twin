@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | built; review rounds next |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 1 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -957,3 +957,22 @@ hospital rounds, which continue alongside.*
   motion misses; the 20-day sweep went from 1 problem to 0.
 - Demo: `tools/demo_video.py` records a 41 s walkthrough (kept out of git) and 19
   screenshots in `docs/screenshots/`, embedded in the README.
+
+### Traffic round log
+
+**Round 1 — a metre of road that froze an avenue.**
+- *Found:* after the hour plus 15 minutes of clearance, 318 vehicles were still on the
+  map, every one of them stopped, and 227 had never got on — the same 227 under both
+  signal plans, so not congestion. Following the queue from North Avenue to its head:
+  a car 0.2 m from the end of its link, the next link on its route empty and 1.1 m
+  long. Car-following looked only one link ahead, so the car saw 1.3 m of road, less
+  than its jam gap, and stopped for good; North Avenue and Maqbool Road queued behind
+  it all morning. OSM splits roads into stubs that short wherever two ways meet.
+- *Fixed:* the look-ahead walks the route across links for up to 100 m until it finds
+  a vehicle or a red light. All 7,078 trips now finish under both plans.
+- *Test:* a 20-minute peak must leave nobody waiting to enter and nobody standing still
+  at the end (a late long trip may still be driving: the first version of the test
+  counted a rickshaw doing 34 km/h as stuck). Checked to fail on the old code.
+- *Not fixed, stated:* peak speeds of 34–37 km/h are probably optimistic (no parking,
+  pedestrians or lane indiscipline modelled); no measured peak-hour figure for Lahore
+  was found to calibrate against, so none was invented. README says so.

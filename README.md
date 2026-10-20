@@ -15,7 +15,7 @@ simulated one without changing the rules.
 | **Office tower** | 3 floors (basement car park, ground, first), 46 people, badge doors, lights, AC, CO₂ | motion + CO₂ uses **29.5% less** light and AC energy than a fixed timetable; 9 of 11 tailgates caught, no false alarms | ready |
 | **Home + GridSense** | double-storey house with roof solar (6 kWp), 10 kWh battery, a day of load-shedding | GridSense keeps the house lit through every cut (**94 → 0** dark minutes); its eco setting costs about the same as the inverter default | ready |
 | **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2 | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
-| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes; 7,078 trips | adaptive signals cut median delay **53 → 20 s** and stops per trip **3.7 → 2.2** | ready |
+| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes; 7,078 trips | adaptive signals cut median delay **54 → 20 s** and stops per trip **3.9 → 2.3** | ready |
 | Junction planner | tests underpasses, U-turns and signal plans at the worst junctions; ambulance green wave | | planned |
 | City systems | smog sensors, underpass flooding alarms, smart streetlights | | planned |
 
@@ -34,7 +34,7 @@ python demo.py               # office    — writes viewer/replay.js
 python demo_home.py          # home      — viewer/home_replay.js
 python demo_hospital.py      # hospital  — viewer/hospital_replay.js
 python demo_traffic.py       # traffic   — viewer/traffic_replay.js
-python -m pytest -q          # 89 tests
+python -m pytest -q          # 90 tests
 ```
 
 Python 3.10+, standard library only. No network: the map data ships in `plans/osm/`.
@@ -128,10 +128,15 @@ Traffic, the same 7,078 trips in an hour of morning peak:
 
 | | Fixed signals | Adaptive signals |
 |---|---|---|
-| Median delay, s | 53.0 | 19.6 |
-| Stops per trip | 3.68 | 2.23 |
-| Stopped at signals, vehicle-hours | 53.3 | 10.1 |
-| Mean speed, km/h | 34.2 | 37.1 |
+| Trips finished | 7,078 | 7,078 |
+| Median delay, s | 54.3 | 19.5 |
+| Stops per trip | 3.92 | 2.27 |
+| Stopped at signals, vehicle-hours | 68.0 | 13.9 |
+| Mean speed, km/h | 33.7 | 37.0 |
+
+The simulated peak is probably faster than Lahore's real one: on-street parking, pedestrians
+crossing and lane indiscipline are not modelled, and the only published network figure found
+(JICA's master plan) is a daily average above 30 km/h, not a peak-hour speed.
 
 Everything is simulated; rates and parameters that are assumptions are marked as such in the code.
 

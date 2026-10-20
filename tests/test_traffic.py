@@ -96,3 +96,15 @@ def test_committed_traffic_replay_matches_the_current_code():
     text = (ROOT / "viewer" / "traffic_replay.js").read_text(encoding="utf-8")
     meta = json.loads(text[len("window.TRAFFIC = "):].rstrip().rstrip(";"))["meta"]
     assert meta["digest"] == source_digest("traffic"), "run python demo_traffic.py to refresh the replay"
+
+
+def test_a_metre_long_stub_does_not_freeze_the_road(net):
+    """OSM splits roads into stubs a metre long. Looking only one link ahead, a car at the end
+    of a link saw 1.3 m of road (the stub) and stopped for good; 318 vehicles froze behind it
+    on North Avenue and 227 never got onto the map."""
+    trips = make_demand(net, seed=7, minutes=20, per_hour=8000)
+    s = TrafficSim(net, trips, "fixed", minutes=20).run()
+    m = s.metrics()
+    # a late long trip may still be on its way; a gridlock is vehicles standing still
+    assert m["not_yet_entered"] == 0, m
+    assert not [v.id for v in s.active if v.v < 0.5], m
