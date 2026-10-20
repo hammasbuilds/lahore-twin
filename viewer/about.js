@@ -106,6 +106,7 @@ window.TWIN_ABOUT = {
       "Follow a vehicle: the camera rides along, with its route, speed and arrival time; a minimap shows where it is",
       "Signals changing on every approach, a junction inspector with its phase log",
       "Travel time, delay, stops per trip, mean speed and the hotspot list, side by side for both rule sets",
+      "Keys: Space play/pause, ← → a minute, Shift + arrows pan, + − zoom, f follow a vehicle, Esc stop following; Tab reaches every control and hotspot",
     ],
     analysis: "Adaptive signals cut the time vehicles spend stopped at signals by about four-fifths and median delay by about two-thirds on the same trips; the same few junctions stay near the top under both — Allama Shabbir Usmani Road / Kiramat Road and the Main Boulevard Garden Town crossing. Signals here are placed at crossings of named main roads because OpenStreetMap maps only two in the area.",
   },

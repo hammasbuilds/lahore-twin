@@ -48,6 +48,13 @@ const fail = (m) => { throw new Error(m); };
   const note = await page.textContent("#pane-follow");
   if (!/arrived/.test(note)) fail("the hop is not explained in the Follow panel");
   await shot("03-follow-hop");
+  // keyboard only: Tab to a hotspot, Enter opens its junction; Shift+arrow pans
+  await page.click(".tabs button[data-tab=hot]");
+  await page.focus("#pane-hot li[data-sig]"); await page.keyboard.press("Enter"); await page.waitForTimeout(300);
+  if (!(await page.textContent("#pane-junction")).includes("Phase")) fail("Enter on a hotspot did not open its junction");
+  const cx = await T(() => window.__traffic.state.cam.x);
+  await page.locator("body").click({ position: { x: 5, y: 880 } }); await page.keyboard.press("Shift+ArrowRight");
+  if (!((await T(() => window.__traffic.state.cam.x)) > cx)) fail("Shift+Right did not pan the map");
   // a hotspot flies to its junction and the junction panel stays live
   await page.click(".tabs button[data-tab=hot]"); await page.click("#pane-hot li[data-sig]");
   if (!(await page.textContent("#pane-junction")).includes("Phase")) fail("hotspot did not open its junction");

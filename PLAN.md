@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 6 of 10 done |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 7 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -1052,3 +1052,12 @@ hospital rounds, which continue alongside.*
   worst is Allama Shabbir Usmani Road / Kiramat Road under fixed and Ghalib Road / Main
   Boulevard Gulberg under adaptive. *Fixed:* both sentences now say what the data says —
   the same few junctions stay near the top under both.
+
+**Round 7 — no mouse.**
+- *Checked:* Space, ← →, + −, f and Esc all do what they say; every header control is
+  in the Tab order with a visible focus ring.
+- *Found:* the hotspot list was plain list items — a keyboard user could not open a
+  junction — and there was no way to pan the map without dragging. *Fixed:* hotspots
+  are focusable buttons (Enter or Space flies there), Shift + arrows pan a quarter
+  screen, and the keys are listed in the module's About panel. The traffic UI check now
+  opens a junction with Enter and pans with Shift + →.

@@ -318,7 +318,7 @@
     let html = `<h3>Worst signalised junctions · ${MODE_NAMES[state.mode]}</h3><p class="note">Vehicle-hours spent stopped within 60 m of the junction over the whole peak. Click one to fly there.</p><ul class="hot">`;
     for (const [name, vh] of m.worst_junctions) {
       const sig = R.signal_sites.find((s) => s.name === name);
-      html += `<li data-sig="${sig ? sig.id : ""}"><span>${esc(name)}</span><b class="num">${vh.toFixed(2)} veh-h</b></li>`;
+      html += `<li data-sig="${sig ? sig.id : ""}" tabindex="0" role="button" aria-label="Fly to ${esc(name)}"><span>${esc(name)}</span><b class="num">${vh.toFixed(2)} veh-h</b></li>`;
     }
     html += `</ul><p class="note">${R.signal_sites.length} signals. OpenStreetMap maps only a couple of signals here, so signals are placed at at-grade crossings of named secondary-or-bigger roads; the Canal Road corridor runs signal-free through its underpasses.</p>`;
     $("pane-hot").innerHTML = html;
@@ -467,6 +467,8 @@
   }
   $("follow-random").onclick = () => { const i = pickLong(); if (i != null) follow(i); };
   $("pane-follow").onclick = (e) => { if (e.target.id === "stop-follow") follow(null); };
+  // a keyboard user opens a hotspot with Enter or Space
+  $("pane-hot").onkeydown = (e) => { if ((e.key === "Enter" || e.key === " ") && e.target.closest("li[data-sig]")) { e.preventDefault(); e.target.click(); } };
   $("pane-hot").onclick = (e) => {
     const li = e.target.closest("li[data-sig]"); if (!li || li.dataset.sig === "") return;
     const sig = R.signal_sites.find((s) => s.id === +li.dataset.sig); state.sel = sig.id;
@@ -521,6 +523,13 @@
   document.addEventListener("keydown", (e) => {
     if (["INPUT", "SELECT", "TEXTAREA"].includes(e.target.tagName)) return;
     if (e.code === "Space" && e.target.tagName !== "BUTTON") { e.preventDefault(); $("play").click(); }
+    if (e.shiftKey && e.key.startsWith("Arrow")) {        // Shift + arrows pan the map a quarter screen
+      e.preventDefault(); state.follow = null;
+      const d = 0.25 / state.cam.z;
+      if (e.key === "ArrowLeft") state.cam.x -= W * d; if (e.key === "ArrowRight") state.cam.x += W * d;
+      if (e.key === "ArrowUp") state.cam.y -= H * d; if (e.key === "ArrowDown") state.cam.y += H * d;
+      frame(true); return;
+    }
     if (e.key === "ArrowRight") { state.t = Math.min(R.meta.t1 - 1, state.t + 60); frame(true); }
     if (e.key === "ArrowLeft") { state.t = Math.max(0, state.t - 60); frame(true); }
     if (e.key === "+" || e.key === "=") $("zin").click();
