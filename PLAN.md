@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 2 of 10 done |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 3 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -992,3 +992,20 @@ hospital rounds, which continue alongside.*
   their English forms. The signal count did not change (33), so no false crossing had
   been created; the hotspot list now reads "Canal Bank Road / Chaudhary Ali Anwar Road".
 - Phone: no sideways scroll; the underpass reads as dashed and dimmed; light theme fine.
+
+**Round 3 — three more mornings, three demand levels.**
+- *Added:* `tools/sweep_traffic.py` — seeds 11–13 × 4,000 / 8,000 / 12,000 trips an
+  hour × both rule sets; invariants: nobody gridlocked, nobody left off the map, nobody
+  faster than road (×1.05) or vehicle allows, adaptive never holds vehicles at signals
+  longer than fixed.
+- *First run, 6 "problems" — none a bug:* the invariant was "standing still at the
+  end". At 4,000 trips an hour the single "stuck" car had waited 50 s at a red light
+  when the run ended; at 12,000 with fixed signals 672 vehicles were still on the map,
+  none of them still for more than five minutes — the network over capacity and
+  draining, not locked. *Fixed the measure, not the model:* each vehicle records when
+  it last came to a standstill; "gridlocked" means still for over five minutes, in the
+  sweep, the regression test (which could have failed on a red light) and the Compare
+  tab.
+- *Second run: 0 problems.* Adaptive beats fixed at every load; at 12,000 trips an hour
+  fixed signals leave about 600 vehicles draining after the 15-minute clearance and
+  adaptive about a tenth of that, with median delay 82–84 s → 41–48 s. In the README.

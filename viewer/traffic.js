@@ -348,11 +348,11 @@
   }
   const ROWS = [["Trips", "trips"], ["Finished", "completed"], ["Median travel time, s", "travel_time_median_s"], ["Median delay, s", "delay_median_s"],
     ["Mean delay, s", "delay_mean_s"], ["Total delay, vehicle-hours", "delay_total_veh_h"], ["Stops per trip", "stops_mean"], ["Mean speed, km/h", "speed_mean_kmh"],
-    ["Stopped at signals, vehicle-hours", "signal_delay_veh_h"], ["Still driving at the end", "still_driving"], ["Never got onto the road", "not_yet_entered"]];
+    ["Stopped at signals, vehicle-hours", "signal_delay_veh_h"], ["Still driving at the end", "still_driving"], ["Gridlocked (still for 5+ min)", "gridlocked"], ["Never got onto the road", "not_yet_entered"]];
   function renderCompare() {
     const f = R.modes.fixed.metrics, a = R.modes.adaptive.metrics;
     let html = `<h3>Same vehicles, same morning</h3><table class="cmp"><tr><th></th><th>Fixed</th><th>Adaptive</th></tr>`;
-    const better = { travel_time_median_s: -1, delay_median_s: -1, delay_mean_s: -1, delay_total_veh_h: -1, stops_mean: -1, speed_mean_kmh: 1, signal_delay_veh_h: -1, completed: 1, still_driving: -1, not_yet_entered: -1 };
+    const better = { travel_time_median_s: -1, delay_median_s: -1, delay_mean_s: -1, delay_total_veh_h: -1, stops_mean: -1, speed_mean_kmh: 1, signal_delay_veh_h: -1, completed: 1, still_driving: -1, gridlocked: -1, not_yet_entered: -1 };
     for (const [label, key] of ROWS) {
       const x = f[key], y = a[key], dir = better[key];
       const bx = dir && x !== y && (dir < 0 ? x < y : x > y), by = dir && x !== y && !bx;

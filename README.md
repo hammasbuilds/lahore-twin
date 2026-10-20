@@ -35,6 +35,7 @@ python demo_home.py          # home      — viewer/home_replay.js
 python demo_hospital.py      # hospital  — viewer/hospital_replay.js
 python demo_traffic.py       # traffic   — viewer/traffic_replay.js
 python -m pytest -q          # 90 tests
+python tools/sweep_traffic.py # traffic invariants over 3 mornings x 3 demand levels (~10 min)
 ```
 
 Python 3.10+, standard library only. No network: the map data ships in `plans/osm/`.
@@ -133,6 +134,12 @@ Traffic, the same 7,078 trips in an hour of morning peak:
 | Stops per trip | 3.92 | 2.27 |
 | Stopped at signals, vehicle-hours | 68.0 | 13.9 |
 | Mean speed, km/h | 33.7 | 37.0 |
+
+Over three other mornings at 4,000, 8,000 and 12,000 trips an hour (`tools/sweep_traffic.py`),
+nobody is gridlocked, nobody exceeds the road's or the vehicle's speed, and adaptive signals
+beat fixed ones at every load. At 12,000 trips an hour fixed signals cannot clear the queues
+in the 15 minutes after the peak (about 600 vehicles still draining); adaptive signals halve
+median delay (82–84 s → 41–48 s) and leave about a tenth as many.
 
 The simulated peak is probably faster than Lahore's real one: on-street parking, pedestrians
 crossing and lane indiscipline are not modelled, and the only published network figure found

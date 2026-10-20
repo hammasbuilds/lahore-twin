@@ -38,7 +38,7 @@ MIN_GREEN, MAX_GREEN, GAP_OUT, DETECT = 8, 55, 3, 40.0
 
 class Vehicle:
     __slots__ = ("id", "kind", "route", "ri", "lane", "pos", "v", "v0f", "T", "s0", "a", "b", "L", "cap",
-                 "t0", "tin", "free", "stops", "stopped", "done", "samples", "next_lc", "acc", "wait")
+                 "t0", "tin", "free", "stops", "stopped", "done", "samples", "next_lc", "acc", "wait", "still_since")
 
     def __init__(self, vid, kind, route, t0, free):
         _, L, v0f, T, s0, a, b, cap = KINDS[kind]
@@ -46,6 +46,7 @@ class Vehicle:
         self.pos, self.v, self.v0f, self.T, self.s0, self.a, self.b, self.L, self.cap = 0.0, 0.0, v0f, T, s0, a, b, L, cap
         self.t0, self.tin, self.free, self.stops, self.stopped, self.done = t0, None, free, 0, False, None
         self.samples, self.next_lc, self.acc, self.wait = [], 0, 0.0, 0
+        self.still_since = None              # when it last came to a standstill (None while moving)
 
 
 @dataclass
@@ -314,12 +315,16 @@ class TrafficSim:
             nv = max(0.0, veh.v + veh.acc * DT)
             veh.pos += (veh.v + nv) / 2 * DT
             if nv < 0.5:
+                if veh.still_since is None:
+                    veh.still_since = t
                 veh.wait += 1
                 if not veh.stopped and veh.v >= 0.5:
                     veh.stops += 1
                 veh.stopped = True
             elif nv > 2.0:
                 veh.stopped = False
+            if nv >= 0.5:
+                veh.still_since = None
             veh.v = nv
             lk = self.links[veh.route[veh.ri]]
             if nv < 0.5 and lk.length - veh.pos < 60:
@@ -412,6 +417,8 @@ class TrafficSim:
         hot = sorted(((d, self.signals[i].name if i < len(self.signals) else str(i)) for i, d in self.junction_delay.items()), reverse=True)
         return {
             "trips": len(self.vehicles), "completed": len(done), "still_driving": len(self.active),
+            # a red light holds a vehicle for a minute or so; five minutes without moving is a gridlock
+            "gridlocked": sum(1 for v in self.active if v.still_since is not None and self.t - v.still_since > 300),
             "not_yet_entered": sum(len(q) for q in self.waiting.values()),
             "travel_time_median_s": med(tt), "delay_median_s": med(delay),
             "delay_mean_s": round(sum(delay) / len(delay), 1) if delay else None,

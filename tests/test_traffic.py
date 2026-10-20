@@ -105,6 +105,7 @@ def test_a_metre_long_stub_does_not_freeze_the_road(net):
     trips = make_demand(net, seed=7, minutes=20, per_hour=8000)
     s = TrafficSim(net, trips, "fixed", minutes=20).run()
     m = s.metrics()
-    # a late long trip may still be on its way; a gridlock is vehicles standing still
+    # a late long trip may still be on its way and a car may be at a red light; a gridlock
+    # is a vehicle that has not moved for five minutes
     assert m["not_yet_entered"] == 0, m
-    assert not [v.id for v in s.active if v.v < 0.5], m
+    assert m["gridlocked"] == 0, m
