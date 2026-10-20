@@ -20,11 +20,22 @@ function bisectRight(arr, x, key) {
   return lo;
 }
 
+// floor-change segments (stairs, lifts, ramps) and their real lengths, from plan.portal_hops;
+// the walker waits where they got on, then appears where they get off, as in the simulator
+const HOPS = new Map();
+const hopKey = (ax, ay, bx, by) => [ax, ay, bx, by].map((v) => Math.round(v * 1000) / 1000).join(",");
+function setHops(list) {
+  HOPS.clear();
+  for (const [ax, ay, bx, by, m] of list || []) HOPS.set(hopKey(ax, ay, bx, by), m);
+}
+
 function pointAlong(pts, dist) {
   for (let i = 0; i < pts.length - 1; i++) {
     const [ax, ay] = pts[i], [bx, by] = pts[i + 1];
-    const seg = Math.hypot(bx - ax, by - ay);
+    const hop = HOPS.get(hopKey(ax, ay, bx, by));
+    const seg = hop != null ? hop : Math.hypot(bx - ax, by - ay);
     if (dist <= seg) {
+      if (hop != null) return [ax, ay, true];
       const f = seg ? dist / seg : 0;
       return [ax + (bx - ax) * f, ay + (by - ay) * f, true];
     }
@@ -110,5 +121,5 @@ function energyUpTo(series, idx) {
   return kwh;
 }
 
-const TwinCore = { bisectRight, pointAlong, buildIndex, personAt, labelAt, deviceAt, whyChain, clock, energyUpTo, seriesIndex };
+const TwinCore = { bisectRight, pointAlong, setHops, buildIndex, personAt, labelAt, deviceAt, whyChain, clock, energyUpTo, seriesIndex };
 if (typeof module !== "undefined") module.exports = TwinCore;

@@ -27,4 +27,11 @@ assert.strictEqual(core.deviceAt(IX.modes.m, "r", "light", 450).on, false);
 assert.deepStrictEqual(core.whyChain(IX.modes.m, 7).map((m) => m.id), [7, 5]);
 assert.deepStrictEqual(core.whyChain(IX.modes.m, 9).map((m) => m.id), [9], "missing cause ends the chain");
 assert.strictEqual(core.clock(9 * 3600 + 5 * 60 + 59), "09:05");
+// a stair hop drawn 40 m across the page but 8 m long: the walker waits at the bottom, then appears at the top
+core.setHops([[2, 0, 42, 0, 8]]);
+const up = [[0, 0], [2, 0], [42, 0], [45, 0]];
+assert.deepStrictEqual(core.pointAlong(up, 6).slice(0, 2), [2, 0], "on the stairs: shown where they got on");
+assert.deepStrictEqual(core.pointAlong(up, 11).slice(0, 2), [43, 0], "2 m + 8 m of stairs + 1 m");
+core.setHops([]);
+assert.deepStrictEqual(core.pointAlong(up, 11).slice(0, 2), [11, 0], "without the hop it is a straight line");
 console.log("viewer core ok");

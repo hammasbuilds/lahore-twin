@@ -239,8 +239,13 @@ def build(ed_plan, ward_plan, seed: int = 7) -> HospitalScenario:
     put("pump", "ed", ed_plan, [(25.6, 6.2), (26.6, 6.2), (27.4, 6.2), (28.2, 12.2), (28.2, 24.2), (25.5, 41)])
     put("wheelchair", "ed", ed_plan, [(23, 46.5), (24, 46.5), (21, 48.5), (12, 9.6), (24.5, 30)])
     put("trolley", "ed", ed_plan, [(28, 46.5), (29.5, 46.5), (23.5, 42.5)])
-    put("pump", "ward", ward_plan, [(29, 33.5), (30, 33.5), (31, 33.5), (2.4, 3.5), (16.8, 13.5), (14.5, 21.5), (17.5, 25), (7.2, 31.5)])
-    put("wheelchair", "ward", ward_plan, [(36.5, 13.5), (32.5, 30)])
+    # four spare pumps wait in the basement central store under the ED
+    bx, by = next(f["origin"] for f in ed_plan.floors if f["id"] == "B1")
+    put("pump", "ed", ed_plan, [(bx + 2.5, by + 3), (bx + 3.5, by + 3), (bx + 4.5, by + 3), (bx + 5.5, by + 3)])
+    wx, wy = next(f["origin"] for f in ward_plan.floors if f["id"] == "2")
+    put("pump", "ward", ward_plan, [(wx + x, wy + y) for x, y in
+                                     [(29, 33.5), (30, 33.5), (31, 33.5), (2.4, 3.5), (16.8, 13.5), (14.5, 21.5), (17.5, 25), (7.2, 31.5)]])
+    put("wheelchair", "ward", ward_plan, [(wx + 36.5, wy + 13.5), (wx + 32.5, wy + 30)])
     del sh
     return HospitalScenario(seed, staff, pats, wps, beds, alarms, calls, fridge, assets)
 

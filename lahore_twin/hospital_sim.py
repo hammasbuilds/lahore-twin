@@ -29,15 +29,15 @@ from .bus import Bus
 from .hospital import DAY, H, HospitalScenario
 from .hospital_site import site
 from .office import clock
-from .plan import Plan, path_length
+from .plan import Plan, is_portal, path_length, seg_len
 
 MODES = ("today", "connected")
 PATIENT_ROOMS = {"bay", "hdu", "side", "cubicle", "resus", "treat"}
 COLOUR_PRIO = {"red": 0, "orange": 1, "yellow": 2, "green": 3, "blue": 4}
 ALARM_DELAY = 15
-SEARCH_ORDER = {"ed": ["store", "amb", "majors", "resus", "xray", "waiting", "minors", "m1", "m2", "m3", "m4", "m5", "m6"],
+SEARCH_ORDER = {"ed": ["store", "amb", "majors", "resus", "xray", "waiting", "minors", "m1", "m2", "m3", "m4", "m5", "m6",
+                       "b_store"],
                 "ward": ["store", "corridor", "station", "bay_a", "bay_b", "bay_c", "hdu", "side1", "side2", "lobby"]}
-STORE = {"ed": (26.2, 7.0), "ward": (31.0, 33.0)}
 
 
 @dataclass
@@ -89,12 +89,16 @@ class Agent:
         budget = self.speed * dt
         while budget > 0 and self.seg < len(self.path) - 1:
             a, b = self.path[self.seg], self.path[self.seg + 1]
-            left = math.dist(a, b) - self.seg_done
+            length = seg_len(a, b)
+            left = length - self.seg_done
             if budget < left:
                 self.seg_done += budget
                 self.walked += budget
-                f = self.seg_done / math.dist(a, b)
-                self.pos = (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+                if is_portal(a, b):
+                    self.pos = a                 # on the stairs or in the lift
+                else:
+                    f = self.seg_done / length
+                    self.pos = (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
                 return False
             budget -= left
             self.walked += left
@@ -341,7 +345,12 @@ class HospitalSim:
                 tk.meta["pspot"] = tuple(self.plans["ed"].spots["triage_patient"][0 if a.base[0] < 7 else 1])
             self.say(a, tk.meta.get("label", tk.kind))
             if tk.asset:
-                got = yield from self.fetch(a, tk.asset, tk.unit if tk.asset != "pump_retrieve" else "ward")
+                if tk.asset == "pump_retrieve":
+                    src = tk.meta.get("source", "ward")
+                    got = yield from self.fetch(a, "pump", "ed" if src == "basement" else "ward",
+                                                floor="B1" if src == "basement" else None)
+                else:
+                    got = yield from self.fetch(a, tk.asset, tk.unit)
                 if got is None and tk.kind == "drip":
                     # no pump anywhere: the drip runs by gravity, counted
                     self.say(a, "No free pump — gravity drip")
@@ -416,7 +425,7 @@ class HospitalSim:
             return
         if tk.kind == "pump_retrieve":
             asset = self.assets[tk.meta["asset_id"]]
-            yield ("go", "ed", STORE["ed"])
+            yield ("go", "ed", self.plans["ed"].spots["store_shelf"][0])
             asset["holder"], asset["pos"], asset["building"] = None, a.pos, "ed"
             asset["room"] = self.plans["ed"].room_at(*a.pos)
             self.asset_moved(asset)
@@ -459,13 +468,12 @@ class HospitalSim:
         return [x for x in self.assets.values()
                 if x["kind"] == kind and x["building"] == building and x["holder"] is None and x["attached"] is None]
 
-    def fetch(self, a: Agent, kind: str, building: str):
-        kind = "pump" if kind == "pump_retrieve" else kind
+    def fetch(self, a: Agent, kind: str, building: str, floor: str | None = None):
         plan = self.plans[building]
         t0, start, start_bld, walked0 = self.t, a.pos, a.building, a.walked
         found = None
         if self.conn:
-            cands = self.free_assets(kind, building)
+            cands = [x for x in self.free_assets(kind, building) if floor is None or plan.floor_at(*x["pos"]) == floor]
             if cands:
                 if a.building == building:
                     found = min(cands, key=lambda x: path_length(plan.route(a.pos, x["pos"])))
@@ -904,15 +912,25 @@ class HospitalSim:
             self.pending_admit.remove(item)
 
     def par_level(self) -> None:
-        """Connected: keep at least two free pumps in the ED by fetching them back from the ward."""
+        """Connected: keep at least two free pumps on the ED floor, fetched from the basement
+        store first and from the ward when the basement has none."""
         if not self.conn:
             return
-        pending = sum(1 for tk in self.open if tk.kind == "pump_retrieve")
-        if len(self.free_assets("pump", "ed")) + pending < 2 and len(self.free_assets("pump", "ward")) > pending:
-            m = self.bus.publish("hospital/ed/pumps/below_par", len(self.free_assets("pump", "ed")), None,
-                                 "ED below par on infusion pumps — porter sent to the ward")
-            self.task("pump_retrieve", "ed", STORE["ed"], 3, 0, "porter", visible=self.t, asset="pump_retrieve",
-                      cause=m.id, meta={"label": "Bring a pump back from the ward"})
+        ed = self.plans["ed"]
+        pending = [tk for tk in self.open if tk.kind == "pump_retrieve"]
+        on_floor = [x for x in self.free_assets("pump", "ed") if ed.floor_at(*x["pos"]) == "G"]
+        basement = [x for x in self.free_assets("pump", "ed") if ed.floor_at(*x["pos"]) == "B1"]
+        if len(on_floor) + len(pending) >= 2:
+            return
+        source = "basement" if len(basement) > sum(t.meta["source"] == "basement" for t in pending) else \
+            "ward" if len(self.free_assets("pump", "ward")) > sum(t.meta["source"] == "ward" for t in pending) else None
+        if source is None:
+            return
+        m = self.bus.publish("hospital/ed/pumps/below_par", len(on_floor), None,
+                             f"ED below par on infusion pumps — porter sent to the {source}")
+        self.task("pump_retrieve", "ed", ed.spots["store_shelf"][0], 3, 0, "porter", visible=self.t, asset="pump_retrieve",
+                  cause=m.id, meta={"label": f"Bring a pump up from the {source}" if source == "basement"
+                                    else "Bring a pump back from the ward", "source": source})
 
     # ---------------------------------------------------------------- the day
     def _staff_agent(self, s) -> Agent:

@@ -35,7 +35,15 @@
   }
   const modes = Object.fromEntries(Object.entries(R.modes).map(([k, M]) => [k, indexMode(M)]));
 
-  const state = { t: 11 * 3600, mode: "connected", view: "ed", playing: false, speed: 300, sel: null };
+  const state = { t: 11 * 3600, mode: "connected", view: "ed", floor: { ed: "G", ward: "2" }, playing: false, speed: 300, sel: null, follow: null };
+  C.setHops([...(PL.ed.portal_hops || []), ...(PL.ward.portal_hops || [])]);
+  const FLOORS = { ed: PL.ed.floors, ward: PL.ward.floors };
+  function floorOf(b, x, y) {
+    for (const f of FLOORS[b] || []) { const [ox, oy] = f.origin; if (x >= ox && x <= ox + f.size[0] && y >= oy && y <= oy + f.size[1]) return f.id; }
+    return (FLOORS[b] || [{ id: "G" }])[0].id;
+  }
+  const floorDef = (b, id) => FLOORS[b].find((f) => f.id === id);
+  const curFloor = () => floorDef(state.view, state.floor[state.view]);
   try {
     const saved = JSON.parse(localStorage.getItem("hospital-twin") || "{}");
     if (saved.theme) document.documentElement.dataset.theme = saved.theme;
@@ -96,14 +104,17 @@
   function fridgeAt(key, t) { const s = M().fridge[key]; return s[Math.max(0, Math.min(s.length - 1, Math.floor(t / 60)))]; }
 
   // ---- geometry ----
-  function size(v) { return v === "site" ? R.site.size : PL[v].size; }
+  function size(v) { return v === "site" ? R.site.size : curFloor().size; }
+  // plan coordinates -> floor-local -> what the current view draws (null = not on this view)
+  function local(b, x, y) { const f = floorDef(b, floorOf(b, x, y)); return [x - f.origin[0], y - f.origin[1], f.id]; }
   function toView(b, x, y) {
-    if (state.view === b) return [x, y];
+    if (b === "campus") return state.view === "site" ? [x, y] : null;
+    if (!FLOORS[b]) return null;
+    const [lx, ly, fid] = local(b, x, y);
+    if (state.view === b) return fid === state.floor[b] ? [lx, ly] : null;
     if (state.view !== "site") return null;
-    if (b === "campus") return [x, y];
-    if (b === "ed") return [R.site.ed_origin[0] + x, R.site.ed_origin[1] + y];
-    if (b === "ward") { const w = R.site.ward; return [w.origin[0] + w.dx + y, w.origin[1] + w.dy - x]; }
-    return null;
+    if (b === "ed") return [R.site.ed_origin[0] + lx, R.site.ed_origin[1] + ly];
+    const w = R.site.ward; return [w.origin[0] + w.dx + ly, w.origin[1] + w.dy - lx];
   }
   let view = { s: 10, ox: 0, oy: 0 };
   function fit() {
@@ -120,7 +131,15 @@
   // ---- drawing ----
   let hits = [];
   function drawBuilding(b) {
-    const P = PL[b], s = view.s, t = state.t;
+    const F = curFloor(), [fx0, fy0] = F.origin, s = view.s, t = state.t;
+    const onF = (x, y) => floorOf(b, x, y) === F.id;
+    const P = { ...PL[b],
+      rooms: PL[b].rooms.filter((r) => r.floor === F.id).map((r) => ({ ...r, rect: [r.rect[0] - fx0, r.rect[1] - fy0, r.rect[2] - fx0, r.rect[3] - fy0] })),
+      furniture: (PL[b].furniture || []).filter((f) => onF(f.rect[0], f.rect[1])).map((f) => ({ ...f, rect: [f.rect[0] - fx0, f.rect[1] - fy0, f.rect[2], f.rect[3]] })),
+      labels: (PL[b].labels || []).filter((l) => onF(l.at[0], l.at[1])).map((l) => ({ ...l, at: [l.at[0] - fx0, l.at[1] - fy0] })),
+      doors: PL[b].doors.filter((d) => ROOMS[b][d.a].floor === F.id).map((d) => ({ ...d, at: d.at - (d.axis === "x" ? fy0 : fx0), lo: d.lo - (d.axis === "x" ? fx0 : fy0), hi: d.hi - (d.axis === "x" ? fx0 : fy0) })),
+      size: F.size };
+    const LROOMS = Object.fromEntries(P.rooms.map((r) => [r.id, r]));
     for (const r of P.rooms) {
       const [x0, y0, x1, y1] = r.rect;
       ctx.fillStyle = r.kind === "outdoor" ? palette["floor-out"] : r.kind === "corridor" ? rgba(palette.muted, 0.08) : palette.floor;
@@ -131,12 +150,23 @@
     ctx.strokeStyle = palette.wall; ctx.lineWidth = Math.max(1, s * 0.12);
     for (const r of P.rooms) { if (r.kind === "outdoor") continue; const [x0, y0, x1, y1] = r.rect; ctx.strokeRect(X(x0), Y(y0), (x1 - x0) * s, (y1 - y0) * s); }
     for (const d of P.doors) {
-      ctx.strokeStyle = ROOMS[b][d.a].kind === "outdoor" || ROOMS[b][d.b].kind === "outdoor" ? palette["floor-out"] : palette.floor;
+      ctx.strokeStyle = (LROOMS[d.a] || {}).kind === "outdoor" || (LROOMS[d.b] || {}).kind === "outdoor" ? palette["floor-out"] : palette.floor;
       ctx.lineWidth = Math.max(1.5, s * 0.16); ctx.beginPath();
       if (d.axis === "x") { ctx.moveTo(X(d.lo + 0.05), Y(d.at)); ctx.lineTo(X(d.hi - 0.05), Y(d.at)); } else { ctx.moveTo(X(d.at), Y(d.lo + 0.05)); ctx.lineTo(X(d.at), Y(d.hi - 0.05)); }
       ctx.stroke();
     }
     if (P.outline) { ctx.strokeStyle = palette.wall; ctx.lineWidth = Math.max(1.5, s * 0.22); poly(P.outline); ctx.stroke(); }
+    // lifts and stairs on this floor
+    for (const pt of PL[b].portals || []) {
+      const at = pt.at[F.id]; if (!at) continue;
+      const x = X(at[0] - fx0), y = Y(at[1] - fy0), r = Math.max(7, s * 0.6);
+      ctx.fillStyle = palette["panel-2"]; ctx.strokeStyle = palette.accent; ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.rect(x - r, y - r, 2 * r, 2 * r); ctx.fill(); ctx.stroke();
+      ctx.fillStyle = palette.accent; ctx.font = `700 ${Math.max(8, r * 0.9)}px Segoe UI`; ctx.textAlign = "center"; ctx.textBaseline = "middle";
+      ctx.fillText(pt.kind === "lift" ? "⇅" : "▤", x, y + 0.5);
+      const others = Object.keys(pt.at).filter((f) => f !== F.id).join(", ");
+      hits.push({ type: "portal", id: pt.id, x, y, r: r + 2, text: `${pt.kind === "lift" ? "Lift" : "Stairs"} to ${others}` });
+    }
     ctx.textAlign = "center"; ctx.textBaseline = "top";
     for (const r of P.rooms) {
       const [x0, y0, x1, y1] = r.rect, name = (s * (x1 - x0) < 70 && P.short_names[r.id]) || r.name;
@@ -148,8 +178,8 @@
     // beds and chairs
     const calls = new Set(openCalls(t).map((c) => c.bed)), alarms = openAlarms(t);
     for (const [id, bd] of Object.entries(R.beds)) {
-      if (bd.unit !== b) continue;
-      const st = bedAt(id, t), [bx, by] = bd.spot, chair = id.startsWith("chair");
+      if (bd.unit !== b || !onF(bd.spot[0], bd.spot[1])) continue;
+      const st = bedAt(id, t), [bx, by] = [bd.spot[0] - fx0, bd.spot[1] - fy0], chair = id.startsWith("chair");
       const w = chair ? 0.7 : 0.95, h = chair ? 0.7 : 1.9;
       const rec = st.state === "occupied" || st.state === "reserved" ? null : null;
       ctx.lineWidth = 1.4;
@@ -171,7 +201,9 @@
       void rec;
     }
     // fridge chip
-    const fkey = b === "ed" ? "ed" : "ward", fspot = b === "ed" ? P.spots.fridge[0] : P.spots.meds_fridge[0];
+    const fkey = b === "ed" ? "ed" : "ward", fg = b === "ed" ? P.spots.fridge[0] : P.spots.meds_fridge[0];
+    if (!onF(fg[0], fg[1])) return;
+    const fspot = [fg[0] - fx0, fg[1] - fy0];
     const T = fridgeAt(fkey, t), over = T > 8;
     ctx.font = "600 11px Segoe UI, system-ui"; ctx.textBaseline = "middle"; ctx.textAlign = "left";
     const txt = `${T.toFixed(1)} °C`, tw = ctx.measureText(txt).width + 12;
@@ -192,8 +224,8 @@
     // the two simulated floors inside their footprints
     ctx.strokeStyle = rgba(palette.accent, 0.55); ctx.lineWidth = 0.6;
     for (const b of ["ed", "ward"]) for (const r of PL[b].rooms) {
-      if (r.kind === "outdoor") continue;
-      const [x0, y0, x1, y1] = r.rect, c = [[x0, y0], [x1, y0], [x1, y1], [x0, y1]].map(([x, y]) => toView(b, x, y));
+      if (r.kind === "outdoor" || r.floor !== (b === "ed" ? "G" : "2")) continue;
+      const [x0, y0, x1, y1] = r.rect, c = [[x0 + 0.01, y0 + 0.01], [x1 - 0.01, y0 + 0.01], [x1 - 0.01, y1 - 0.01], [x0 + 0.01, y1 - 0.01]].map(([x, y]) => toView(b, x, y));
       ctx.beginPath(); c.forEach(([x, y], k) => (k ? ctx.lineTo(X(x), Y(y)) : ctx.moveTo(X(x), Y(y)))); ctx.closePath(); ctx.stroke();
     }
     ctx.strokeStyle = palette.accent; ctx.lineWidth = 2; ctx.setLineDash([5, 5]); poly(S.path, false); ctx.stroke(); ctx.setLineDash([]);
@@ -337,6 +369,7 @@
       const a = M().agents[sel.id]; if (!a) { body.innerHTML = ""; return; }
       const at = agentAt(a, t), rec = M().rec[a.id];
       html += `<h3>${esc(a.name)} · ${ROLE_NAMES[a.role]}${a.unit ? ` (${a.unit === "ed" ? "Emergency" : "Ward"})` : ""}</h3>`;
+      html += `<button class="btn" id="follow-btn" style="margin:2px 0 8px">${state.follow === a.id ? "Stop following" : "Follow on the map"}</button>`;
       html += `<div class="row"><span>Now</span><b>${esc(labelAt(a, t) || (at ? "" : "Not here"))}</b></div>`;
       if (at) html += `<div class="row"><span>Where</span><b>${esc(at.b === "campus" ? "Crossing the campus" : roomName(at.b, at.x, at.y))}</b></div>`;
       if (rec) {
@@ -452,6 +485,7 @@
   let lastPanel = 0;
   function frame(force) {
     $("clock").textContent = C.clock(state.t); scrub.value = state.t;
+    followCamera(); renderFloors();
     draw(); renderTimeline(); kpis();
     const nowT = performance.now();
     if (force || nowT - lastPanel > 300) {
@@ -479,10 +513,31 @@
     if (name === "compare") renderCompare();
     frame(true);
   }
-  function setView(v) {
+  function renderFloors() {
+    const box = $("floors");
+    if (state.view === "site") { box.style.display = "none"; return; }
+    box.style.display = "";
+    const t = state.t, count = {};
+    for (const a of Object.values(M().agents)) { const at = agentAt(a, t); if (at && at.b === state.view) { const f = floorOf(at.b, at.x, at.y); count[f] = (count[f] || 0) + 1; } }
+    const fl = [...FLOORS[state.view]].sort((p, q) => q.level - p.level);
+    const html = fl.map((f) => `<button data-floor="${f.id}" aria-pressed="${f.id === state.floor[state.view]}" title="${esc(f.name)}: ${count[f.id] || 0} people now">${f.id} <span class="muted num">(${count[f.id] || 0})</span></button>`).join("");
+    if (box.dataset.html !== html) { box.innerHTML = html; box.dataset.html = html; }
+  }
+  function setFloor(f) { state.floor[state.view] = f; fit(); frame(true); }
+  function setView(v, floor) {
     state.view = v;
+    if (floor) state.floor[v] = floor;
     for (const x of document.querySelectorAll("#views button")) x.setAttribute("aria-pressed", x.dataset.view === v);
     fit(); renderLegend(); save(); frame(true);
+  }
+  // follow mode: keep the selected person on screen across buildings and floors, like a game map
+  function followCamera() {
+    if (!state.follow) return;
+    const a = M().agents[state.follow], at = a && agentAt(a, state.t);
+    if (!at) return;
+    if (at.b === "campus") { if (state.view !== "site") setView("site"); return; }
+    const f = floorOf(at.b, at.x, at.y);
+    if (state.view !== at.b || state.floor[at.b] !== f) setView(at.b, f);
   }
 
   $("play").onclick = () => { if (state.t >= 86399) state.t = 0; setPlaying(!state.playing); };
@@ -492,7 +547,8 @@
     b.setAttribute("aria-pressed", b.dataset.mode === state.mode);
     b.onclick = () => { state.mode = b.dataset.mode; for (const x of document.querySelectorAll("#modes button")) x.setAttribute("aria-pressed", x === b); lastLogKey = ""; save(); fillFinder(); frame(true); };
   }
-  for (const b of document.querySelectorAll("#views button")) b.onclick = () => setView(b.dataset.view);
+  for (const b of document.querySelectorAll("#views button")) b.onclick = () => { state.follow = null; setView(b.dataset.view); };
+  $("floors").onclick = (e) => { const b = e.target.closest("button[data-floor]"); if (b) { state.follow = null; setFloor(b.dataset.floor); } };
   for (const b of document.querySelectorAll(".tabs button")) b.onclick = () => showTab(b.dataset.tab);
   $("only-key").onchange = () => renderLog(true);
   const select = (sel) => { state.sel = sel; showTab("inspect"); };
@@ -500,7 +556,10 @@
   $("pane-board").onclick = (e) => { const tr = e.target.closest("tr[data-agent]"); if (tr) select({ type: "agent", id: tr.dataset.agent }); };
   $("pane-beds").onclick = (e) => { const d = e.target.closest("[data-bed]"); if (d) select({ type: "bed", id: d.dataset.bed }); };
   $("pane-kit").onclick = (e) => { const tr = e.target.closest("tr[data-asset]"); if (tr) select({ type: "asset", id: tr.dataset.asset }); };
-  $("inspect-body").onclick = (e) => { const d = e.target.closest("[data-msg]"); if (d) select({ type: "msg", id: +d.dataset.msg }); };
+  $("inspect-body").onclick = (e) => {
+    if (e.target.id === "follow-btn" && state.sel && state.sel.type === "agent") { state.follow = state.follow === state.sel.id ? null : state.sel.id; frame(true); return; }
+    const d = e.target.closest("[data-msg]"); if (d) select({ type: "msg", id: +d.dataset.msg });
+  };
   $("find").onchange = (e) => { const v = e.target.value; if (!v) return; const [type, id] = v.split(/:(.*)/s); state.sel = { type, id }; frame(true); };
   $("theme").onclick = () => { const d = document.documentElement.dataset.theme !== "light"; document.documentElement.dataset.theme = d ? "light" : "dark"; $("theme").textContent = d ? "Dark" : "Light"; readPalette(); renderLegend(); save(); if ($("pane-compare").classList.contains("on")) renderCompare(); frame(true); };
   function pick(ev) {
@@ -510,10 +569,15 @@
     if (best) return { type: best.type, id: best.id };
     if (state.view === "site") return null;
     const wx = (mx - view.ox) / view.s, wy = (my - view.oy) / view.s;
-    for (const [id, b] of Object.entries(R.beds)) if (b.unit === state.view && Math.abs(wx - b.spot[0]) < 0.6 && Math.abs(wy - b.spot[1]) < 1.0) return { type: "bed", id };
+    const [gx, gy] = [wx + curFloor().origin[0], wy + curFloor().origin[1]];
+    for (const [id, b] of Object.entries(R.beds)) if (b.unit === state.view && Math.abs(gx - b.spot[0]) < 0.6 && Math.abs(gy - b.spot[1]) < 1.0) return { type: "bed", id };
     return null;
   }
-  cv.addEventListener("click", (ev) => { const p = pick(ev); if (p) select(p); else { state.sel = null; frame(true); } });
+  cv.addEventListener("click", (ev) => {
+    const p = pick(ev);
+    if (p && p.type === "portal") return;
+    if (p) select(p); else { state.sel = null; frame(true); }
+  });
   cv.addEventListener("mousemove", (ev) => {
     const p = pick(ev), tip = $("tip"); if (!p) { tip.style.display = "none"; return; }
     const rect = cv.getBoundingClientRect(), t = state.t; let html = "";
@@ -521,6 +585,7 @@
     else if (p.type === "asset") { const at = assetAt(p.id, t); html = `<b>${esc(p.id)}</b><br><span class="muted">${at && at.holder ? "with " + esc(M().agents[at.holder].name) : "here"}</span>`; }
     else if (p.type === "bed") { const st = bedAt(p.id, t); html = `<b>${esc(p.id)}</b><br><span class="muted">${st.state} since ${C.clock(st.since)}</span>`; }
     else if (p.type === "fridge") html = `<b>Medicine fridge</b><br><span class="muted">${fridgeAt(p.id, t).toFixed(1)} °C</span>`;
+    else if (p.type === "portal") html = `<b>${esc(hits.find((h) => h.id === p.id).text)}</b>`;
     tip.innerHTML = html; tip.style.display = "block";
     tip.style.left = Math.min(ev.clientX - rect.left + 14, rect.width - tip.offsetWidth - 6) + "px";
     tip.style.top = Math.min(ev.clientY - rect.top + 14, rect.height - tip.offsetHeight - 6) + "px";
@@ -539,5 +604,5 @@
   $("theme").textContent = document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
   for (const x of document.querySelectorAll("#views button")) x.setAttribute("aria-pressed", x.dataset.view === state.view);
   readPalette(); fit(); fillFinder(); renderLegend(); frame(true); requestAnimationFrame(loop);
-  window.__hosp = { state, frame, showTab, setView, hits: () => hits, agentAt, assetAt, bedAt, openAlarms, openCalls, get modes() { return modes; } };
+  window.__hosp = { state, frame, showTab, setView, setFloor, floorOf, hits: () => hits, agentAt, assetAt, bedAt, openAlarms, openCalls, get modes() { return modes; } };
 })();

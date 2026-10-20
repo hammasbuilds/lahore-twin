@@ -1,101 +1,1352 @@
 {
-  "name": "Lahore General Hospital — Emergency Department (ground floor)",
+  "name": "Lahore General Hospital — Emergency block (ground floor + basement)",
   "units": "metres; outline from OpenStreetMap way 706568994 rotated 17.5 degrees square; interior designed",
-  "size": [31, 58],
-  "outline": [[0, 0], [14.5, 0], [14.5, 3.5], [26, 3.5], [28, 4.5], [30, 6.5], [30.5, 8.5], [31, 50], [0.5, 50]],
+  "size": [
+    31,
+    58
+  ],
+  "outline": [
+    [
+      0,
+      0
+    ],
+    [
+      14.5,
+      0
+    ],
+    [
+      14.5,
+      3.5
+    ],
+    [
+      26,
+      3.5
+    ],
+    [
+      28,
+      4.5
+    ],
+    [
+      30,
+      6.5
+    ],
+    [
+      30.5,
+      8.5
+    ],
+    [
+      31,
+      50
+    ],
+    [
+      0.5,
+      50
+    ]
+  ],
   "rooms": [
-    {"id": "doctors", "name": "Doctors' room", "kind": "staff", "rect": [0.5, 0, 14.5, 4]},
-    {"id": "spine", "name": "Corridor", "kind": "corridor", "rect": [13.5, 4, 16.5, 40]},
-    {"id": "xray", "name": "X-ray", "kind": "imaging", "rect": [0.5, 4, 13.5, 11]},
-    {"id": "lab", "name": "Sample lab", "kind": "lab", "rect": [0.5, 11, 13.5, 14.5]},
-    {"id": "minors", "name": "Minors", "kind": "treat", "rect": [0.5, 14.5, 13.5, 26]},
-    {"id": "iso", "name": "Isolation", "kind": "treat", "rect": [0.5, 26, 13.5, 30]},
-    {"id": "triage1", "name": "Triage 1", "kind": "triage", "rect": [0.5, 30, 7, 35]},
-    {"id": "triage2", "name": "Triage 2", "kind": "triage", "rect": [7, 30, 13.5, 35]},
-    {"id": "reg", "name": "Registration", "kind": "public", "rect": [0.5, 35, 13.5, 50]},
-    {"id": "waiting", "name": "Waiting hall", "kind": "public", "rect": [13.5, 40, 22, 50]},
-    {"id": "wc", "name": "Toilets", "kind": "wc", "rect": [16.5, 34, 22, 40]},
-    {"id": "clean", "name": "Clean utility", "kind": "utility", "rect": [16.5, 4, 20.5, 9]},
-    {"id": "dirty", "name": "Dirty utility", "kind": "utility", "rect": [20.5, 4, 24.5, 9]},
-    {"id": "store", "name": "Equipment store", "kind": "store", "rect": [24.5, 5, 28, 9]},
-    {"id": "majors", "name": "Majors", "kind": "treat_floor", "rect": [16.5, 9, 26.5, 34]},
-    {"id": "m1", "name": "Majors 1", "kind": "cubicle", "rect": [26.5, 9, 30.5, 13]},
-    {"id": "m2", "name": "Majors 2", "kind": "cubicle", "rect": [26.5, 13, 30.5, 17]},
-    {"id": "m3", "name": "Majors 3", "kind": "cubicle", "rect": [26.5, 17, 30.5, 21]},
-    {"id": "m4", "name": "Majors 4", "kind": "cubicle", "rect": [26.5, 21, 30.5, 25]},
-    {"id": "m5", "name": "Majors 5", "kind": "cubicle", "rect": [26.5, 25, 30.5, 29]},
-    {"id": "m6", "name": "Majors 6", "kind": "cubicle", "rect": [26.5, 29, 30.5, 33]},
-    {"id": "resus", "name": "Resus", "kind": "resus", "rect": [22, 34, 30.5, 44]},
-    {"id": "amb", "name": "Ambulance entrance", "kind": "public", "rect": [22, 44, 30.5, 50]},
-    {"id": "forecourt", "name": "Forecourt", "kind": "outdoor", "rect": [0, 50, 31, 58]}
+    {
+      "id": "doctors",
+      "name": "Doctors' room",
+      "kind": "staff",
+      "rect": [
+        0.5,
+        0,
+        14.5,
+        4
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "spine",
+      "name": "Corridor",
+      "kind": "corridor",
+      "rect": [
+        13.5,
+        4,
+        16.5,
+        40
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "xray",
+      "name": "X-ray",
+      "kind": "imaging",
+      "rect": [
+        0.5,
+        4,
+        13.5,
+        11
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "lab",
+      "name": "Sample lab",
+      "kind": "lab",
+      "rect": [
+        0.5,
+        11,
+        13.5,
+        14.5
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "minors",
+      "name": "Minors",
+      "kind": "treat",
+      "rect": [
+        0.5,
+        14.5,
+        13.5,
+        26
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "iso",
+      "name": "Isolation",
+      "kind": "treat",
+      "rect": [
+        0.5,
+        26,
+        13.5,
+        30
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "triage1",
+      "name": "Triage 1",
+      "kind": "triage",
+      "rect": [
+        0.5,
+        30,
+        7,
+        35
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "triage2",
+      "name": "Triage 2",
+      "kind": "triage",
+      "rect": [
+        7,
+        30,
+        13.5,
+        35
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "reg",
+      "name": "Registration",
+      "kind": "public",
+      "rect": [
+        0.5,
+        35,
+        13.5,
+        50
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "waiting",
+      "name": "Waiting hall",
+      "kind": "public",
+      "rect": [
+        13.5,
+        40,
+        22,
+        50
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "wc",
+      "name": "Toilets",
+      "kind": "wc",
+      "rect": [
+        16.5,
+        34,
+        22,
+        40
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "clean",
+      "name": "Clean utility",
+      "kind": "utility",
+      "rect": [
+        16.5,
+        4,
+        20.5,
+        9
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "dirty",
+      "name": "Dirty utility",
+      "kind": "utility",
+      "rect": [
+        20.5,
+        4,
+        24.5,
+        9
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "store",
+      "name": "Equipment store",
+      "kind": "store",
+      "rect": [
+        24.5,
+        5,
+        28,
+        9
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "majors",
+      "name": "Majors",
+      "kind": "treat_floor",
+      "rect": [
+        16.5,
+        9,
+        26.5,
+        34
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "m1",
+      "name": "Majors 1",
+      "kind": "cubicle",
+      "rect": [
+        26.5,
+        9,
+        30.5,
+        13
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "m2",
+      "name": "Majors 2",
+      "kind": "cubicle",
+      "rect": [
+        26.5,
+        13,
+        30.5,
+        17
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "m3",
+      "name": "Majors 3",
+      "kind": "cubicle",
+      "rect": [
+        26.5,
+        17,
+        30.5,
+        21
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "m4",
+      "name": "Majors 4",
+      "kind": "cubicle",
+      "rect": [
+        26.5,
+        21,
+        30.5,
+        25
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "m5",
+      "name": "Majors 5",
+      "kind": "cubicle",
+      "rect": [
+        26.5,
+        25,
+        30.5,
+        29
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "m6",
+      "name": "Majors 6",
+      "kind": "cubicle",
+      "rect": [
+        26.5,
+        29,
+        30.5,
+        33
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "resus",
+      "name": "Resus",
+      "kind": "resus",
+      "rect": [
+        22,
+        34,
+        30.5,
+        44
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "amb",
+      "name": "Ambulance entrance",
+      "kind": "public",
+      "rect": [
+        22,
+        44,
+        30.5,
+        50
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "forecourt",
+      "name": "Forecourt",
+      "kind": "outdoor",
+      "rect": [
+        0,
+        50,
+        31,
+        58
+      ],
+      "floor": "G"
+    },
+    {
+      "id": "b_core",
+      "name": "Lift lobby",
+      "kind": "corridor",
+      "floor": "B1",
+      "rect": [
+        13.5,
+        0,
+        16.5,
+        40
+      ]
+    },
+    {
+      "id": "b_store",
+      "name": "Central store",
+      "kind": "store",
+      "floor": "B1",
+      "rect": [
+        0.5,
+        0,
+        13.5,
+        14
+      ]
+    },
+    {
+      "id": "b_cssd",
+      "name": "Sterile supply (CSSD)",
+      "kind": "utility",
+      "floor": "B1",
+      "rect": [
+        0.5,
+        14,
+        13.5,
+        27
+      ]
+    },
+    {
+      "id": "b_mortuary",
+      "name": "Mortuary",
+      "kind": "utility",
+      "floor": "B1",
+      "rect": [
+        0.5,
+        27,
+        13.5,
+        40
+      ]
+    },
+    {
+      "id": "b_gen",
+      "name": "Generator room",
+      "kind": "plant",
+      "floor": "B1",
+      "rect": [
+        16.5,
+        8.5,
+        30.5,
+        22
+      ]
+    },
+    {
+      "id": "b_gas",
+      "name": "Medical gas manifold",
+      "kind": "plant",
+      "floor": "B1",
+      "rect": [
+        16.5,
+        22,
+        30.5,
+        31
+      ]
+    },
+    {
+      "id": "b_water",
+      "name": "Water tanks and pumps",
+      "kind": "plant",
+      "floor": "B1",
+      "rect": [
+        16.5,
+        31,
+        30.5,
+        40
+      ]
+    }
   ],
   "doors": [
-    {"a": "doctors", "b": "spine", "span": [13.5, 14.5]},
-    {"a": "xray", "b": "spine", "span": [4.8, 6.6]},
-    {"a": "lab", "b": "spine", "span": [11.8, 13.4]},
-    {"a": "minors", "b": "spine", "span": [16, 18]},
-    {"a": "minors", "b": "spine", "span": [22.5, 24.5]},
-    {"a": "iso", "b": "spine", "span": [27.2, 28.8]},
-    {"a": "triage1", "b": "reg", "span": [3, 4.6]},
-    {"a": "triage2", "b": "reg", "span": [9, 10.6]},
-    {"a": "triage2", "b": "spine", "span": [31.5, 33.2]},
-    {"a": "reg", "b": "spine", "span": [36, 39.5]},
-    {"a": "reg", "b": "waiting", "span": [41, 49]},
-    {"a": "waiting", "b": "spine", "span": [13.5, 16.5]},
-    {"a": "wc", "b": "waiting", "span": [17.5, 19]},
-    {"a": "clean", "b": "majors", "span": [17.5, 19.3]},
-    {"a": "dirty", "b": "majors", "span": [21.5, 23.3]},
-    {"a": "store", "b": "majors", "span": [25, 26.4]},
-    {"a": "majors", "b": "spine", "span": [9.5, 33.5]},
-    {"a": "m1", "b": "majors", "span": [9.5, 12.5]},
-    {"a": "m2", "b": "majors", "span": [13.5, 16.5]},
-    {"a": "m3", "b": "majors", "span": [17.5, 20.5]},
-    {"a": "m4", "b": "majors", "span": [21.5, 24.5]},
-    {"a": "m5", "b": "majors", "span": [25.5, 28.5]},
-    {"a": "m6", "b": "majors", "span": [29.5, 32.5]},
-    {"a": "resus", "b": "majors", "span": [22.5, 26]},
-    {"a": "resus", "b": "amb", "span": [23, 29.5]},
-    {"a": "amb", "b": "waiting", "span": [45, 49]},
-    {"a": "reg", "b": "forecourt", "span": [4, 9], "name": "Walk-in entrance"},
-    {"a": "amb", "b": "forecourt", "span": [23.5, 29], "name": "Ambulance doors"}
+    {
+      "a": "doctors",
+      "b": "spine",
+      "span": [
+        13.5,
+        14.5
+      ]
+    },
+    {
+      "a": "xray",
+      "b": "spine",
+      "span": [
+        4.8,
+        6.6
+      ]
+    },
+    {
+      "a": "lab",
+      "b": "spine",
+      "span": [
+        11.8,
+        13.4
+      ]
+    },
+    {
+      "a": "minors",
+      "b": "spine",
+      "span": [
+        16,
+        18
+      ]
+    },
+    {
+      "a": "minors",
+      "b": "spine",
+      "span": [
+        22.5,
+        24.5
+      ]
+    },
+    {
+      "a": "iso",
+      "b": "spine",
+      "span": [
+        27.2,
+        28.8
+      ]
+    },
+    {
+      "a": "triage1",
+      "b": "reg",
+      "span": [
+        3,
+        4.6
+      ]
+    },
+    {
+      "a": "triage2",
+      "b": "reg",
+      "span": [
+        9,
+        10.6
+      ]
+    },
+    {
+      "a": "triage2",
+      "b": "spine",
+      "span": [
+        31.5,
+        33.2
+      ]
+    },
+    {
+      "a": "reg",
+      "b": "spine",
+      "span": [
+        36,
+        39.5
+      ]
+    },
+    {
+      "a": "reg",
+      "b": "waiting",
+      "span": [
+        41,
+        49
+      ]
+    },
+    {
+      "a": "waiting",
+      "b": "spine",
+      "span": [
+        13.5,
+        16.5
+      ]
+    },
+    {
+      "a": "wc",
+      "b": "waiting",
+      "span": [
+        17.5,
+        19
+      ]
+    },
+    {
+      "a": "clean",
+      "b": "majors",
+      "span": [
+        17.5,
+        19.3
+      ]
+    },
+    {
+      "a": "dirty",
+      "b": "majors",
+      "span": [
+        21.5,
+        23.3
+      ]
+    },
+    {
+      "a": "store",
+      "b": "majors",
+      "span": [
+        25,
+        26.4
+      ]
+    },
+    {
+      "a": "majors",
+      "b": "spine",
+      "span": [
+        9.5,
+        33.5
+      ]
+    },
+    {
+      "a": "m1",
+      "b": "majors",
+      "span": [
+        9.5,
+        12.5
+      ]
+    },
+    {
+      "a": "m2",
+      "b": "majors",
+      "span": [
+        13.5,
+        16.5
+      ]
+    },
+    {
+      "a": "m3",
+      "b": "majors",
+      "span": [
+        17.5,
+        20.5
+      ]
+    },
+    {
+      "a": "m4",
+      "b": "majors",
+      "span": [
+        21.5,
+        24.5
+      ]
+    },
+    {
+      "a": "m5",
+      "b": "majors",
+      "span": [
+        25.5,
+        28.5
+      ]
+    },
+    {
+      "a": "m6",
+      "b": "majors",
+      "span": [
+        29.5,
+        32.5
+      ]
+    },
+    {
+      "a": "resus",
+      "b": "majors",
+      "span": [
+        22.5,
+        26
+      ]
+    },
+    {
+      "a": "resus",
+      "b": "amb",
+      "span": [
+        23,
+        29.5
+      ]
+    },
+    {
+      "a": "amb",
+      "b": "waiting",
+      "span": [
+        45,
+        49
+      ]
+    },
+    {
+      "a": "reg",
+      "b": "forecourt",
+      "span": [
+        4,
+        9
+      ],
+      "name": "Walk-in entrance"
+    },
+    {
+      "a": "amb",
+      "b": "forecourt",
+      "span": [
+        23.5,
+        29
+      ],
+      "name": "Ambulance doors"
+    },
+    {
+      "a": "b_store",
+      "b": "b_core",
+      "span": [
+        4,
+        7
+      ]
+    },
+    {
+      "a": "b_cssd",
+      "b": "b_core",
+      "span": [
+        19,
+        21
+      ]
+    },
+    {
+      "a": "b_mortuary",
+      "b": "b_core",
+      "span": [
+        32,
+        34
+      ]
+    },
+    {
+      "a": "b_gen",
+      "b": "b_core",
+      "span": [
+        13,
+        15
+      ]
+    },
+    {
+      "a": "b_gas",
+      "b": "b_core",
+      "span": [
+        25,
+        27
+      ]
+    },
+    {
+      "a": "b_water",
+      "b": "b_core",
+      "span": [
+        34,
+        36
+      ]
+    }
   ],
   "spots": {
-    "walkin": [[6.5, 56]],
-    "ambulance_bay": [[26.5, 55]],
-    "campus_exit": [[15.5, 57.5]],
-    "reg_desk_staff": [[3, 37], [6, 37]],
-    "reg_queue": [[3, 39], [3, 40.2], [3, 41.4], [3, 42.6], [3, 43.8], [3, 45], [3, 46.2], [3, 47.4], [4.4, 48.6], [6, 48.6], [7.6, 48.6], [9.2, 48.6]],
-    "seat": [[14.5, 42], [15.7, 42], [16.9, 42], [18.1, 42], [19.3, 42], [20.5, 42], [14.5, 44], [15.7, 44], [16.9, 44], [18.1, 44], [19.3, 44], [20.5, 44], [14.5, 46], [15.7, 46], [16.9, 46], [18.1, 46], [19.3, 46], [20.5, 46], [14.5, 48.5], [15.7, 48.5], [16.9, 48.5], [18.1, 48.5], [19.3, 48.5], [20.5, 48.5], [10.5, 42], [11.7, 42], [10.5, 44], [11.7, 44], [10.5, 46], [11.7, 46]],
-    "triage_nurse": [[2.5, 31.5], [9, 31.5]],
-    "triage_patient": [[4.5, 33], [11, 33]],
-    "bed_resus": [[24.5, 38], [27, 38], [29.3, 38]],
-    "bed_majors": [[29, 11], [29, 15], [29, 19], [29, 23], [29, 27], [29, 31]],
-    "bed_minors": [[2, 16.5], [4.5, 16.5], [7, 16.5], [9.5, 16.5], [2, 22], [4.5, 22], [7, 22], [9.5, 22]],
-    "chair_majors": [[17.5, 27], [17.5, 28.3], [17.5, 29.6], [17.5, 30.9], [17.5, 32.2], [19, 32.6]],
-    "bed_iso": [[5, 28]],
-    "nurse_station": [[21.5, 20], [22.8, 20], [21.5, 22], [22.8, 22]],
-    "doctor_desk": [[3, 1.8], [5.5, 1.8], [8, 1.8], [10.5, 1.8]],
-    "xray_table": [[5, 7.5]],
-    "xray_staff": [[11.5, 9.5]],
-    "lab_bench": [[4, 12.8]],
-    "store_shelf": [[26.2, 7]],
-    "clean_shelf": [[18.5, 6.5]],
-    "dirty_sluice": [[22.5, 6.5]],
-    "porter_base": [[25.5, 45.5], [27.5, 45.5]],
-    "cleaner_base": [[22.5, 7.5]],
-    "guard_post": [[10.5, 48.5]],
-    "wc": [[19, 37]],
-    "fridge": [[11.5, 12.6]]
+    "walkin": [
+      [
+        6.5,
+        56
+      ]
+    ],
+    "ambulance_bay": [
+      [
+        26.5,
+        55
+      ]
+    ],
+    "campus_exit": [
+      [
+        15.5,
+        57.5
+      ]
+    ],
+    "reg_desk_staff": [
+      [
+        3,
+        37
+      ],
+      [
+        6,
+        37
+      ]
+    ],
+    "reg_queue": [
+      [
+        3,
+        39
+      ],
+      [
+        3,
+        40.2
+      ],
+      [
+        3,
+        41.4
+      ],
+      [
+        3,
+        42.6
+      ],
+      [
+        3,
+        43.8
+      ],
+      [
+        3,
+        45
+      ],
+      [
+        3,
+        46.2
+      ],
+      [
+        3,
+        47.4
+      ],
+      [
+        4.4,
+        48.6
+      ],
+      [
+        6,
+        48.6
+      ],
+      [
+        7.6,
+        48.6
+      ],
+      [
+        9.2,
+        48.6
+      ]
+    ],
+    "seat": [
+      [
+        14.5,
+        42
+      ],
+      [
+        15.7,
+        42
+      ],
+      [
+        16.9,
+        42
+      ],
+      [
+        18.1,
+        42
+      ],
+      [
+        19.3,
+        42
+      ],
+      [
+        20.5,
+        42
+      ],
+      [
+        14.5,
+        44
+      ],
+      [
+        15.7,
+        44
+      ],
+      [
+        16.9,
+        44
+      ],
+      [
+        18.1,
+        44
+      ],
+      [
+        19.3,
+        44
+      ],
+      [
+        20.5,
+        44
+      ],
+      [
+        14.5,
+        46
+      ],
+      [
+        15.7,
+        46
+      ],
+      [
+        16.9,
+        46
+      ],
+      [
+        18.1,
+        46
+      ],
+      [
+        19.3,
+        46
+      ],
+      [
+        20.5,
+        46
+      ],
+      [
+        14.5,
+        48.5
+      ],
+      [
+        15.7,
+        48.5
+      ],
+      [
+        16.9,
+        48.5
+      ],
+      [
+        18.1,
+        48.5
+      ],
+      [
+        19.3,
+        48.5
+      ],
+      [
+        20.5,
+        48.5
+      ],
+      [
+        10.5,
+        42
+      ],
+      [
+        11.7,
+        42
+      ],
+      [
+        10.5,
+        44
+      ],
+      [
+        11.7,
+        44
+      ],
+      [
+        10.5,
+        46
+      ],
+      [
+        11.7,
+        46
+      ]
+    ],
+    "triage_nurse": [
+      [
+        2.5,
+        31.5
+      ],
+      [
+        9,
+        31.5
+      ]
+    ],
+    "triage_patient": [
+      [
+        4.5,
+        33
+      ],
+      [
+        11,
+        33
+      ]
+    ],
+    "bed_resus": [
+      [
+        24.5,
+        38
+      ],
+      [
+        27,
+        38
+      ],
+      [
+        29.3,
+        38
+      ]
+    ],
+    "bed_majors": [
+      [
+        29,
+        11
+      ],
+      [
+        29,
+        15
+      ],
+      [
+        29,
+        19
+      ],
+      [
+        29,
+        23
+      ],
+      [
+        29,
+        27
+      ],
+      [
+        29,
+        31
+      ]
+    ],
+    "bed_minors": [
+      [
+        2,
+        16.5
+      ],
+      [
+        4.5,
+        16.5
+      ],
+      [
+        7,
+        16.5
+      ],
+      [
+        9.5,
+        16.5
+      ],
+      [
+        2,
+        22
+      ],
+      [
+        4.5,
+        22
+      ],
+      [
+        7,
+        22
+      ],
+      [
+        9.5,
+        22
+      ]
+    ],
+    "chair_majors": [
+      [
+        17.5,
+        27
+      ],
+      [
+        17.5,
+        28.3
+      ],
+      [
+        17.5,
+        29.6
+      ],
+      [
+        17.5,
+        30.9
+      ],
+      [
+        17.5,
+        32.2
+      ],
+      [
+        19,
+        32.6
+      ]
+    ],
+    "bed_iso": [
+      [
+        5,
+        28
+      ]
+    ],
+    "nurse_station": [
+      [
+        21.5,
+        20
+      ],
+      [
+        22.8,
+        20
+      ],
+      [
+        21.5,
+        22
+      ],
+      [
+        22.8,
+        22
+      ]
+    ],
+    "doctor_desk": [
+      [
+        3,
+        1.8
+      ],
+      [
+        5.5,
+        1.8
+      ],
+      [
+        8,
+        1.8
+      ],
+      [
+        10.5,
+        1.8
+      ]
+    ],
+    "xray_table": [
+      [
+        5,
+        7.5
+      ]
+    ],
+    "xray_staff": [
+      [
+        11.5,
+        9.5
+      ]
+    ],
+    "lab_bench": [
+      [
+        4,
+        12.8
+      ]
+    ],
+    "store_shelf": [
+      [
+        26.2,
+        7
+      ]
+    ],
+    "clean_shelf": [
+      [
+        18.5,
+        6.5
+      ]
+    ],
+    "dirty_sluice": [
+      [
+        22.5,
+        6.5
+      ]
+    ],
+    "porter_base": [
+      [
+        25.5,
+        45.5
+      ],
+      [
+        27.5,
+        45.5
+      ]
+    ],
+    "cleaner_base": [
+      [
+        22.5,
+        7.5
+      ]
+    ],
+    "guard_post": [
+      [
+        10.5,
+        48.5
+      ]
+    ],
+    "wc": [
+      [
+        19,
+        37
+      ]
+    ],
+    "fridge": [
+      [
+        11.5,
+        12.6
+      ]
+    ],
+    "b_store_shelf": [
+      [
+        7,
+        3,
+        "B1"
+      ],
+      [
+        8.5,
+        3,
+        "B1"
+      ],
+      [
+        10,
+        3,
+        "B1"
+      ],
+      [
+        11.5,
+        3,
+        "B1"
+      ]
+    ],
+    "generator": [
+      [
+        23.5,
+        15,
+        "B1"
+      ]
+    ]
   },
-  "parking": {"lane_y": 54, "spots": [[26.5, 55]]},
+  "parking": {
+    "lane_y": 54,
+    "spots": [
+      [
+        26.5,
+        55
+      ]
+    ]
+  },
   "ac_rooms": [],
   "furniture": [
-    {"rect": [1.2, 36, 6.8, 0.8], "radius": 0.1, "what": "registration counter"},
-    {"rect": [20.6, 18.6, 3.2, 1.0], "radius": 0.2, "what": "nurse station"},
-    {"rect": [3.6, 6.6, 2.8, 1.8], "radius": 0.1, "what": "X-ray table"},
-    {"rect": [1.2, 11.6, 9.6, 0.8], "radius": 0.05, "what": "lab bench"},
-    {"rect": [1.2, 0.6, 11.0, 0.8], "radius": 0.05, "what": "doctors' desk"}
+    {
+      "rect": [
+        1.2,
+        36,
+        6.8,
+        0.8
+      ],
+      "radius": 0.1,
+      "what": "registration counter"
+    },
+    {
+      "rect": [
+        20.6,
+        18.6,
+        3.2,
+        1.0
+      ],
+      "radius": 0.2,
+      "what": "nurse station"
+    },
+    {
+      "rect": [
+        3.6,
+        6.6,
+        2.8,
+        1.8
+      ],
+      "radius": 0.1,
+      "what": "X-ray table"
+    },
+    {
+      "rect": [
+        1.2,
+        11.6,
+        9.6,
+        0.8
+      ],
+      "radius": 0.05,
+      "what": "lab bench"
+    },
+    {
+      "rect": [
+        1.2,
+        0.6,
+        11.0,
+        0.8
+      ],
+      "radius": 0.05,
+      "what": "doctors' desk"
+    },
+    {
+      "rect": [
+        1.2,
+        1.0,
+        11.6,
+        1.0
+      ],
+      "radius": 0.05,
+      "what": "store racks",
+      "floor": "B1"
+    },
+    {
+      "rect": [
+        19,
+        11.5,
+        9,
+        6
+      ],
+      "radius": 0.3,
+      "what": "500 kVA generator",
+      "floor": "B1"
+    },
+    {
+      "rect": [
+        18,
+        24,
+        11,
+        2
+      ],
+      "radius": 0.2,
+      "what": "oxygen cylinder manifold",
+      "floor": "B1"
+    }
   ],
-  "short_names": {"triage1": "Tri 1", "triage2": "Tri 2", "m1": "M1", "m2": "M2", "m3": "M3", "m4": "M4", "m5": "M5", "m6": "M6", "amb": "Ambulance", "wc": "WC", "clean": "Clean", "dirty": "Dirty", "store": "Store"},
-  "labels": [{"text": "Walk-in", "at": [6.5, 53.5]}, {"text": "Ambulances", "at": [26.5, 52.5]}]
+  "short_names": {
+    "triage1": "Tri 1",
+    "triage2": "Tri 2",
+    "m1": "M1",
+    "m2": "M2",
+    "m3": "M3",
+    "m4": "M4",
+    "m5": "M5",
+    "m6": "M6",
+    "amb": "Ambulance",
+    "wc": "WC",
+    "clean": "Clean",
+    "dirty": "Dirty",
+    "store": "Store",
+    "b_core": "Lifts",
+    "b_store": "Central store",
+    "b_cssd": "CSSD",
+    "b_mortuary": "Mortuary",
+    "b_gen": "Generator",
+    "b_gas": "Med gas",
+    "b_water": "Water"
+  },
+  "labels": [
+    {
+      "text": "Walk-in",
+      "at": [
+        6.5,
+        53.5
+      ]
+    },
+    {
+      "text": "Ambulances",
+      "at": [
+        26.5,
+        52.5
+      ]
+    }
+  ],
+  "floors": [
+    {
+      "id": "G",
+      "name": "Ground floor — Emergency Department",
+      "level": 0,
+      "origin": [
+        0,
+        0
+      ],
+      "size": [
+        31,
+        58
+      ]
+    },
+    {
+      "id": "B1",
+      "name": "Basement — stores and plant",
+      "level": -1,
+      "origin": [
+        0,
+        62
+      ],
+      "size": [
+        31,
+        50
+      ]
+    }
+  ],
+  "portals": [
+    {
+      "id": "ed-lift",
+      "kind": "lift",
+      "length": 4.5,
+      "at": {
+        "G": [
+          15,
+          5.5
+        ],
+        "B1": [
+          15,
+          2
+        ]
+      }
+    },
+    {
+      "id": "ed-stairs",
+      "kind": "stairs",
+      "length": 9,
+      "at": {
+        "G": [
+          15,
+          30
+        ],
+        "B1": [
+          15,
+          30
+        ]
+      }
+    }
+  ]
 }

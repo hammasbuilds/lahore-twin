@@ -7,7 +7,7 @@ above it has finished its build **and** ten review rounds.
 |---|---|---|
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
-| 3 | Hospital — staff, patients, IoT, management panel | review round 1 of 10 done |
+| 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
 | 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | — |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
@@ -830,3 +830,27 @@ Bills moved by under 1%. Tests 63 → 65 (both stress cases, failing before).
   doctors, not the sensors, are the bottleneck, and badges do not change that.
 - Office and home replays regenerated: adding the hospital to `SOURCES` in
   export.py changed their digests (content unchanged). Tests 79 → 80.
+
+**Round 2 — floors and a basement (user request, 2026-10-20).**
+- *Asked for:* buildings with several floors and a basement, not one flat floor.
+- *Engine:* `plan.py` takes `floors` (each laid out in its own area of one 2D
+  space) and `portals` — stairs, lifts and ramps as routing edges whose cost is
+  the real climb (stairs 9 m a level; a lift 4.5 m a level plus an 18 m-equivalent
+  wait), not the gap on the drawing. A* drops its distance heuristic when the
+  floors differ (the hop is shorter than the drawing). Walkers on a hop wait where
+  they got on, then appear where they get off; `seg_len` gives every walker,
+  `path_length` and the viewer (`TwinCore.setHops`) the same lengths, so replays
+  stay in step. Single-floor plans are untouched (office and home tests pass).
+- *Hospital:* the ED block gains a basement (central store with four spare pumps,
+  CSSD, mortuary, generator, medical gas, water) by lift and stairs; the main
+  block becomes ground floor (entrance hall, pharmacy, admissions, lab,
+  radiology) with the medical ward on floor 2 by lift and stairs. Today's search
+  for a pump now ends in the basement (96 min of searching on seed 7); Connected's
+  par level brings spares up from the basement first and the ward second (1 drip
+  without a pump, was 4).
+- *Viewer:* a floor switcher showing how many people are on each floor, lifts
+  and stairs drawn on every floor, and **Follow on the map** in the inspector: the
+  camera keeps the chosen person in view across floors, buildings and the campus,
+  as a game map does. The UI check follows a porter and requires the view to move
+  on its own; it requires the basement's spare pumps to be drawn.
+- *Test:* a floor change goes through exactly one hop at the stairs' cost.

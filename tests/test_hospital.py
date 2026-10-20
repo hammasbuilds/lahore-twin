@@ -36,6 +36,18 @@ def test_the_campus_path_runs_between_buildings_and_the_floors_sit_in_their_foot
     assert abs((max(xs) - min(xs)) - 31) < 1.5 and abs((max(ys) - min(ys)) - 50) < 1.5
 
 
+def test_floors_connect_through_their_lifts_and_stairs(plans):
+    from lahore_twin.plan import is_portal, path_length
+    ed, ward = plans
+    down = ed.route(ed.spots["walkin"][0], ed.spots["b_store_shelf"][0])
+    hops = [(a, b) for a, b in zip(down, down[1:]) if is_portal(a, b)]
+    assert len(hops) == 1 and ed.floor_at(*hops[0][0]) == "G" and ed.floor_at(*hops[0][1]) == "B1"
+    # the hop costs the stairs (9 m), not the 60 m gap between the floors on the drawing
+    assert path_length(down) < 90
+    up = ward.route(ward.spots["entry"][0], ward.spots["bed_hdu"][0])
+    assert [ward.floor_at(*p) for p in (up[0], up[-1])] == ["G", "2"]
+
+
 def test_every_spot_on_both_floors_can_reach_every_other(plans):
     for p in plans:
         pts = [v[0] for v in p.spots.values()]

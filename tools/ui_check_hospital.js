@@ -61,6 +61,26 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   if (!(sounded.connected < sounded.today)) fail(`the alarm delay should sound fewer alarms: ${JSON.stringify(sounded)}`);
   const alarmT = await page.evaluate(() => { const a = window.__hosp.modes.today.alarms.find((x) => x.annunciated && x.arrived && x.arrived - x.annunciated > 20); return a ? a.annunciated + 5 : null; });
   if (alarmT) { await page.evaluate((t) => { window.__hosp.state.t = t; window.__hosp.frame(true); }, alarmT); await page.waitForTimeout(150); await shot("09-ward-alarm"); }
+  // floors: the ED basement holds the spare pumps; the main block's ward is on floor 2
+  await page.click('#views button[data-view="ed"]'); await page.click('#floors button[data-floor="B1"]'); await setT("06:00");
+  const b1 = await page.evaluate(() => window.__hosp.hits().filter((h) => h.type === "asset").length);
+  if (b1 < 1) fail("no equipment drawn in the ED basement at 06:00 (four spare pumps live there)");
+  await shot("09b-ed-basement");
+  await page.click('#views button[data-view="ward"]');
+  if ((await page.evaluate(() => window.__hosp.state.floor.ward)) !== "2") fail("the main block should open on the ward floor");
+  // follow a porter across the campus: the view must change on its own
+  const trip = await page.evaluate(() => {
+    const H = window.__hosp, M = H.modes[H.state.mode];
+    for (let t = 8 * 3600; t < 86400; t += 60) for (const a of Object.values(M.agents)) { if (a.role !== "porter") continue; const at = H.agentAt(a, t); if (at && at.b === "campus") return { id: a.id, t: t - 300 }; }
+    return null;
+  });
+  if (!trip) fail("no porter crosses the campus");
+  await page.evaluate((x) => { const H = window.__hosp; H.state.t = x.t; H.state.sel = { type: "agent", id: x.id }; H.showTab("inspect"); }, trip);
+  await page.click("#follow-btn");
+  const seen = new Set();
+  for (let k = 0; k < 12; k++) { await page.evaluate(() => { window.__hosp.state.t += 60; window.__hosp.frame(true); }); seen.add(await page.evaluate(() => window.__hosp.state.view)); }
+  if (!seen.has("site") || !seen.has("ed")) fail(`following a porter should move the camera between the ED and the site: ${[...seen]}`);
+  await page.click("#follow-btn");
   await page.click("#theme"); await page.waitForTimeout(150); await shot("10-light");
   await page.keyboard.press("1"); await page.waitForTimeout(150);
   if ((await page.evaluate(() => window.__hosp.state.view)) !== "site") fail("key 1 should open the site view");

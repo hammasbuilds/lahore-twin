@@ -11,6 +11,8 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field
 
+from .plan import is_portal, seg_len
+
 ROLE_COLOURS = {
     "staff": "#8b7cf6",
     "manager": "#e879f9",
@@ -82,12 +84,15 @@ class Person:
         budget = self.speed * dt
         while budget > 0 and self.seg < len(self.path) - 1:
             a, b = self.path[self.seg], self.path[self.seg + 1]
-            seg_len = math.dist(a, b)
-            left = seg_len - self.seg_done
+            length = seg_len(a, b)
+            left = length - self.seg_done
             if budget < left:
                 self.seg_done += budget
-                f = self.seg_done / seg_len
-                self.pos = (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
+                if is_portal(a, b):
+                    self.pos = a                 # on the stairs or in the lift: shown where they got on
+                else:
+                    f = self.seg_done / length
+                    self.pos = (a[0] + (b[0] - a[0]) * f, a[1] + (b[1] - a[1]) * f)
                 return False
             budget -= left
             self.seg += 1
