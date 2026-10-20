@@ -107,7 +107,7 @@ window.TWIN_ABOUT = {
       "Signals changing on every approach, a junction inspector with its phase log",
       "Travel time, delay, stops per trip, mean speed and the hotspot list, side by side for both rule sets",
     ],
-    analysis: "Adaptive signals cut the time vehicles spend stopped at signals by about four-fifths and roughly halve median delay on the same trips; they do not change which junctions are worst — Garden Town's Main Boulevard crossings stay at the top under both. Signals here are placed at crossings of named main roads because OpenStreetMap maps only two in the area.",
+    analysis: "Adaptive signals cut the time vehicles spend stopped at signals by about four-fifths and median delay by about two-thirds on the same trips; the same few junctions stay near the top under both — Allama Shabbir Usmani Road / Kiramat Road and the Main Boulevard Garden Town crossing. Signals here are placed at crossings of named main roads because OpenStreetMap maps only two in the area.",
   },
   junctions: {
     title: "Junction planner",

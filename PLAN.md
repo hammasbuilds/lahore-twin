@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 5 of 10 done |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 6 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -1041,3 +1041,14 @@ hospital rounds, which continue alongside.*
   the current state has lasted.
 - Unused raised pieces (Ali Zaib Road and Tipu Road underpasses, a Wahdat Road flyover
   piece) stay unused: no trip's best route crosses them in this demand.
+
+**Round 6 — the sweep again, and the claims that went stale.**
+- *Re-ran* `tools/sweep_traffic.py` against round 5's signal-aware routing: 0 problems in
+  18 runs. At 12,000 trips an hour fixed signals leave 180–340 vehicles draining after
+  the peak, adaptive 12–33; median delay 53–61 s → 27–35 s. README updated.
+- *Found:* the traffic About panel still said adaptive signals "roughly halve" median
+  delay (now about two-thirds: 35 → 12 s) and that Garden Town's Main Boulevard
+  crossing stays worst under both rule sets. With drivers routing around signals the
+  worst is Allama Shabbir Usmani Road / Kiramat Road under fixed and Ghalib Road / Main
+  Boulevard Gulberg under adaptive. *Fixed:* both sentences now say what the data says —
+  the same few junctions stay near the top under both.

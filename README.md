@@ -141,8 +141,8 @@ Underpass 619):
 Over three other mornings at 4,000, 8,000 and 12,000 trips an hour (`tools/sweep_traffic.py`),
 nobody is gridlocked, nobody exceeds the road's or the vehicle's speed, and adaptive signals
 beat fixed ones at every load. At 12,000 trips an hour fixed signals cannot clear the queues
-in the 15 minutes after the peak (about 600 vehicles still draining); adaptive signals halve
-median delay (82–84 s → 41–48 s) and leave about a tenth as many.
+in the 15 minutes after the peak (180–340 vehicles still draining); adaptive signals leave
+12–33 and roughly halve median delay (53–61 s → 27–35 s).
 
 The simulated peak is probably faster than Lahore's real one: on-street parking, pedestrians
 crossing and lane indiscipline are not modelled, and the only published network figure found
