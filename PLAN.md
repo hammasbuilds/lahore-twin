@@ -1067,3 +1067,21 @@ hospital rounds, which continue alongside.*
   12,000 replay (10,745 trips, 12.6 MB) opens in the viewer in 0.8 s with no errors and
   is labelled "Your run · seed 5 · 12,000 trips/h". 50,000 and "lots" are refused with
   their reasons. No change needed; recorded so the numbers can be checked later.
+
+## Watch the demo (user request, 2026-10-20)
+
+- *Asked for:* open the projects with real inputs and let them run themselves — no clicking.
+- *Built:* `viewer/demo.js` — **▶ Watch the demo** (or `/#demo`): asks the server to
+  simulate all four modules from real inputs (office: day 11, 36 staff, 6 visitors;
+  hospital: 120% arrivals, 3 ward nurses, 15 s alarm delay; traffic: 9,000 trips an hour;
+  home: a June day of category V load-shedding), shows each as soon as its run is ready
+  and drives it through its own buttons — play, floors, views, following a vehicle, the
+  junction, the comparison — with a caption saying what is on screen. First time ~6
+  minutes (the runs are real), then ~2.5 minutes from the cache.
+- *Found while testing it:* the home viewer threw when the minute series said "grid down"
+  a moment before the outage list did (an outage's edge) — guarded. Captions written in
+  advance did not match some days (the pump ran at 07:16, not 11:00; one day had no
+  pre-cool), so the home scenes now jump to the moments this run's controller actually
+  acted and quote its own decision.
+- Launchpad's server on 8860 was the old static one (no API); replaced by `run.bat`
+  (serve.py) on the same port.
