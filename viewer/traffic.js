@@ -157,7 +157,9 @@
         ctx.globalAlpha = alpha[ri] * (r.layer < 0 ? 0.55 : 1);
         if (pass === "edge") {
           if (r.layer > 0) { ctx.strokeStyle = "rgba(0,0,0,0.35)"; ctx.lineWidth = w + 6; ctx.save(); ctx.translate(3, 4); strokeRoad(r); ctx.restore(); }
-          ctx.strokeStyle = r.layer < 0 ? palette["road-tunnel"] : palette["road-edge"]; ctx.lineWidth = w + 2;
+          // a flyover's deck gets a light outline so it reads as above the roads it crosses
+          ctx.strokeStyle = r.layer < 0 ? palette["road-tunnel"] : r.layer > 0 ? palette.text : palette["road-edge"];
+          ctx.lineWidth = w + (r.layer > 0 ? 4 : 2);
           if (r.layer < 0) ctx.setLineDash([6, 5]);
           strokeRoad(r); ctx.setLineDash([]);
         } else {
@@ -259,8 +261,10 @@
       } else {
         const [L, Wd] = KIND_SIZE[v.kind];
         ctx.save(); ctx.translate(sx, sy); ctx.rotate(Math.atan2(p.hy, p.hx));
-        const l = Math.max(4, L * z), wd = Math.max(2.5, Wd * z);
-        ctx.fillRect(-l / 2, -wd / 2, l, wd);
+        // never smaller than a readable mark, with a dark rim so it shows on any road colour
+        const l = Math.max(v.kind === "motorcycle" ? 5 : 8, L * z), wd = Math.max(v.kind === "motorcycle" ? 3 : 4, Wd * z);
+        ctx.strokeStyle = palette.bg; ctx.lineWidth = 1;
+        ctx.fillRect(-l / 2, -wd / 2, l, wd); ctx.strokeRect(-l / 2, -wd / 2, l, wd);
         ctx.restore();
       }
       if (sel) { ctx.strokeStyle = palette.text; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(sx, sy, Math.max(9, z * 5), 0, 7); ctx.stroke(); }

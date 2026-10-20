@@ -95,7 +95,8 @@ def build_signals(net: Network) -> list[Signal]:
         if not names:                     # unnamed approaches: name it after the nearest named road
             gx = sum(net.nodes[n][0] for n in group) / len(group)
             gy = sum(net.nodes[n][1] for n in group) / len(group)
-            near = min((lk for lk in net.links if lk.name), key=lambda lk: math.dist((gx, gy), lk.pts[len(lk.pts) // 2]))
+            near = min((lk for lk in net.links if lk.name and lk.rank >= 3),       # a main road, not a back street
+                       key=lambda lk: min(math.dist((gx, gy), p) for p in lk.pts))
             names = [f"near {near.name}"]
         sigs.append(Signal(i, group, " / ".join(names), [groups[0], groups[1]]))
     return sigs

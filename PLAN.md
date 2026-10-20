@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 1 of 10 done |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 2 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -976,3 +976,19 @@ hospital rounds, which continue alongside.*
 - *Not fixed, stated:* peak speeds of 34–37 km/h are probably optimistic (no parking,
   pedestrians or lane indiscipline modelled); no measured peak-hour figure for Lahore
   was found to calibrate against, so none was invented. README says so.
+
+**Round 2 — reading the map up close.**
+- *Looked at:* Kalma Chowk at 0.8 m per pixel, a Canal Road underpass, the light theme,
+  a phone.
+- *Found:* the Kalma Chowk Flyover had the colour of the roads it crosses; its shadow
+  was too faint to read as "above". *Fixed:* a flyover's deck gets a light outline.
+- *Found:* at street zoom the vehicles were specks next to roads drawn at full lane
+  width. *Fixed:* a minimum size (motorcycle 5 × 3 px, others 8 × 4) with a dark rim.
+- *Found:* a hotspot was called "near Street 13" — the nearest named road of any size.
+  *Fixed:* unnamed junctions take the nearest named tertiary-or-bigger road.
+- *Found:* three roads are named only in Urdu in OSM, and two of them (MM Alam Road,
+  Ali Zaib Road) are the same roads as English-named pieces — one road under two
+  names looks like a crossing to the signal placer. *Fixed:* the three names map to
+  their English forms. The signal count did not change (33), so no false crossing had
+  been created; the hotspot list now reads "Canal Bank Road / Chaudhary Ali Anwar Road".
+- Phone: no sideways scroll; the underpass reads as dashed and dimmed; light theme fine.

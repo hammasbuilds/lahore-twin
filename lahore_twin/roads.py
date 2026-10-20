@@ -33,6 +33,10 @@ CLASSES = {
     "motorway": (3, 80, 7), "motorway_link": (1, 50, 6),
 }
 LANE_W = 3.2
+# the three roads OSM names only in Urdu here; two are the same roads as their English-named
+# pieces, and one road under two names would look like a crossing to signal_sites
+URDU_NAMES = {"ایم ایم عالم روڈ": "MM Alam Road", "علی زیب روڈ": "Ali Zaib Road",
+              "چوہدری علی انور روڈ": "Chaudhary Ali Anwar Road"}
 
 
 @dataclass
@@ -113,6 +117,7 @@ def load(path: str = str(OSM)) -> Network:
         per_dir = (total if oneway else max(1, total // 2)) if total else dl
         layer = int(t.get("layer", 1 if t.get("bridge") else -1 if t.get("tunnel") else 0) or 0)
         name = t.get("name:en") or t.get("name") or ""
+        name = URDU_NAMES.get(name, name)
         ns = w["nodes"]
         cut = [i for i, n in enumerate(ns) if i in (0, len(ns) - 1) or use[n] > 1]
         for i0, i1 in zip(cut, cut[1:]):
