@@ -8,7 +8,7 @@ above it has finished its build **and** ten review rounds.
 | 1 | Office tower — people, attendance, IoT, energy | done: build + 10 review rounds |
 | 2 | Home + GridSense — load-shedding energy manager | done: build + 10 review rounds |
 | 3 | Hospital — staff, patients, IoT, management panel | review round 2 of 10 done |
-| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 3 of 10 done |
+| 4 | Lahore traffic — OpenStreetMap road network, smart signals, hotspot finder | review round 4 of 10 done |
 | 5 | Junction fix planner + ambulance green wave | — |
 | 6 | City systems — smog, underpass flooding, streetlights | — |
 
@@ -1009,3 +1009,19 @@ hospital rounds, which continue alongside.*
 - *Second run: 0 problems.* Adaptive beats fixed at every load; at 12,000 trips an hour
   fixed signals leave about 600 vehicles draining after the 15-minute clearance and
   adaptive about a tenth of that, with median delay 82–84 s → 41–48 s. In the README.
+
+**Round 4 — watching it play.**
+- *Measured:* a full redraw takes ~20 ms for the whole map and ~8 ms zoomed in; the
+  junction panel updates while playing; a click on the timeline jumps there.
+- *Found:* when the followed vehicle arrived, the camera jumped to another part of the
+  city with no word of why. *Fixed:* the camera glides to the next vehicle over 0.7 s
+  and the Follow panel says "Motorcycle #2302 arrived at 07:59; now riding with the
+  next one."
+- *Found (by making the streaming check strict):* the map opens on the whole area, so
+  all 197 tiles were loaded on the first frame and nothing ever streamed again — the
+  "game map" effect lasted one frame. *Fixed:* tiles out of view for two seconds are
+  released and stream back in when the camera returns; zoomed in the map holds 80
+  tiles and a pan streams in 32 new ones.
+- *Added:* `tools/ui_check_traffic.js` — panning streams new tiles, a drag does not
+  start following, following hops on arrival and says so, a hotspot opens its live
+  junction, the comparison fills, a full redraw stays under 60 ms, light theme, phone.

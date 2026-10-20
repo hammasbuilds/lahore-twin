@@ -112,7 +112,8 @@
   const WY = (sy) => (sy - H / 2) / state.cam.z + state.cam.y;
 
   // ---- tile streaming ----
-  const loadedAt = {};                // tile key -> when it first came into view
+  const loadedAt = {};                // tile key -> when it was streamed in
+  const lastSeen = {};                // tile key -> when it was last in view
   function visibleTiles() {
     const m = 120 / state.cam.z;      // a margin of a few metres around the screen
     const x0 = WX(0) - m, x1 = WX(W) + m, y0 = WY(0) - m, y1 = WY(H) + m;
@@ -135,8 +136,15 @@
     const tiles = visibleTiles();
     const alpha = {};          // road index -> fade-in alpha
     let loading = 0;
+    // like a game map, tiles left behind are released after a couple of seconds out of view
+    // and stream back in when the camera returns
+    const inView = new Set(tiles);
+    for (const k of Object.keys(loadedAt)) {
+      if (inView.has(k)) lastSeen[k] = now;
+      else if (now - (lastSeen[k] || 0) > 2000) { delete loadedAt[k]; delete lastSeen[k]; }
+    }
     for (const k of tiles) {
-      if (!(k in loadedAt)) loadedAt[k] = now;
+      if (!(k in loadedAt)) { loadedAt[k] = now; lastSeen[k] = now; }
       const a = Math.min(1, (now - loadedAt[k]) / 450);
       if (a < 1) {
         loading++;
@@ -321,7 +329,7 @@
     const v = vehiclesOf(state.mode)[state.follow], p = vehAt(v, state.t);
     const total = v.prefix[v.prefix.length - 1];
     const roadsOn = []; for (const lid of v.route) { const n = roads[links[lid].road].name; if (n && roadsOn[roadsOn.length - 1] !== n) roadsOn.push(n); }
-    let html = `<h3>${KIND_NAMES[v.kind]} #${v.i + 1}</h3>`;
+    let html = (hopNote ? `<p class="note">${esc(hopNote)}</p>` : "") + `<h3>${KIND_NAMES[v.kind]} #${v.i + 1}</h3>`;
     html += `<div class="row"><span>Status</span><b>${p ? (p.speed < 0.5 ? "stopped" : "moving") : v.done != null && state.t >= v.done ? "arrived" : "not on the road yet"}</b></div>`;
     if (p) {
       const r = roads[links[p.link].road];
@@ -382,8 +390,21 @@
   function frame(force) {
     if (state.follow != null) {
       const p = vehAt(vehiclesOf(state.mode)[state.follow], state.t);
-      if (p) { state.cam.x = p.x; state.cam.y = p.y; }
-      else if (state.playing) { const i = pickLong(); if (i != null) state.follow = i; }     // arrived: ride with someone else
+      if (p) {
+        // after a hop the camera glides over rather than jumping across the city
+        if (glide) {
+          const f = Math.min(1, (performance.now() - glide.at) / 700), e = f * (2 - f);
+          state.cam.x = glide.x + (p.x - glide.x) * e; state.cam.y = glide.y + (p.y - glide.y) * e;
+          if (f >= 1) glide = null;
+        } else { state.cam.x = p.x; state.cam.y = p.y; }
+      } else if (state.playing) {                          // arrived: ride with someone else
+        const prev = vehiclesOf(state.mode)[state.follow], i = pickLong();
+        if (i != null) {
+          hopNote = `${KIND_NAMES[prev.kind]} #${prev.i + 1} arrived at ${C.clock(T0 + prev.done)}; now riding with the next one.`;
+          glide = { x: state.cam.x, y: state.cam.y, at: performance.now() };
+          state.follow = i;
+        }
+      }
     }
     $("clock").textContent = C.clock(T0 + state.t); $("scrub").value = state.t;
     draw(); renderTimeline(); kpis();
@@ -401,10 +422,11 @@
       if (prev != null) state.t = Math.min(R.meta.t1 - 1, state.t + ((ts - prev) / 1000) * state.speed);
       if (state.t >= R.meta.t1 - 1) setPlaying(false);
       frame(false);
-    } else if (fading || dirty) { frame(false); dirty = false; }
+    } else if (fading || dirty || glide) { frame(false); dirty = false; }
     prev = ts; requestAnimationFrame(loop);
   }
   let dirty = false;
+  let glide = null, hopNote = "";
   function setPlaying(on) { state.playing = on; $("play").textContent = on ? "❚❚ Pause" : "▶ Play"; $("play").setAttribute("aria-label", on ? "Pause" : "Play"); }
   function save() { try { localStorage.setItem("traffic-twin", JSON.stringify({ theme: document.documentElement.dataset.theme, mode: state.mode })); } catch (e) { /* ignore */ } }
   function showTab(name) {
@@ -414,7 +436,7 @@
     frame(true);
   }
   function follow(i) {
-    state.follow = i;
+    state.follow = i; hopNote = ""; glide = null;
     if (i != null) { state.cam.z = Math.max(state.cam.z, 2.2); showTab("follow"); } else frame(true);
   }
   function flyTo(x, y, z) { state.follow = null; state.cam = { x, y, z: z || Math.max(state.cam.z, 1.6) }; frame(true); }
