@@ -8,7 +8,7 @@ simulated one without changing the rules.
 
 ![Overview: every module with its headline numbers](docs/screenshots/01-overview.png)
 
-**Demo video (48 s):** [lahore-twin-demo.mp4](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-demo.mp4)
+**Demo video (51 s):** [lahore-twin-demo.mp4](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-demo.mp4)
 
 | Module | What it simulates | Headline result | Status |
 |---|---|---|---|
@@ -16,7 +16,7 @@ simulated one without changing the rules.
 | **Home + GridSense** | double-storey house with roof solar (6 kWp), 10 kWh battery, a day of load-shedding; a family whose children take the school van, go to tuition, and whose relatives visit in the evening; a gate counter | GridSense keeps the house lit through every cut (**93 → 0** dark minutes); its eco setting costs about the same as the inverter default | ready |
 | **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2; patients' attendants and visitors | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
 | **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes, 59 signals on a 60 s / 30 s plan; 7,097 trips in the evening peak with 1,763 stops at 432 real shops and amenities | adaptive signals cut median delay **105 → 60 s** and time stopped at signals **90 → 21** vehicle-hours | ready |
-| Junction planner | tests underpasses, U-turns and signal plans at the worst junctions; ambulance green wave | | planned |
+| **Junction planner** | the evening's three worst junctions under five fixes (retime, adaptive, U-turn conversion, underpass), and ten Rescue 1122 calls from the real station | at Firozpur Road / Wahdat Road time lost falls **28.8 → 6.9–9.6** vehicle-hours; a green wave gets the ambulance to the call **11% sooner** (4:27 → 3:58) | ready |
 | City systems | smog sensors, underpass flooding alarms, smart streetlights | | planned |
 
 ## Run it
@@ -47,6 +47,7 @@ Python 3.10+, standard library only. No network: the map data ships in `plans/os
 | Office | day (seed), staff with desks, visitors | floor-by-floor plan with people, lights, AC and cars; energy and comfort per rule set; attendance, tailgating, roll-call from badges and from badges + Wi-Fi |
 | Home | day, season, load-shedding category, solar kWp, battery kWh | each floor and the roof with fans, ACs, tank and panels; power flow; dark minutes, comfort, bill; every controller decision with its reason |
 | Hospital | day, emergency arrivals (%), ward nurses per shift, alarm delay (s) | site, ED and ward floors with patients by triage colour; ED board, bed board, equipment list; waits, call and alarm response, search time, fridge excursions, bed turnaround |
+| Junction planner | day (seed), trips per hour; then pick a junction, a fix, a call and a way on the page | a close map of each junction with the fix drawn; time lost, queue, delay, extra km and pedestrian cost per fix; the ambulance on its route with a time–distance diagram |
 | Traffic | evening or morning peak, day (seed), trips per hour | a streaming map that loads around the camera; follow any vehicle and see why it is driving and where it stops; the busiest shops; signals with countdowns; delay, stops, speed and the worst junctions per rule set |
 
 Every module has an **About** panel with the same information, and a **Compare** tab that
@@ -82,6 +83,11 @@ puts its rule sets side by side for the whole day.
 ![Busiest places](docs/screenshots/13b-traffic-places.png)
 ![Junction inspector](docs/screenshots/14-traffic-junction.png)
 ![Traffic comparison](docs/screenshots/15-traffic-compare.png)
+
+**Junction planner** — a U-turn conversion drawn on the real roads, and an ambulance on a green wave with its time–distance diagram.
+
+![Junction planner](docs/screenshots/15b-junction-planner.png)
+![Ambulance green wave](docs/screenshots/15c-ambulance-green-wave.png)
 
 **Run with your values** — typed inputs, and the hospital day they produced (150% arrivals, 4 ward nurses, no alarm delay).
 
@@ -188,6 +194,30 @@ simulated peak may run faster than the real one. The only published network figu
 (JICA's master plan) is a daily average above 30 km/h, not a peak-hour speed.
 
 Everything is simulated; rates and parameters that are assumptions are marked as such in the code.
+
+Junction planner, 30 minutes of the same evening (3,617 trips), every fix on the same trips.
+Firozpur Road / Wahdat Road, vehicle-hours lost within 350 m:
+
+| As today | Retime (Webster) | Adaptive | U-turn conversion | Underpass |
+|---|---|---|---|---|
+| 28.8 | 9.6 | 9.2 | **6.9** (+333 km driven, no pedestrian crossing) | 9.5 |
+
+Retiming alone gives Wahdat Road the long green, because Firozpur Road's through traffic rides
+the flyover above; the U-turn conversion does best at the junction but sends 759 trips 150–400 m
+on to turn back through a gap in the median. At Ahmed Munir Shaheed Road no fix helps much
+(16.0 → 12.8 at best).
+
+Rescue 1122, ten calls in the half hour from the station on OpenStreetMap, ten minutes at each,
+then to the nearest hospital with an emergency department:
+
+| | No priority | Siren | Green wave |
+|---|---|---|---|
+| To the call, mean | 4:27 | 4:16 | **3:58** |
+| On to hospital, mean (9 calls every way finished) | 2:23 | 2:17 | 2:09 |
+| Red lights met | 10 | 11 | 0 |
+
+Field studies of signal preemption report 14–23% shorter emergency trips; this is 11%. The calls
+are short (1.5–8 km, one to four signals), so there is less to gain than on a long corridor.
 
 ## How it works
 

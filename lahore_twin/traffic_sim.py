@@ -46,7 +46,11 @@ KINDS = {
     "car":        (0.25, 4.5, 1.00, 1.2, 2.0, 1.5, 2.0, 25.0),
     "rickshaw":   (0.05, 2.8, 0.85, 1.0, 1.5, 1.0, 2.0, 11.0),
     "bus":        (0.05, 11.0, 0.85, 1.5, 2.5, 0.9, 1.6, 16.0),
+    "ambulance":  (0.00, 5.5, 1.25, 1.0, 2.0, 2.2, 2.5, 22.0),     # Rescue 1122; never drawn as demand
 }
+AMB_MODES = ("none", "siren", "greenwave")
+PREEMPT_M = 300.0               # a signal turns green for the ambulance when it is this far along its route
+SIREN_RED_WAIT = 3              # with a siren it stops at a red, looks, and crosses slowly
 MAIN_GREEN, SIDE_GREEN, EVEN_GREEN = 60, 30, 45     # fixed plan: main road, side road, two equal roads
 AMBER, ALL_RED = 3, 2
 MIN_GREEN, MAX_STRETCH, GAP_OUT, DETECT = 10, 1.5, 3, 40.0
@@ -107,6 +111,7 @@ class Signal:
     phases: list                  # [[link ids], [link ids]] approaches per phase
     greens: list = field(default_factory=lambda: [EVEN_GREEN, EVEN_GREEN])
     phase: int = 0
+    adaptive: bool | None = None  # this junction's own rule, overriding the rule set (junction planner)
     state: str = "green"          # green | amber | allred
     since: int = 0
     log: list = field(default_factory=list)   # (t, phase, state)
@@ -421,9 +426,13 @@ def make_demand(net: Network, seed: int = 7, minutes: int = 60, per_hour: int = 
 
 
 class TrafficSim:
-    def __init__(self, net: Network, trips: list[Trip], mode: str, minutes: int = 60):
-        assert mode in MODES
+    def __init__(self, net: Network, trips: list[Trip], mode: str, minutes: int = 60, amb_mode: str = "none"):
+        assert mode in MODES and amb_mode in AMB_MODES
         self.net, self.trips, self.mode, self.T = net, trips, mode, minutes * 60 + 900   # 15 min to clear
+        self.amb_mode = amb_mode
+        self.underpass: set[int] = set()     # approach links whose through traffic goes under the junction
+        self.preempt_log: list = []          # [t, signal id, ambulance id]
+        self.amb_reds: dict[int, set] = {}   # ambulance id -> signalled approaches it had to stop at
         self.links = net.links
         self.lanes = [[[] for _ in range(lk.lanes)] for lk in self.links]
         self.signals = build_signals(net)
@@ -463,9 +472,34 @@ class TrafficSim:
                     break                                    # lanes are front-first: the rest are further back
         return False
 
+    def _preempt_requests(self) -> dict[int, int]:
+        """Green wave: the next signal on each ambulance's route within PREEMPT_M -> its phase."""
+        req: dict[int, int] = {}
+        if self.amb_mode != "greenwave":
+            return req
+        for v in self.active:
+            if v.kind != "ambulance" or v.hold_until is not None:
+                continue
+            d, ri = self.links[v.route[v.ri]].length - v.pos, v.ri
+            while ri < len(v.route) and d < PREEMPT_M:
+                hit = self.sig_of.get(v.route[ri])
+                if hit:
+                    sig, ph = hit
+                    if sig.id not in req:
+                        req[sig.id] = ph
+                        if not sig.log or sig.log[-1][1] != ph or sig.state != "green":
+                            self.preempt_log.append([self.t, sig.id, v.id])
+                    break
+                ri += 1
+                if ri < len(v.route):
+                    d += self.links[v.route[ri]].length
+        return req
+
     def tick_signals(self, t: int) -> None:
+        req = self._preempt_requests()
         for s in self.signals:
             el = t - s.since
+            want = req.get(s.id)
             if s.state == "amber":
                 if el >= AMBER:
                     s.state, s.since = "allred", t
@@ -476,7 +510,12 @@ class TrafficSim:
                     s.phase, s.state, s.since = 1 - s.phase, "green", t
                     s.log.append((t, s.phase, "green"))
                 continue
-            if self.mode == "fixed":
+            adaptive = s.adaptive if s.adaptive is not None else self.mode == "adaptive"
+            if want is not None:
+                # Safe City preemption: hold the ambulance's green, or end the other green
+                # (after 5 s of it, so nobody is cut off the instant it turned green)
+                end = want != s.phase and el >= 5
+            elif not adaptive:
                 end = el >= s.greens[s.phase]
             else:
                 if self._detect(s, s.phase):
@@ -520,11 +559,21 @@ class TrafficSim:
             return to_end + 50.0, v.v                       # the trip ends: drive off the map
         if to_end > 80:
             return to_end + 50.0, v.v
+        nxt = self.links[v.route[v.ri + 1]]
+        under = lk.id in self.underpass and nxt.name == lk.name          # straight on, under the junction
+        siren = v.kind == "ambulance" and self.amb_mode != "none"
         # red, amber or all-red at a signal: stop at the line (amber only if it can stop comfortably)
-        if not self.green(lk.id):
+        if not self.green(lk.id) and not under:
             sig = self.sig_of[lk.id][0]
-            if sig.state != "amber" or v.v * v.v / (2 * v.b) < to_end:
+            if v.kind == "ambulance":
+                self.amb_reds.setdefault(v.id, set()).add(lk.id)
+            # with a siren: stop, look, and cross slowly
+            if siren and v.still_since is not None and self.t - v.still_since >= SIREN_RED_WAIT:
+                pass
+            elif sig.state != "amber" or v.v * v.v / (2 * v.b) < to_end:
                 return to_end - 1.0, 0.0
+        elif siren:
+            pass                                                          # others give way to it
         elif lk.id not in self.sig_of and lk.rank < self.max_rank_into.get(lk.b, 0) and not lk.roundabout:
             # no signal: give way to the bigger road if something is coming on it
             for other in self.net.into.get(lk.b, ()):
@@ -542,7 +591,8 @@ class TrafficSim:
             if lane2:
                 rear = lane2[-1]
                 return dist + rear.pos - rear.L, rear.v
-            if ri > v.ri + 1 and not self.green(self.links[v.route[ri - 1]].id):
+            prev = self.links[v.route[ri - 1]]
+            if ri > v.ri + 1 and not self.green(prev.id) and not (prev.id in self.underpass and nl.name == prev.name):
                 return dist - 1.0, 0.0              # a red light at the end of a stub ahead
             dist += nl.length
             ri += 1
@@ -692,16 +742,31 @@ class TrafficSim:
             while veh.ei < len(veh.errands) and veh.errands[veh.ei][0] < veh.ri:
                 veh.ei += 1                       # drove past it (rare): carry on
         # lane changes, a few vehicles each second
+        amb_at = [(v.route[v.ri], v.lane, v.pos) for v in self.active
+                  if v.kind == "ambulance" and self.amb_mode != "none"]
+        # someone stopped at the kerb (or double-parked) with a siren close behind moves off the road
+        for lid, ln, apos in amb_at:
+            for x in list(self.lanes[lid][ln]):
+                if x.hold_until is not None and x.kind != "ambulance" and 0 < x.pos - apos < 40:
+                    self.lanes[lid][ln].remove(x)
+                    self.active.remove(x)
+                    x.parked = True
+                    self.parked.append(x)
         for veh in self.active:
-            if t < veh.next_lc or veh.hold_until is not None:
+            if veh.hold_until is not None:
+                continue
+            if t < veh.next_lc and not (amb_at and any(lid == veh.route[veh.ri] for lid, _, _ in amb_at)):
                 continue
             veh.next_lc = t + 3
             lk = self.links[veh.route[veh.ri]]
             if lk.lanes < 2 or lk.length - veh.pos < 30:
                 continue
-            # heading for a stop on this link: move over to the kerb lane, whatever it costs
+            # heading for a stop on this link: move over to the kerb lane, whatever it costs;
+            # and everyone pulls over for an ambulance with its siren on close behind
             seeking = (veh.ei < len(veh.errands) and veh.errands[veh.ei][0] == veh.ri
                        and veh.errands[veh.ei][1] - veh.pos < 200 and veh.lane < lk.lanes - 1)
+            if not seeking and amb_at and veh.kind != "ambulance" and veh.lane < lk.lanes - 1:
+                seeking = any(lid == lk.id and ln == veh.lane and 0 < veh.pos - pos < 60 for lid, ln, pos in amb_at)
             lane = self.lanes[lk.id][veh.lane]
             idx = lane.index(veh)
             cur = veh.acc

@@ -39,9 +39,9 @@ const log = (...a) => console.log(...a);
   const ready = await page.locator(".card [data-open]").count();
   log("overview cards", cards, "ready", ready);
   if (cards !== 6) fail(`overview shows ${cards} modules, not 6`);
-  if (ready < 4) fail(`only ${ready} modules can be opened`);
+  if (ready < 5) fail(`only ${ready} modules can be opened`);
   const stats = await page.locator(".card .stats b").allTextContents();
-  if (stats.length < 12 || stats.some((s) => !s.trim() || /undefined|NaN/.test(s))) fail("overview numbers missing: " + stats.join(" | "));
+  if (stats.length < 15 || stats.some((s) => !s.trim() || /undefined|NaN/.test(s))) fail("overview numbers missing: " + stats.join(" | "));
   await shot("01-overview");
 
   // ---- every About ----
@@ -50,7 +50,7 @@ const log = (...a) => console.log(...a);
     await page.waitForSelector("#dlg[open]");
     const text = await page.textContent("#dlg-body");
     if (text.length < 120) fail(`About ${key} is nearly empty`);
-    if (["office", "home", "hospital", "traffic"].includes(key) && !/What you can put in/.test(text)) fail(`About ${key} does not say what input it takes`);
+    if (["office", "home", "hospital", "traffic", "junctions"].includes(key) && !/What you can put in/.test(text)) fail(`About ${key} does not say what input it takes`);
     if (key === "hospital") await shot("02-about-hospital");
     await page.click("#dlg [data-close]");
   }
@@ -89,6 +89,14 @@ const log = (...a) => console.log(...a);
       await f.click("#pane-hot li[data-sig]");
       if (!(await f.textContent("#pane-junction")).includes("Phase")) fail("clicking a hotspot did not open its junction");
       await f.click(".tabs button[data-tab=compare]");
+    }],
+    ["junctions", "__junctions", async (f) => {
+      for (const fix of ["retime", "adaptive", "uturn", "underpass", "baseline"]) await f.click(`tr[data-fix="${fix}"]`);
+      await f.selectOption("#pick", "1");
+      await f.click('#views button[data-view="amb"]');
+      await f.click("li[data-call] >> nth=1");
+      for (const m of ["none", "siren", "greenwave"]) await f.click(`#ambmodes button[data-mode="${m}"]`);
+      if (!(await f.textContent("#pane-amb")).includes("Calls")) fail("ambulance panel is empty");
     }],
   ];
   for (const [key, global, poke] of modules) {

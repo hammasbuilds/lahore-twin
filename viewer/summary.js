@@ -62,5 +62,21 @@ window.TWIN_SUMMARY = {
     "stops at real shops and amenities"
    ]
   ]
+ },
+ "junctions": {
+  "stats": [
+   [
+    "29 → 7",
+    "veh-h lost at the worst junction (u-turn conversion)"
+   ],
+   [
+    "4:27 → 3:58",
+    "ambulance to the call (green wave)"
+   ],
+   [
+    "3",
+    "junctions × 5 fixes"
+   ]
+  ]
  }
 };

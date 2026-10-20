@@ -60,6 +60,17 @@ def build() -> dict:
             [f"{traffic['meta']['trips']:,}", f"trips in the {traffic['meta'].get('period', 'morning')} peak"],
             [f"{f.get('errand_stops', 0):,}", "stops at real shops and amenities"],
         ]}
+    jn = _load("junctions_replay.js")
+    if jn:
+        j0 = jn["junctions"][0]["fixes"]
+        best = min((f for f in j0 if f != "baseline"), key=lambda f: j0[f]["junction_veh_h"])
+        amb = jn["ambulance"]["summary"]
+        out["junctions"] = {"stats": [
+            [f"{j0['baseline']['junction_veh_h']:.0f} → {j0[best]['junction_veh_h']:.0f}", f"veh-h lost at the worst junction ({jn['fix_names'][best].lower()})"],
+            [f"{amb['none']['response_mean_s'] // 60}:{amb['none']['response_mean_s'] % 60:02d} → "
+             f"{amb['greenwave']['response_mean_s'] // 60}:{amb['greenwave']['response_mean_s'] % 60:02d}", "ambulance to the call (green wave)"],
+            [str(len(jn["junctions"])), "junctions × 5 fixes"],
+        ]}
     return out
 
 

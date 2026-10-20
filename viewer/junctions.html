@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Junction Planner</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%2314b8a6'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='%230b1220' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="twin.css">
+<style>
+:root { --accent: #2dd4bf; --rescue: #f87171; --sig-red: #ef4444; --sig-green: #22c55e; --road-major: #e8b04b; --road-mid: #c9d3e3; --road-minor: #7c8aa5; --road-edge: #0b1120; --siren: #fbbf24; --none: #94a3b8; }
+:root[data-theme="light"] { --accent: #0f766e; --rescue: #dc2626; --sig-red: #dc2626; --sig-green: #16a34a; --road-major: #d97706; --road-mid: #ffffff; --road-minor: #cbd5e1; --road-edge: #94a3b8; --siren: #b45309; --none: #64748b; }
+#stage { overflow: hidden; }
+.fixrow { cursor: pointer; }
+.fixrow:hover td, .fixrow:focus-visible td { background: var(--panel-2); }
+.fixrow.sel td { background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.fixrow:focus-visible { outline: 2px solid var(--accent); outline-offset: -2px; }
+.calls { list-style: none; margin: 0 0 10px; padding: 0; }
+.calls li { display: grid; grid-template-columns: 46px 1fr auto; gap: 8px; padding: 6px 2px; border-bottom: 1px solid var(--line); font-size: 13px; cursor: pointer; }
+.calls li.sel { background: color-mix(in srgb, var(--rescue) 14%, transparent); }
+.calls li:hover, .calls li:focus-visible { background: var(--panel-2); }
+.note { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.key { display: flex; gap: 12px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin: 4px 0 6px; }
+.key i { display: inline-block; width: 14px; height: 4px; margin-right: 5px; vertical-align: middle; border-radius: 2px; }
+@media (max-width: 900px) { canvas#plan { aspect-ratio: 1 / 1; } }
+</style>
+</head>
+<body data-module="junctions">
+<header>
+  <h1>Junction Planner <span>· Lahore Twin, phase 5</span></h1>
+  <div class="clock num" id="clock">17:30</div>
+  <button class="btn" id="play" aria-label="Play">▶ Play</button>
+  <div class="seg" id="views" role="group" aria-label="View">
+    <button data-view="plan" aria-pressed="true">Fix a junction</button>
+    <button data-view="amb" aria-pressed="false">Ambulance</button>
+  </div>
+  <label class="muted" style="font-size:13px">Junction <select id="pick" aria-label="Junction"></select></label>
+  <div class="spacer"></div>
+  <a class="btn xlink" href="index.html" style="text-decoration:none">All modules</a>
+  <button class="btn" id="about-btn" aria-label="About this module">About</button>
+  <button class="btn" id="theme" aria-label="Toggle colour theme">Light</button>
+</header>
+<main>
+  <section id="stage">
+    <canvas id="plan" aria-label="Close map of the junction with the chosen fix, or the ambulance's route"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="tip" id="tip"></div>
+  </section>
+  <aside>
+    <div class="kpis" style="grid-template-columns:repeat(3,1fr)">
+      <div class="kpi"><div class="v num" id="k1">–</div><div class="l" id="k1l"></div></div>
+      <div class="kpi"><div class="v num" id="k2">–</div><div class="l" id="k2l"></div></div>
+      <div class="kpi"><div class="v num" id="k3">–</div><div class="l" id="k3l"></div></div>
+    </div>
+    <div class="pane on" id="pane-plan"></div>
+    <div class="pane" id="pane-amb"></div>
+  </aside>
+</main>
+<footer>
+  <div class="timeline"><canvas id="tl"></canvas><input type="range" id="scrub" min="0" max="2699" step="1" value="0" aria-label="Time"></div>
+  <div class="ticks num" id="ticks"></div>
+</footer>
+<script>(function () { var q = new URLSearchParams(location.search).get("replay");
+  var src = q && /^runs\/[\w.-]+\.js$/.test(q) ? q : "junctions_replay.js";
+  document.write('<script src="' + src + '"><\/script>'); })();</script>
+<script src="about.js"></script>
+<script src="core.js"></script>
+<script src="junctions.js"></script>
+<script src="embed.js"></script>
+</body>
+</html>

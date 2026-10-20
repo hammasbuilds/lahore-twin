@@ -164,6 +164,16 @@ def main() -> None:
         f.click(".tabs button[data-tab=compare]"); page.wait_for_timeout(800)
         shot("15-traffic-compare")
 
+        # 6b junction planner: a fix drawn, then the ambulance
+        page.click('#nav button[data-go="junctions"]')
+        f = wait_module("__junctions")
+        f.click('tr[data-fix="uturn"]'); page.wait_for_timeout(900)
+        shot("15b-junction-planner")
+        f.click('#views button[data-view="amb"]')
+        f.evaluate("() => { const J = window.__junctions; J.state.call = 1; J.state.t = J.calls[1].t0 + 120; J.render(); }")
+        page.wait_for_timeout(900)
+        shot("15c-ambulance-green-wave")
+
         # 7 run with your own values
         page.click('#nav button[data-go="overview"]')
         page.click(f'.card[data-card="{RUN["module"]}"] [data-run]')

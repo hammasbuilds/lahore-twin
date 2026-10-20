@@ -1203,3 +1203,100 @@ hospital rounds, which continue alongside.*
 - Day 7: relatives in the ED bays 11.9 → 6.1 on average (peak 29 → 14); ward visitor-minutes
   outside visiting hours 3,010 → 19; most at one bed 4 → 2; costs counted: 32 on the ward at
   16:00 against 12, 40 families waiting downstairs, 18 turned away after 18:00.
+
+## Phase 5 — Junction planner + ambulance green wave
+
+**Research (2026-10-20).**
+- Rescue 1122 reports an average response under 8 minutes (Tribune 2018: seven); Lahore
+  added motorbike ambulances in 2017 because vans could not get through traffic (about 4 min
+  average). A UMT thesis on Gulberg proposes Safe City and Rescue 1122 giving the emergency
+  vehicle "a signal-free path" — proposed, not shown to be built.
+  [Tribune](https://tribune.com.pk/story/1625223/seven-minutes-rescue-1122-maintains-average-response-time),
+  [UMT thesis](https://escholar.umt.edu.pk/items/483fe784-1a5c-4694-9246-6ad66320813e),
+  [Pakistan Today](https://www.pakistantoday.com.pk/2017/11/14/reaching-the-unreachable-motorcycle-ambulances-attending-150-emergencies-per-day)
+- Signal preemption in the field: 16–23% shorter emergency travel time (Houston, 22
+  junctions), 14–23% (south-west Pennsylvania); a Virginia corridor with long cycles and
+  far-apart signals got 1.6% *slower*. Simulations range from 1% to 60%.
+  [USDOT ITS KRS](https://www.itskrs.its.dot.gov/2002-b00227),
+  [Route 7 study](https://rosap.ntl.bts.gov/view/dot/35851)
+- How Lahore fixes a junction: U-turn conversions (close the crossing; side-road traffic turns
+  left and U-turns 200–300 m away — the 2014 Jail Road / Main Boulevard plan abolished three
+  Main Boulevard junctions with four U-turns), underpasses and flyovers that lift the main
+  road over the crossing, and retiming. Critics: done in haste, often reversed, pedestrians
+  lose their crossing. [Tribune 2014](https://tribune.com.pk/story/764260/urban-development-jail-road-main-boulevard-to-be-made-signal-free),
+  [The News](https://www.thenews.pk/tns/detail/1156619-a-road-shock)
+
+**What it does.**
+- *Junction planner:* starts from the traffic module's worst junctions. For a chosen
+  junction it tries four fixes on exactly the same trips, one at a time: **retime** (split
+  the cycle by measured demand, Webster's method), **adaptive** (loop detectors, this
+  junction only), **U-turn conversion** (the crossing closes; the side road may only turn
+  left, through and right movements U-turn at the nearest gap 200–300 m along the main
+  road), **underpass** (the main road's through traffic goes under the crossing, signal-free;
+  turning traffic stays on the surface signal). Reports, for each: vehicle-hours lost at the
+  junction, network median delay, extra kilometres driven, vehicles gridlocked, and what it
+  costs pedestrians (a U-turn conversion and an underpass remove the surface crossing).
+- *Ambulance green wave:* Rescue 1122 calls during the evening peak — an ambulance leaves
+  its station, drives to the call, then to the nearest hospital (from OpenStreetMap). Three
+  ways: **no priority** (it queues like everyone), **siren** (cars ahead pull over where
+  they can; it may cross a red slowly once the junction is clear — how it is done today),
+  **green wave** (Safe City preemption: each signal on its route turns green for it ~25 s
+  before it arrives, with amber and all-red kept). Reports response time to the call, time
+  to hospital, reds faced, and the cost to cross traffic.
+
+**UI.** One module page in the app shell: a junction picker (worst first), a close map of the
+junction drawn from the real roads with the fix overlaid (U-turn arrows, the underpass dashed
+under the main road), a fixes table and a queue-over-time chart, before vs after. The
+ambulance tab: its route on the map, and a time–distance diagram (the classic green-wave
+chart) with signal states along the route, one trace per way. Design: same shell and
+tokens; accent teal for the planner, Rescue red for the ambulance; light and dark themes.
+
+**Simulation.** Reuses the traffic engine; a fix is a change to the network or to one
+controller; every scenario runs the same demand (seed, evening, 8,000 trips/h) so
+differences are the fix. Shares and parameters that are assumptions are labelled.
+
+**Built (phase 5).** `junctions.py` + `export_junctions.py` + `viewer/junctions.html/js`,
+`demo_junctions.py`, `tests/test_junctions.py`, `tools/ui_check_junctions.js`. Engine additions in
+`traffic_sim.py` (a junction's own adaptive rule, underpass pass-through, ambulance: pull-over,
+slow red crossing, preemption that keeps amber and all-red) leave ordinary traffic identical — the
+committed evening came out 104.9 / 60.3 s and 1,763 shop stops again. The station is the real
+Rescue 1122 node in OpenStreetMap (31.5194 N, 74.3274 E).
+
+*Found while building it:*
+- U-turn conversion rerouted 0 trips: the ban was put on the last internal step of a divided
+  junction, which the main road's own straight-on movement also used — every car on the
+  approach was trapped and the router gave up. Movements are now judged whole, approach to
+  exit; a test checks the main road still goes straight through.
+- The U-turn gaps landed on a service road and a residential street (an unnamed slip road in
+  the main phase made "" count as the main road) and nobody used them: a 2.3 km detour each.
+  Then Firozpur Road, a divided road, had no gaps at all — it cannot turn back on itself. Gaps
+  now sit on the named main road, and on a divided road cross the median to the opposite
+  carriageway; 378 of 395 rerouted trips use them, median detour 413 m.
+- A 174° "left turn" let traffic U-turn in the closed junction; left turns stop at 150°.
+- The ambulance's time to hospital was averaged over the calls that finished, so "no priority"
+  dropped its slowest call; means now use only calls every way finished (and say how many).
+- Red lights met were counted only with a siren; now for every ambulance.
+
+*Results (seed 7, 30 min of 17:30):* Firozpur Road / Wahdat Road loses 28.8 vehicle-hours today;
+retime 9.6, adaptive 9.2, underpass 9.5, U-turn conversion 6.9 (+333 km, 759 trips rerouted, no
+pedestrian crossing). Ambulance to the call: 7:14 no priority, 6:35 siren, 6:14 green wave
+(−14%, inside the 14–23% field range); 0 reds met on the green wave.
+
+**Round 1 — use it.** `tools/ui_check_junctions.js`: every fix on all three junctions changes the
+numbers and the drawing, the U-turn gap has a tooltip, Enter picks a fix row, the ambulance view
+plays and steps, three ways chosen, light theme, phone width with no sideways scroll; no console
+errors. Seen in the screenshots: the last call had no hospital (taken from the no-priority run,
+which had not arrived) — now from any way that got there; "1 signals" → "1 signal".
+
+**Round 2 — the ambulance's routes.** The screenshot showed a call right beside a hospital
+reached by a loop 4 km long. Two faults: the station's exit was chosen by the fewest road
+pieces, not by time; and the station snapped onto one carriageway of Firozpur Road, a divided
+road one-way southbound there, so every northbound call drove kilometres to turn round. The
+ambulance now leaves by whichever road within 200 m is quickest (a station has gates on both
+sides); driven/straight distance fell from 2.6–5.9× to 1.2–1.8×. Six calls then gave a thin
+answer, so ten calls in the half hour (assumption). Then siren came out *slower* than no
+priority (287 vs 267 s): one call took 456 s against 138. Traced: a motorcycle double-parked for
+a 5-minute pharmacy stop in the outer lane, and the ambulance sat behind it for all of it. Now a
+vehicle stopped for an errand with a siren within 40 m behind pulls off the road. Result: to the
+call 4:27 / 4:16 / 3:58 (−11%), to hospital 2:23 / 2:17 / 2:09 on the 9 calls every way finished,
+reds 10 / 11 / 0. The junction fixes are unchanged by this.

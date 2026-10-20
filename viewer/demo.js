@@ -14,6 +14,8 @@
       about: "a full day with 120% emergency arrivals, 3 ward nurses a shift and a 15 s alarm delay" },
     { key: "traffic", glob: "__traffic", inputs: { seed: 7, per_hour: 8000, period: "evening" },
       about: "an evening peak of 8,000 trips an hour, with people stopping at real shops" },
+    { key: "junctions", glob: "__junctions", inputs: { seed: 7, per_hour: 8000 },
+      about: "the three worst junctions under five fixes, and six Rescue 1122 calls three ways" },
     { key: "home", glob: "__home", inputs: { seed: 3, season: "june", category: "V", pv_kwp: 6, battery_kwh: 10 },
       about: "a June day with 6 hours of load-shedding, 6 kWp of solar and a 10 kWh battery — four controllers, each after a warm-up day" },
   ];
@@ -108,6 +110,25 @@
       u.click(".tabs button[data-tab=compare]");
       caption("The result", "Fixed against adaptive signals, on exactly the same trips.");
       await wait(7000);
+    },
+    async junctions(w) {
+      const J = w.__junctions, d = w.document;
+      const click = (sel) => { const el = d.querySelector(sel); if (el) el.click(); };
+      const j0 = w.JUNCTIONS.junctions[0], f = j0.fixes;
+      caption("Junction planner · " + j0.name, `Today this junction loses ${f.baseline.junction_veh_h} vehicle-hours in half an hour of the evening peak.`);
+      await wait(6000);
+      for (const [fix, what] of [["retime", "a new timing sheet"], ["uturn", "closing the crossing: U-turns 150–400 m away"], ["underpass", "an underpass for the main road"]]) {
+        click(`tr[data-fix="${fix}"]`);
+        caption("Fix: " + w.JUNCTIONS.fix_names[fix], `${what} — ${f[fix].junction_veh_h} vehicle-hours lost${f[fix].km_extra > 0 ? ", " + f[fix].km_extra + " km more driving" : ""}, on the same trips.`);
+        await wait(6500);
+      }
+      click('#views button[data-view="amb"]');
+      const S = w.JUNCTIONS.ambulance.summary, mm = (s) => `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      caption("Rescue 1122 · green wave", `From the real station in Gulberg: ${mm(S.none.response_mean_s)} to the call with no priority, ${mm(S.greenwave.response_mean_s)} when each signal turns green ahead of it.`);
+      J.state.t = J.calls[J.state.call].t0 + 20; J.frame();
+      const p = d.getElementById("play"); if (!/Pause/.test(p.textContent)) p.click();
+      await wait(10000);
+      if (/Pause/.test(p.textContent)) p.click();
     },
     async home(w) {
       const u = ui(w), G = "__home";

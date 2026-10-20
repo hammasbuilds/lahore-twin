@@ -31,6 +31,10 @@
       ["seed", "Day (seed)", "number", 7, 1, 999],
       ["per_hour", "Trips per hour", "number", 8000, 2000, 12000],
     ],
+    junctions: [
+      ["seed", "Evening (seed)", "number", 7, 1, 999],
+      ["per_hour", "Trips per hour", "number", 8000, 2000, 12000],
+    ],
     hospital: [
       ["seed", "Day (seed)", "number", 7, 1, 999],
       ["arrivals_pct", "Emergency arrivals (%)", "number", 100, 50, 200],
@@ -122,7 +126,7 @@
         return;
       }
       const body = Object.fromEntries(new FormData(form).entries());
-      const how = { office: "about 20 seconds", hospital: "about a minute", traffic: "about 2½ minutes: the same hour under both signal plans", home: "3–4 minutes: four controllers, each after a warm-up day" };
+      const how = { office: "about 20 seconds", hospital: "about a minute", traffic: "about 2½ minutes: the same hour under both signal plans", junctions: "about 4 minutes: three junctions × five fixes, and three ways for the ambulance", home: "3–4 minutes: four controllers, each after a warm-up day" };
       msg.textContent = `Simulating… (${how[key] || "a minute or two"})`;
       $("run-go").disabled = true;
       try {
