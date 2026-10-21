@@ -1417,3 +1417,22 @@ Phase 5 complete; next: phase 6, city systems.
 along the roads with sensor dots; underpasses as gauges with gates; streetlights as a glow that
 dims and brightens. Same shell, tokens and themes; accent per view (haze amber, water blue,
 lamp yellow). Shares, rates and capacities that are assumptions are labelled.
+
+**Built (phase 6, smog backend).** `lahore_twin/city.py`: PM2.5 on a 100 m grid every minute from
+the traffic module's own vehicles (exhaust per km and idling per minute by kind) spread with a
+250 m Gaussian, plus a regional background under a closing evening inversion; traffic scaled to
+36% of the near-road mean at the peak (2010 apportionment, labelled dated). Official monitor vs
+25 low-cost sensors (15 at schools/hospitals/colleges, 10 on main-road junction poles), each with
+gain error and noise, corrected network-wide against the co-located sensor.
+*Found while building it:*
+- First peaks hit 1,891 µg/m³ — twice the highest hourly readings reported for Lahore. Scaling
+  on the whole rectangle (mostly empty cells) and a 150 m spread inflated the street peaks.
+  Now calibrated on near-road cells with a 250 m spread: peak 799–1,014 µg/m³ over three evenings.
+- Sensors only at schools and hospitals missed the true hotspot by 1.8 km, so the action went to
+  the wrong junction. 10 now sit on main-road junction poles.
+- The 25 sensors then mapped the air *worse* than one monitor (131.8 vs 113.4 µg/m³ error):
+  inverse-distance interpolation smears junction peaks over whole blocks, and the error was
+  scored over empty cells too. Connected now fits a land-use regression each minute — readings
+  against what the signals' loop detectors count (only signal approaches, so no copy of the
+  truth) — and interpolates the residuals; error scored near roads. Map error 83–103 → 55–58
+  µg/m³; hotspot found within 0–141 m; adaptive signals there cut its PM2.5 8–14% (seeds 7, 11, 23).
