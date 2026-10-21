@@ -147,12 +147,25 @@ window.TWIN_ABOUT = {
     title: "City systems",
     icon: "☁",
     page: "city.html",
-    status: "planned",
-    what: "Smog sensors, underpass flooding alarms and smart streetlights across the city.",
-    does: ["Planned after the junction planner."],
-    inputs: [],
-    outputs: [],
-    analysis: "",
+    status: "ready",
+    what: "Three city-wide IoT systems on Lahore's real roads, driven by the traffic module: a smog sensor network on a November evening, underpasses flooding in a monsoon storm with a power cut, and streetlights through a night of load-shedding.",
+    does: [
+      "Smog: PM2.5 at street level every minute from the regional haze under a closing inversion plus what the traffic module's vehicles emit, exhaust and idling. One official monitor against 25 low-cost sensors at schools, hospitals and junction poles, mapped with the signals' loop-detector counts; the hotspot they find gets adaptive signals.",
+      "Rain: each real underpass a basin filling from the streets around it, pumped until LESCO's feeder trips. Today the water finds the drivers; Connected's level sensors start the generator, close the gate at 0.15 m and route traffic over the surface.",
+      "Night: about 9,500 LED streetlights. Connected dims each road to 30% unless traffic is on or next to it, keeps main roads lit on a battery through load-shedding, and every lamp reports its own failure.",
+    ],
+    inputs: [
+      ["Demand", "trips per hour in the evening (2,000–12,000); the storm and the night scale from it"],
+      ["Seed", "a different evening: other trips, sensors' errors, failures"],
+      ["View and rule set", "Smog, Rain or Night; Today or Connected; what the city sees or the truth"],
+    ],
+    outputs: [
+      "A PM2.5 map in the US AQI bands with every sensor's reading; the hotspot the network finds",
+      "Underpass gauges, gates, stalled vehicles, depth and rain charts with the power cut",
+      "Every road's light level minute by minute, the shed feeder, failed lamps, power drawn",
+      "Today against Connected for each: map error, water depth, vehicles stalled, kWh, roads left dark",
+    ],
+    analysis: "Twenty-five low-cost sensors with the signals' traffic counts halve the error of the city's air map and find the hotspot within about 150 m; adaptive signals there cut its PM2.5 by 8–14%. In the storm the water reaches about half a metre and strands drivers Today; Connected closes the gates first, nobody stalls, and more trips get home at a few seconds' detour. Adaptive streetlights use about 38% less energy and keep main roads lit through the cut. Background, storm, pumps and lamp figures are assumptions, labelled on each view.",
   },
 };
 

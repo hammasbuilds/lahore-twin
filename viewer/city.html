@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>City Systems</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%23fbbf24'/%3E%3Ccircle cx='16' cy='13' r='5' fill='%230b1220'/%3E%3Cpath d='M16 18v8' stroke='%230b1220' stroke-width='3'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="twin.css">
+<style>
+:root { --accent: #fbbf24; --water: #38bdf8; --haze: #f59e0b; --lamp: #fde68a; --lamp-dim: #a16207; --road: #46536f; --dark-road: #1b2232; --sig-red: #ef4444;
+        --aqi1: #22c55e; --aqi2: #eab308; --aqi3: #f97316; --aqi4: #ef4444; --aqi5: #a855f7; --aqi6: #9f1239; --aqi7: #6b1028; --aqi8: #3b0716; }
+:root[data-theme="light"] { --accent: #b45309; --water: #0369a1; --haze: #b45309; --lamp: #ca8a04; --lamp-dim: #fde68a; --road: #94a3b8; --dark-road: #334155; --sig-red: #dc2626;
+        --aqi1: #16a34a; --aqi2: #ca8a04; --aqi3: #ea580c; --aqi4: #dc2626; --aqi5: #9333ea; --aqi6: #9f1239; --aqi7: #6b1028; --aqi8: #3b0716; }
+#stage { overflow: hidden; }
+canvas#plan { cursor: grab; touch-action: none; }
+.note { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
+.key { display: flex; gap: 10px; flex-wrap: wrap; font-size: 11.5px; color: var(--muted); margin: 4px 0 6px; }
+.key i { display: inline-block; width: 14px; height: 8px; margin-right: 4px; vertical-align: 0; border-radius: 2px; }
+.gauges { list-style: none; margin: 0 0 10px; padding: 0; }
+.gauges li { display: grid; grid-template-columns: 1fr 110px 60px; gap: 8px; align-items: center; padding: 5px 0; border-bottom: 1px solid var(--line); font-size: 12.5px; }
+.bar { position: relative; height: 10px; background: var(--panel-2); border-radius: 5px; overflow: hidden; }
+.bar b { position: absolute; left: 0; top: 0; bottom: 0; background: var(--water); }
+.bar s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--sig-red); }
+.sensors { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 14px; font-size: 12px; }
+.sensors li { display: flex; justify-content: space-between; gap: 6px; padding: 2px 0; break-inside: avoid; }
+.kpis.k3 { grid-template-columns: repeat(3, 1fr); }
+.kpi .v { font-size: 20px; }
+</style>
+</head>
+<body data-module="city">
+<header>
+  <h1>City Systems <span>· Lahore Twin, phase 6</span></h1>
+  <div class="clock num" id="clock">17:30</div>
+  <button class="btn" id="play" aria-label="Play">▶ Play</button>
+  <div class="seg" id="views" role="group" aria-label="System">
+    <button data-view="smog" aria-pressed="true">Smog</button>
+    <button data-view="rain" aria-pressed="false">Rain</button>
+    <button data-view="night" aria-pressed="false">Night</button>
+  </div>
+  <div class="seg" id="modes" role="group" aria-label="Rule set">
+    <button data-mode="today" aria-pressed="false" title="What Lahore has now">Today</button>
+    <button data-mode="connected" aria-pressed="true" title="With the sensors and controls">Connected</button>
+  </div>
+  <div class="seg" id="layers" role="group" aria-label="Smog layer">
+    <button data-layer="seen" aria-pressed="true" title="The map the city's sensors can make">What the city sees</button>
+    <button data-layer="truth" aria-pressed="false" title="The simulator's truth">The truth</button>
+  </div>
+  <div class="spacer"></div>
+  <a class="btn xlink" href="index.html" style="text-decoration:none">All modules</a>
+  <button class="btn" id="about-btn" aria-label="About this module">About</button>
+  <button class="btn" id="theme" aria-label="Toggle colour theme">Light</button>
+</header>
+<main>
+  <section id="stage">
+    <canvas id="plan" aria-label="Lahore's roads with the chosen city system drawn on them"></canvas>
+    <div class="legend" id="legend"></div>
+    <div class="tip" id="tip"></div>
+  </section>
+  <aside>
+    <div class="kpis k3">
+      <div class="kpi"><div class="v num" id="k1">–</div><div class="l" id="k1l"></div></div>
+      <div class="kpi"><div class="v num" id="k2">–</div><div class="l" id="k2l"></div></div>
+      <div class="kpi"><div class="v num" id="k3">–</div><div class="l" id="k3l"></div></div>
+    </div>
+    <div class="pane on" id="pane"></div>
+  </aside>
+</main>
+<footer>
+  <div class="timeline"><canvas id="tl"></canvas><input type="range" id="scrub" min="0" max="59" step="1" value="0" aria-label="Time"></div>
+  <div class="ticks num" id="ticks"></div>
+</footer>
+<script>(function () { var q = new URLSearchParams(location.search).get("replay");
+  var src = q && /^runs\/[\w.-]+\.js$/.test(q) ? q : "city_replay.js";
+  document.write('<script src="' + src + '"><\/script>'); })();</script>
+<script src="about.js"></script>
+<script src="core.js"></script>
+<script src="city.js"></script>
+<script src="embed.js"></script>
+</body>
+</html>

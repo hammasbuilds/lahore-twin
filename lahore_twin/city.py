@@ -403,7 +403,9 @@ def flood(seed: int = 7, per_hour: int = 6000, minutes: int = 60) -> dict:
                      "gridlocked_elsewhere": sum(1 for v in stuck if not near_up(v)),
                      "depth": {k: [round(d, 3) for d in v[::30]] for k, v in depth.items()},
                      "max_depth": {k: round(max(v), 2) for k, v in depth.items()},
-                     "stranded": len(stranded), "stranded_at": {k: sum(1 for _, (_, u) in stranded.items() if u == k) for k in depth},
+                     "stranded": len(stranded),
+                     "stranded_events": sorted([t, u] for t, u in stranded.values()),
+                     "stranded_at": {k: sum(1 for _, (_, u) in stranded.items() if u == k) for k in depth},
                      "closed": closed, "closed_min": {k: round(sum(((b or T) - a) for a, b in v) / 60) for k, v in closed.items()},
                      "rerouted": len(rerouted), "delay_median_s": m["delay_median_s"], "completed": m["completed"],
                      "gridlocked": m["gridlocked"], "trips": m["trips"]}

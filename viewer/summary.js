@@ -63,6 +63,22 @@ window.TWIN_SUMMARY = {
    ]
   ]
  },
+ "city": {
+  "stats": [
+   [
+    "91 → 55",
+    "air-map error, µg/m³ (1 monitor → 25 sensors)"
+   ],
+   [
+    "28 → 0",
+    "vehicles stalled in flooded underpasses"
+   ],
+   [
+    "38%",
+    "less streetlight energy"
+   ]
+  ]
+ },
  "junctions": {
   "stats": [
    [

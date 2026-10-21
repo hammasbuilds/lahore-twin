@@ -32,6 +32,8 @@ SOURCES = {
     "junctions": ["roads.py", "traffic_sim.py", "junctions.py", "export_junctions.py", "export.py",
                   "../plans/osm/lahore_gulberg_roads.json", "../plans/osm/lahore_gulberg_pois.json",
                   "../plans/osm/rescue_1122.json"],
+    "city": ["roads.py", "traffic_sim.py", "junctions.py", "city.py", "export_city.py", "export.py",
+             "../plans/osm/lahore_gulberg_roads.json", "../plans/osm/lahore_gulberg_pois.json"],
 }
 
 

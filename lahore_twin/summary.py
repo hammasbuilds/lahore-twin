@@ -60,6 +60,14 @@ def build() -> dict:
             [f"{traffic['meta']['trips']:,}", f"trips in the {traffic['meta'].get('period', 'morning')} peak"],
             [f"{f.get('errand_stops', 0):,}", "stops at real shops and amenities"],
         ]}
+    cy = _load("city_replay.js")
+    if cy:
+        sm, fl, li = cy["smog"]["metrics"], cy["flood"]["modes"], cy["lights"]["modes"]
+        out["city"] = {"stats": [
+            [f"{sm['map_error_today']:.0f} → {sm['map_error_sensors']:.0f}", "air-map error, µg/m³ (1 monitor → 25 sensors)"],
+            [f"{fl['today']['stranded']} → {fl['connected']['stranded']}", "vehicles stalled in flooded underpasses"],
+            [f"{round(100 * (1 - li['connected']['kwh'] / li['today']['kwh']))}%", "less streetlight energy"],
+        ]}
     jn = _load("junctions_replay.js")
     if jn:
         j0 = jn["junctions"][0]["fixes"]

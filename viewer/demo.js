@@ -16,6 +16,8 @@
       about: "an evening peak of 8,000 trips an hour, with people stopping at real shops" },
     { key: "junctions", glob: "__junctions", inputs: { seed: 7, per_hour: 8000 },
       about: "the three worst junctions under five fixes, and ten Rescue 1122 calls three ways" },
+    { key: "city", glob: "__city", inputs: { seed: 7, per_hour: 8000 },
+      about: "a smoggy November evening, a monsoon storm with a power cut, and a night of streetlights" },
     { key: "home", glob: "__home", inputs: { seed: 3, season: "june", category: "V", pv_kwp: 6, battery_kwh: 10 },
       about: "a June day with 6 hours of load-shedding, 6 kWp of solar and a 10 kWh battery — four controllers, each after a warm-up day" },
   ];
@@ -129,6 +131,25 @@
       const p = d.getElementById("play"); if (!/Pause/.test(p.textContent)) p.click();
       await wait(10000);
       if (/Pause/.test(p.textContent)) p.click();
+    },
+    async city(w) {
+      const d = w.document, click = (sel) => { const el = d.querySelector(sel); if (el) el.click(); };
+      const X = w.__city, Cy = w.CITY, sm = Cy.smog.metrics, fl = Cy.flood.modes, li = Cy.lights.modes;
+      click('#views button[data-view="smog"]'); click('#modes button[data-mode="today"]'); X.state.t.smog = Cy.smog.minutes - 2; X.frame(true);
+      caption("City · smog, today", `One official monitor: the city sees one number, ${sm.official_reads_peak} µg/m³, everywhere.`);
+      await wait(6000);
+      click('#modes button[data-mode="connected"]');
+      caption("City · smog, connected", `25 low-cost sensors and the signals' traffic counts: map error ${sm.map_error_today} → ${sm.map_error_sensors} µg/m³, and the hotspot found.`);
+      await wait(7000);
+      click('#views button[data-view="rain"]'); click('#modes button[data-mode="today"]'); X.state.t.rain = 50; X.frame(true);
+      caption("City · a monsoon storm, today", `The power cuts out, the pumps stop: ${fl.today.stranded} vehicles stall in the underpasses.`);
+      await wait(7000);
+      click('#modes button[data-mode="connected"]'); X.frame(true);
+      caption("City · a monsoon storm, connected", `Level sensors start the generator and close the gates: ${fl.connected.stranded} stalled, ${fl.connected.rerouted} rerouted over the surface.`);
+      await wait(7000);
+      click('#views button[data-view="night"]'); X.state.t.night = 130; X.frame(true);
+      caption("City · streetlights at night", `Roads dim when empty and brighten for traffic: ${li.today.kwh.toLocaleString("en")} → ${li.connected.kwh.toLocaleString("en")} kWh in a night.`);
+      await wait(8000);
     },
     async home(w) {
       const u = ui(w), G = "__home";

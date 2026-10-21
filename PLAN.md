@@ -1450,3 +1450,26 @@ of Lahore's underpasses filling — the 2 ha catchment is the surrounding street
 *Seed 7:* Today 0.41–0.52 m, 28 vehicles stalled, 453 gridlocked queued behind them (all at
 underpasses); Connected 0.09–0.17 m, five underpasses closed 34 min, 349 rerouted, 0 stranded,
 0 gridlocked, 4,670 → 5,146 trips finished, median delay +4.5 s for the diversion.
+
+**Built (phase 6, streetlights backend).** 9,545 LED lamps along the roads (35 m on main roads, 40 m
+elsewhere; 150 W / 70 W), 23:00–05:00. Traffic per road piece per minute comes from a night run of
+the traffic simulation. Today: all on at full power; load-shedding (01:00–02:00) darkens the east
+half; failed lamps (0.4% a night) stay out until someone complains. Connected: each road dims to
+30% unless a vehicle is on it or on a neighbouring piece; main roads ride through the cut on a
+battery; every lamp reports its own failure. *Seed 7:* 5,340 → 3,290 kWh (−38%, inside the
+27–42% the UC Davis field study measured); busy road-minutes left dark 8,695 → 1,803; failures
+known by morning 0 → 42 of 42.
+
+**Built (phase 6, viewer).** `viewer/city.html` / `city.js`: Smog / Rain / Night on a cached base
+map; Today / Connected; smog layer "what the city sees" against "the truth". Smog in the US AQI
+bands with Hazardous split in three (250–400, 400–600, 600+), since Lahore's evening sits almost
+wholly in it; every sensor dot has its reading on hover. Rain: underpass gauges with the gate
+depth, stalled vehicles, depth and rain charts with the power cut shaded. Night: every road's
+lamp level per minute, the shed half, failed lamps, power drawn. `tools/ui_check_city.js` uses
+every view, rule set and layer, play, keys, theme and phone width.
+*Found while checking it:* the night clock read "25:10" and the ticks ran to "29:00" (the night
+crosses midnight; the clock now wraps); the sensor list coloured each reading's number in its
+AQI colour, and the darkest Hazardous shades were unreadable on the dark panel — a coloured dot
+now carries the band and the number stays in the text colour; the UI's power check compared
+Today and Connected inside the load-shedding hour, where Connected rightly draws more (main
+roads lit on a battery, Today's east simply dark) — moved to minute 60.

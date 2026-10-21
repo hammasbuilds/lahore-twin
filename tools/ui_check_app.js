@@ -39,9 +39,9 @@ const log = (...a) => console.log(...a);
   const ready = await page.locator(".card [data-open]").count();
   log("overview cards", cards, "ready", ready);
   if (cards !== 6) fail(`overview shows ${cards} modules, not 6`);
-  if (ready < 5) fail(`only ${ready} modules can be opened`);
+  if (ready < 6) fail(`only ${ready} modules can be opened`);
   const stats = await page.locator(".card .stats b").allTextContents();
-  if (stats.length < 15 || stats.some((s) => !s.trim() || /undefined|NaN/.test(s))) fail("overview numbers missing: " + stats.join(" | "));
+  if (stats.length < 18 || stats.some((s) => !s.trim() || /undefined|NaN/.test(s))) fail("overview numbers missing: " + stats.join(" | "));
   await shot("01-overview");
 
   // ---- every About ----
@@ -97,6 +97,12 @@ const log = (...a) => console.log(...a);
       await f.click("li[data-call] >> nth=1");
       for (const m of ["none", "siren", "greenwave"]) await f.click(`#ambmodes button[data-mode="${m}"]`);
       if (!(await f.textContent("#pane-amb")).includes("Calls")) fail("ambulance panel is empty");
+    }],
+    ["city", "__city", async (f) => {
+      for (const v of ["rain", "night", "smog"]) for (const m of ["today", "connected"]) {
+        await f.click(`#views button[data-view="${v}"]`); await f.click(`#modes button[data-mode="${m}"]`);
+        if (/undefined|NaN/.test(await f.textContent("aside"))) fail(`city ${v}/${m}: panel shows undefined`);
+      }
     }],
   ];
   for (const [key, global, poke] of modules) {

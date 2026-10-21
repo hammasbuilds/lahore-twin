@@ -37,7 +37,7 @@
     const pill = document.createElement("span");
     pill.className = "pill ok";
     pill.id = "your-run";
-    const R = window.REPLAY || window.HOME || window.HOSPITAL || window.TRAFFIC || window.JUNCTIONS || {};
+    const R = window.REPLAY || window.HOME || window.HOSPITAL || window.TRAFFIC || window.JUNCTIONS || window.CITY || {};
     const m = R.meta || {};
     const bits = ["seed " + m.seed];
     if (m.pv_kwp != null) bits.push(`${m.pv_kwp} kWp`, `${m.battery_kwh} kWh`, m.category);

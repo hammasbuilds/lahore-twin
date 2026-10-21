@@ -40,6 +40,7 @@ INPUTS = {
                  "ward_nurses": ("int", 3, 1, 6), "alarm_delay": ("int", 15, 0, 30)},
     "traffic": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000),
                 "period": ("choice", "evening", ("evening", "morning"))},
+    "city": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000)},
     "junctions": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000),
                   # any of the city's signalised junctions, read from the road network
                   "junction": ("choice", "worst", ("worst", *_signal_names()))},
@@ -94,6 +95,10 @@ def simulate(module: str, p: dict) -> str:
                             pv_kwp=p["pv_kwp"], battery_kwh=p["battery_kwh"])
         scen = json.dumps({p["season"]: replay}, separators=(",", ":"), ensure_ascii=False)
         body = f"window.HOME_SCENARIOS = {scen};\nwindow.HOME = window.HOME_SCENARIOS[{json.dumps(p['season'])}];\n"
+    elif module == "city":
+        from lahore_twin.export_city import run_all
+        replay = run_all(seed=p["seed"], per_hour=p["per_hour"])
+        body = "window.CITY = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False) + ";\n"
     elif module == "junctions":
         from lahore_twin.export_junctions import run_all
         replay, _ = run_all(seed=p["seed"], per_hour=p["per_hour"], junction=p["junction"])
