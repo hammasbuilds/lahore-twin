@@ -9,7 +9,7 @@ simulated one without changing the rules.
 
 ![Overview: every module with its headline numbers](docs/screenshots/01-overview.png)
 
-**Demo video (51 s):** [lahore-twin-demo.mp4](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-demo.mp4)
+**Demo video (57 s):** [lahore-twin-demo.mp4](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-demo.mp4)
 
 | Module | What it simulates | Headline result | Status |
 |---|---|---|---|
