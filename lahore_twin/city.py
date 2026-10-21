@@ -410,3 +410,98 @@ def flood(seed: int = 7, per_hour: int = 6000, minutes: int = 60) -> dict:
     return {"underpasses": [{k: (round(v, 1) if isinstance(v, float) else v) for k, v in u.items()} for u in ups],
             "modes": res, "rain": [round(rain_mmh(t), 1) for t in range(0, T, 30)], "power_cut": list(POWER_CUT),
             "generator": {"today": GEN_TODAY, "connected": GEN_CONNECTED}, "trips": len(trips), "minutes": minutes}
+
+
+# ------------------------------------------------------------------ streetlights
+# Assumptions, labelled: spacing and wattage, the dim level, the night's demand, the load-shedding
+# hour and which feeders it hits, the lamp failure rate.
+NIGHT_START = 23 * 3600
+SPACING = {True: 35.0, False: 40.0}            # main road (tertiary or bigger) / smaller street, metres
+WATTS = {True: 150.0, False: 70.0}             # LED luminaire
+DIM = 0.30                                     # Connected: share of full power with nobody near
+OUTAGE = (2 * 3600, 3 * 3600)                  # 01:00-02:00, seconds after 23:00
+FAIL_RATE = 0.004                              # lamps that fail during a night
+
+
+def streetlights(seed: int = 7, per_hour: int = 900, minutes: int = 360) -> dict:
+    net = load()
+    rng = random.Random(seed * 41 + 5)
+    trips = make_demand(net, seed=seed, minutes=minutes, per_hour=per_hour, period="evening")
+    sim = TrafficSim(net, trips, "adaptive", minutes=minutes)      # at night the signals are adaptive or flashing
+    seen: dict[int, set] = {}                                      # minute -> road pieces with a vehicle on them
+    step = sim.step
+
+    def watched(t):
+        step(t)
+        if t % 10 == 0:
+            bucket = seen.setdefault(t // 60, set())
+            for v in sim.active:
+                bucket.add(net.links[v.route[v.ri]].road)
+    sim.step = watched
+    sim.run()
+    roads = [i for i, r in enumerate(net.roads) if CLASSES_RANK(r["cls"]) >= 1]
+    main = {i: CLASSES_RANK(net.roads[i]["cls"]) >= 3 for i in roads}
+    lamps = {i: max(1, int(_len(net.roads[i]["pts"]) // SPACING[main[i]])) for i in roads}
+    # neighbours: road pieces sharing an end, so a light brightens before a car arrives
+    ends: dict[tuple, list] = {}
+    for i in roads:
+        pts = net.roads[i]["pts"]
+        for e in (tuple(pts[0]), tuple(pts[-1])):
+            ends.setdefault(e, []).append(i)
+    nbr = {i: {j for e in (tuple(net.roads[i]["pts"][0]), tuple(net.roads[i]["pts"][-1])) for j in ends[e]} for i in roads}
+    xmid = (net.bbox[0] + net.bbox[2]) / 2
+    east = {i: (net.roads[i]["pts"][0][0] + net.roads[i]["pts"][-1][0]) / 2 > xmid for i in roads}    # the feeder that is shed
+    # failures: lamps that go out at a random minute
+    fails = []
+    for i in roads:
+        for _ in range(lamps[i]):
+            if rng.random() < FAIL_RATE:
+                fails.append((i, rng.randrange(minutes)))
+    failed_from: dict[int, list[int]] = {}
+    for i, m in fails:
+        failed_from.setdefault(i, []).append(m)
+    out = {}
+    for mode in ("today", "connected"):
+        kwh, dark_vm, lit_vm, changes = 0.0, 0, 0, {}
+        kw = [0.0] * minutes
+        for i in roads:
+            last, ch = None, []
+            for m in range(minutes):
+                shed = east[i] and OUTAGE[0] <= m * 60 < OUTAGE[1]
+                busy = any(j in seen.get(m, ()) or j in seen.get(m - 1, ()) for j in nbr[i])
+                if mode == "today":
+                    level = 0.0 if shed else 1.0
+                else:
+                    if shed and not main[i]:
+                        level = 0.0                        # minor streets have no battery
+                    else:
+                        level = 1.0 if busy else DIM
+                n_ok = lamps[i] - sum(1 for f in failed_from.get(i, ()) if f <= m)
+                kwh += level * n_ok * WATTS[main[i]] / 1000 / 60
+                kw[m] += level * n_ok * WATTS[main[i]] / 1000
+                if i in seen.get(m, ()):
+                    if level == 0.0:
+                        dark_vm += 1
+                    else:
+                        lit_vm += 1
+                if level != last:
+                    ch.append([m, level])
+                    last = level
+            changes[i] = ch
+        # road-minutes with traffic on them: in the dark, and lit
+        out[mode] = {"kwh": round(kwh, 1), "busy_road_minutes_dark": dark_vm, "busy_road_minutes_lit": lit_vm,
+                     "kw": [round(x, 1) for x in kw],
+                     "failures_known_by_morning": len(fails) if mode == "connected" else 0,
+                     "changes": changes}
+    return {"roads": roads, "lamps": lamps, "main": main, "fails": fails, "modes": out, "minutes": minutes,
+            "trips": len(trips), "lamp_count": sum(lamps.values()),
+            "night_full_kwh": round(sum(lamps[i] * WATTS[main[i]] for i in roads) / 1000 * minutes / 60, 1)}
+
+
+def _len(pts) -> float:
+    return sum(math.dist(a, b) for a, b in zip(pts, pts[1:]))
+
+
+def CLASSES_RANK(cls: str) -> int:      # noqa: N802
+    from .roads import CLASSES
+    return CLASSES[cls][2]
