@@ -1308,72 +1308,6 @@ Boulevard Garden Town (seed 11) retiming and the underpass lose 3.0 against 2.8 
 adaptive helps there. Ambulance to the call, green wave against no priority: −11% (seed 7),
 −10% (11), −9% (23); siren −3 to −4%. Recorded in the README as a range.
 
-## Isometric animations (user request, 2026-10-21)
-
-- *Asked for:* isometric animations of every project for LinkedIn — input, the whole path
-  through the architecture, output — then "more architecture, down to the token level", keeping
-  both kinds; in GitHub and on the Launchpad board.
-- *Built:* `tools/isometric.py` writes, per module (app, office, home, hospital, traffic,
-  junctions), an **overview** (`mediakit.isometric`: stages with the code that does each) and an
-  **architecture** view (`mediakit.isodeep`, new in the shared media kit: the module as layers of
-  real components and one piece of data hopping between them, shown exactly as recorded — every
-  unit is copied from the committed replays when the pages are generated). MP4s recorded with
-  `mediakit.isorecord` (system Chrome, H.264 for LinkedIn): on the v0.4.0 release, and beside
-  the pages locally (gitignored). Registered in Launchpad (`--isometric docs/isometric`), so the
-  board's shared gallery lists all twelve.
-- *Found:* the badge hop first showed `"gate": "corr1"` — a field the recorded message does not
-  have (its payload was not exported); replaced by the door named in the message's own text. The
-  stack sat too low and ran into the figures; the renderer now fits it into the free area.
-- *Per tool, all with video (user, 2026-10-21: "don't repeat another session's mistakes"):* a
-  pair for every tool inside each module as well — office lights & AC / attendance & roll-call,
-  GridSense / who's home, emergency department / ward alarms / equipment locator / families,
-  trips & shops / signals / the streaming map, junction fixes / ambulance green wave — each
-  following its own data (`tools/isometric_tools.py`). 38 pages, and every one has its MP4 and
-  poster: none left without a video, no architecture view skipped because tools share layers.
-
-**Round 4 — reading the ambulance view.** The time–distance diagram, the reason the view exists,
-sat below ten call rows, out of sight at 1440×900; and ten minutes standing at the call filled
-most of its width, squeezing both drives into slivers. *Fixed:* the diagram comes straight after
-the summary, in two panels on their own clocks — dispatch to the call, then leaving the call to
-the hospital — with each signal's band in the panel of the leg it is on. A call that no way
-finished before the run ended showed a blank hospital; it now says "still on its way when the
-run ended". UI check passes, no console errors.
-
-**Round 5 — plan the junction you drive through.** The planner only ever showed the evening's
-three worst junctions; nobody could ask about their own. *Built:* "Run with your values" now has
-"Junction to plan": the worst (default) or any of the 59 signalised junctions (names read from the
-road network into the overview summary; the server checks the choice and names a bad one by what
-it is rather than reading out 60 names). The picked junction is planned first and named in the
-"Your run" pill. Checked through the real server: Ghalib Road / MM Alam Road at 6,000 trips an
-hour in 164 s. *Found on that page:* its note said "8,000 trips an hour" — hard-coded; it reads
-the run's own demand now. And a junction that loses 0.1 vehicle-hours, with no U-turn gap within
-reach, said neither — it now says it is quiet and no fix is worth digging for, and that crossing
-traffic goes round the block when there is no gap.
-
-**Round 6 — light theme.** Both views in light: routes, the three ambulance traces, signal bands,
-the best value in the fix table and the queue chart all stay distinct. No change needed.
-
-**Round 7 — does half an hour say what an hour says?** The planner runs 30 minutes to keep a
-typed run near three minutes. Over the full hour (seed 7): Firozpur Road / Wahdat Road loses 54.2
-vehicle-hours; retime 23.5, adaptive 23.5, underpass 21.1, U-turn conversion 17.4 (+667 km) — the
-same order, each fix cutting 57–68% (67–76% over the half hour). Green wave against no priority:
-−12% over the hour, −11% over the half. The half-hour answer stands.
-
-**Round 8 — watch the demo, start to finish.** New `tools/ui_check_demo.js` opens `/#demo` through
-the real server and records every caption until the end, failing on any page error, a "Demo
-stopped" or a module never shown. It ran 464 s, 30 captions, all five modules, no errors —
-including the planner's fixes and the green wave. *Found:* the opening still said "Four IoT
-systems" and the planner caption "six Rescue 1122 calls"; it counts the modules it plays now, and
-says ten calls.
-
-**Round 9 — the published media match the code.** The 38 isometric pages regenerate identical
-from the current replays (no stale numbers). The walkthrough's ambulance screenshot cut the
-time–distance diagram off at 720 px; it scrolls the panel to the diagram first now. Video and
-screenshots re-recorded.
-
-**Round 10 — final.** Full suite 110 passed, viewer core ok; planner, app and demo checks clean.
-Phase 5 complete; next: phase 6, city systems.
-
 ## Phase 6 — City systems: smog, underpass flooding, streetlights
 
 **Research (2026-10-21).**
@@ -1491,12 +1425,6 @@ clears circles and labels already placed; one underpass is unnamed in OpenStreet
 charts' axis labels were cut off ("42 kW", "19:") — wider margin, end ticks aligned inwards, top
 label kept inside; in the app shell the three switches pushed About onto a second header row —
 the subtitle hides below 1,400 px. README gained the city section, results and four screenshots.
-Isometric: `city` (module) plus `city-smog`, `city-rain`, `city-night` (tools), each an overview
-and an architecture view with its own data, every page with a poster and a video (46 in all, 47
-release assets). *Found:* the rain view first picked the underpass with the most drivers
-stalled, Canal Road, which Connected never needed to close (0.14 m, under the 0.15 m gate depth),
-so its "gate closes" hop would have shown nothing; it now follows the underpass that stalled most
-drivers among those Connected closed (Ali Zaib Road: 7 stalled from 18:47 Today; gate shut 18:41).
 
 **Round 2.** Light theme, phone width and the Connected storm, looked at closely. Fixed: the smog
 map showed a mesh across the whole city in the light theme — each translucent cell was drawn
