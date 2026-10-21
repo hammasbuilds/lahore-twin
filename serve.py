@@ -25,6 +25,11 @@ VIEWER = ROOT / "viewer"
 RUNS = VIEWER / "runs"
 LOCK = threading.Lock()                  # one simulation at a time: they are CPU-bound
 
+def _signal_names() -> list[str]:
+    from lahore_twin.junctions import signal_names
+    return signal_names()
+
+
 # module -> {input: (kind, default, low, high | choices)}
 INPUTS = {
     "office": {"seed": ("int", 7, 1, 999), "staff": ("int", 36, 10, 36), "visitors": ("int", 4, 0, 8)},
@@ -35,7 +40,9 @@ INPUTS = {
                  "ward_nurses": ("int", 3, 1, 6), "alarm_delay": ("int", 15, 0, 30)},
     "traffic": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000),
                 "period": ("choice", "evening", ("evening", "morning"))},
-    "junctions": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000)},
+    "junctions": {"seed": ("int", 7, 1, 999), "per_hour": ("int", 8000, 2000, 12000),
+                  # any of the city's signalised junctions, read from the road network
+                  "junction": ("choice", "worst", ("worst", *_signal_names()))},
 }
 
 
@@ -49,6 +56,8 @@ def clean(module: str, raw: dict) -> dict:
         v = raw.get(name, default)
         if kind == "choice":
             if v not in spec[2]:
+                if len(spec[2]) > 8:      # a long list (every junction) is named by what it is, not read out
+                    raise ValueError(f"{name} must be {spec[2][0]!r} or one of the {len(spec[2]) - 1} listed in the form")
                 raise ValueError(f"{name} must be one of {', '.join(spec[2])}")
         else:
             try:
@@ -87,7 +96,7 @@ def simulate(module: str, p: dict) -> str:
         body = f"window.HOME_SCENARIOS = {scen};\nwindow.HOME = window.HOME_SCENARIOS[{json.dumps(p['season'])}];\n"
     elif module == "junctions":
         from lahore_twin.export_junctions import run_all
-        replay, _ = run_all(seed=p["seed"], per_hour=p["per_hour"])
+        replay, _ = run_all(seed=p["seed"], per_hour=p["per_hour"], junction=p["junction"])
         body = "window.JUNCTIONS = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False) + ";\n"
     elif module == "traffic":
         from lahore_twin.export_traffic import run_all

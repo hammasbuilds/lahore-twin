@@ -32,6 +32,7 @@
       ["per_hour", "Trips per hour", "number", 8000, 2000, 12000],
     ],
     junctions: [
+      ["junction", "Junction to plan", "select", "worst", ((window.TWIN_SUMMARY || {}).junctions || {}).choices ? window.TWIN_SUMMARY.junctions.choices.junction : ["worst"]],
       ["seed", "Evening (seed)", "number", 7, 1, 999],
       ["per_hour", "Trips per hour", "number", 8000, 2000, 12000],
     ],

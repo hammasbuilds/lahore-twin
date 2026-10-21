@@ -179,7 +179,8 @@
     $("k2").textContent = fmt(f.queue_peak, 0); $("k2l").textContent = `most standing within 350 m (today ${b.queue_peak})`;
     $("k3").textContent = (f.km_extra > 0 ? "+" : "") + fmt(f.km_extra); $("k3l").textContent = "km driven, against today";
     const best = Math.min(...FIXES.map((x) => j.fixes[x].junction_veh_h));
-    let html = `<h3>${esc(j.name)}</h3><p class="note">Main road: ${esc(j.main.join(", "))}. Every fix meets exactly the same ${R.meta.trips.toLocaleString("en")} trips (30 minutes of the 17:30 peak, 8,000 trips an hour). Click a fix to draw it.</p>`;
+    let html = `<h3>${esc(j.name)}</h3><p class="note">Main road: ${esc(j.main.join(", "))}. Every fix meets exactly the same ${R.meta.trips.toLocaleString("en")} trips (${R.meta.minutes} minutes of the 17:30 peak, ${R.meta.per_hour.toLocaleString("en")} trips an hour). Click a fix to draw it.</p>`;
+    if (b.junction_veh_h < 1) html += `<p class="note"><b>A quiet junction:</b> it loses ${fmt(b.junction_veh_h)} vehicle-hours in this half hour, so no fix here is worth digging for.</p>`;
     html += `<table class="cmp"><tr><th>Fix</th><th>Lost here, veh-h</th><th>Queue peak</th><th>Median delay, s</th><th>Extra km</th></tr>`;
     for (const x of FIXES) {
       const r = j.fixes[x];
@@ -193,6 +194,7 @@
       uturn: `The crossing closes, Lahore's signal-free-corridor conversion. ${f.rerouted ? f.rerouted.toLocaleString("en") + " trips" : "Trips"} that went straight across or turned right now turn left and U-turn at a gap in the main road 150–400 m away. It costs extra driving, and pedestrians lose the signal-protected crossing.`,
       underpass: "The main road's straight-on traffic goes under the crossing; turning traffic and the side road keep a surface signal, retimed for what is left. Pedestrians keep the surface crossing. It costs years of digging, not modelled here.",
     };
+    if (state.fix === "uturn" && !j.gaps.length) notes.uturn += " No gap was found on the main road 150–400 m away, so crossing traffic goes round the block instead.";
     html += `<p class="note">${notes[state.fix]}</p><p class="note">Pedestrians: ${esc(f.pedestrian_crossing)}. "Lost here" counts vehicle-hours stopped within 350 m of the centre, which takes in the U-turn gaps. Simulated; demand split, PCU values and saturation flow are assumptions.</p>`;
     $("pane-plan").innerHTML = html;
     drawQueue();

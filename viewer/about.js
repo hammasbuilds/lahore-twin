@@ -133,7 +133,8 @@ window.TWIN_ABOUT = {
     inputs: [
       ["Demand", "trips per hour in the peak (2,000–12,000)"],
       ["Seed", "a different evening: other trips, other calls"],
-      ["Fix and junction", "pick on the page; every fix is already simulated"],
+      ["Junction to plan", "the evening's worst (default), or any of the 59 signalised junctions"],
+      ["Fix, call and way", "pick on the page; every one is already simulated"],
     ],
     outputs: [
       "A close map of each junction from the real roads, the fix drawn on it",

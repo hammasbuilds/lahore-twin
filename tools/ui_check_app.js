@@ -162,6 +162,12 @@ const log = (...a) => console.log(...a);
   const purposes = await f.evaluate(() => window.TRAFFIC.purposes);
   if (!purposes.includes("school run") || purposes.includes("shopping")) fail("a morning run has the wrong trips: " + purposes);
   await shot("07-run-traffic");
+  // the junction planner can plan any signalised junction, not only the worst three
+  f = await runWith("junctions", { junction: "Ghalib Road / MM Alam Road", per_hour: 6000 }, "__junctions");
+  const jm = await f.evaluate(() => ({ meta: window.JUNCTIONS.meta, first: window.JUNCTIONS.junctions[0].name, pick: document.getElementById("pick").options[0].text }));
+  if (jm.meta.junction !== "Ghalib Road / MM Alam Road" || jm.first !== jm.meta.junction || !jm.pick.includes("Ghalib Road")) fail("planner run ignored the picked junction: " + JSON.stringify(jm));
+  if (!/Ghalib Road \/ MM Alam Road/.test(await f.textContent("#your-run"))) fail("the run label does not name the junction");
+  await shot("07b-run-junction");
   f = await runWith("office", { staff: 20, visitors: 2 }, "__twin");
   const om = await f.evaluate(() => window.REPLAY.meta);
   if (om.staff !== 20) fail("office run ignored the staff count: " + JSON.stringify(om));

@@ -27,3 +27,11 @@ def test_a_code_change_never_serves_an_old_cached_run(monkeypatch):
     assert serve.run_key("home", {**p, "seed": 8}) != before
     monkeypatch.setattr(export, "source_digest", lambda module: "changed")
     assert serve.run_key("home", p) != before
+
+
+def test_any_signalised_junction_can_be_planned():
+    names = serve.INPUTS["junctions"]["junction"][2]
+    assert names[0] == "worst" and len(names) > 50
+    assert serve.clean("junctions", {"junction": "Ghalib Road / MM Alam Road"})["junction"] == "Ghalib Road / MM Alam Road"
+    with pytest.raises(ValueError, match="one of the .* listed in the form"):
+        serve.clean("junctions", {"junction": "Mall Road / Nowhere"})

@@ -1338,3 +1338,14 @@ the summary, in two panels on their own clocks — dispatch to the call, then le
 the hospital — with each signal's band in the panel of the leg it is on. A call that no way
 finished before the run ended showed a blank hospital; it now says "still on its way when the
 run ended". UI check passes, no console errors.
+
+**Round 5 — plan the junction you drive through.** The planner only ever showed the evening's
+three worst junctions; nobody could ask about their own. *Built:* "Run with your values" now has
+"Junction to plan": the worst (default) or any of the 59 signalised junctions (names read from the
+road network into the overview summary; the server checks the choice and names a bad one by what
+it is rather than reading out 60 names). The picked junction is planned first and named in the
+"Your run" pill. Checked through the real server: Ghalib Road / MM Alam Road at 6,000 trips an
+hour in 164 s. *Found on that page:* its note said "8,000 trips an hour" — hard-coded; it reads
+the run's own demand now. And a junction that loses 0.1 vehicle-hours, with no U-turn gap within
+reach, said neither — it now says it is quiet and no fix is worth digging for, and that crossing
+traffic goes round the block when there is no gap.

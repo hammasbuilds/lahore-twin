@@ -44,6 +44,7 @@
     if (m.arrivals_pct != null) bits.push(`${m.arrivals_pct}% arrivals`, `${m.alarm_delay} s alarm delay`);
     if (m.per_hour != null) bits.push(`${m.period ? m.period + " · " : ""}${Number(m.per_hour).toLocaleString("en")} trips/h`);
     if (m.staff != null) bits.push(`${m.staff} staff`);
+    if (m.junction && m.junction !== "worst") bits.push(m.junction);
     pill.textContent = "Your run · " + bits.filter(Boolean).join(" · ");
     pill.title = "Simulated with the values you entered";
     const h1 = document.querySelector("header h1");

@@ -43,9 +43,11 @@ def _greens(log, phase: int, t1: int) -> list[list[int]]:
     return out
 
 
-def run_all(seed: int = 7, per_hour: int = 8000, minutes: int = 30, junctions: int = 3) -> tuple[dict, dict]:
+def run_all(seed: int = 7, per_hour: int = 8000, minutes: int = 30, junctions: int = 3,
+            junction: str | None = None) -> tuple[dict, dict]:
     net = load()
-    R = J.run_all(seed=seed, per_hour=per_hour, minutes=minutes, junctions=junctions)
+    R = J.run_all(seed=seed, per_hour=per_hour, minutes=minutes, junctions=junctions,
+                  focus=None if junction in (None, "", "worst") else junction)
     sigs = {s.name: s for s in build_signals(net)}
     t1 = minutes * 60 + 900
     out_j = []
@@ -120,6 +122,7 @@ def run_all(seed: int = 7, per_hour: int = 8000, minutes: int = 30, junctions: i
                          "calls": len(A["calls"]), "compared_response": len(ok_r), "compared_hospital": len(ok_h)}
     replay = {
         "meta": {"seed": seed, "per_hour": per_hour, "minutes": minutes, "t1": t1, "start": 17.5 * 3600,
+                 "junction": junction or "worst",
                  "trips": R["trips"], "digest": source_digest("junctions"), "licence": net.licence,
                  "bbox": [round(v, 1) for v in net.bbox]},
         "classes": list(CLASSES),

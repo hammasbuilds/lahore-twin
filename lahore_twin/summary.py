@@ -71,6 +71,9 @@ def build() -> dict:
              f"{amb['greenwave']['response_mean_s'] // 60}:{amb['greenwave']['response_mean_s'] % 60:02d}", "ambulance to the call (green wave)"],
             [str(len(jn["junctions"])), "junctions × 5 fixes"],
         ]}
+        # for "Run with your values": plan any signalised junction, not only the worst three
+        from .junctions import signal_names
+        out["junctions"]["choices"] = {"junction": ["worst", *signal_names()]}
     return out
 
 

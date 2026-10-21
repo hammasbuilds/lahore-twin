@@ -408,11 +408,21 @@ def run_ambulance(net: Network, trips: list[Trip], calls: list[Trip], amb_mode: 
             "signal_logs": {str(s.id): s.log for s in sim.signals}}
 
 
-def run_all(seed: int = 7, per_hour: int = 8000, minutes: int = 30, junctions: int = 3) -> dict:
+def signal_names(net: Network | None = None) -> list[str]:
+    """Every signalised junction, by name, for picking one to plan."""
+    return sorted(s.name for s in build_signals(net or load()))
+
+
+def run_all(seed: int = 7, per_hour: int = 8000, minutes: int = 30, junctions: int = 3, focus: str | None = None) -> dict:
+    """The worst junctions of the evening - or the one you pick (``focus``) and the worst after it."""
     net = load()
     trips = make_demand(net, seed=seed, minutes=minutes, per_hour=per_hour, period="evening")
     base = TrafficSim(net, trips, "fixed", minutes=minutes).run()
     worst = [name for name, _ in base.metrics()["worst_junctions"][:junctions]]
+    if focus:
+        if focus not in signal_names(net):
+            raise ValueError(f"no signal called {focus!r}")
+        worst = [focus] + [w for w in worst if w != focus][:junctions - 1]
     plans = {name: plan_junction(net, trips, name, minutes) for name in worst}
     calls = ambulance_calls(net, seed, minutes)
     amb = {mode: run_ambulance(net, trips, calls, mode, minutes) for mode in ("none", "siren", "greenwave")}
