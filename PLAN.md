@@ -1533,3 +1533,10 @@ the night caption showed kWh to one decimal and left out the battery on main roa
 as measured. Fixed: on the overview, the junction planner's "4:27 → 3:58" broke across two lines
 after the arrow; card figures now stay on one line (checked at 1,440, 1,280 and 390 px: nothing
 overflows its column).
+
+**Round 7.** Speed and the views not yet looked at. Ready 220 ms after opening; a frame takes
+4.3 ms (smog, 5,236 cells), 2.0 ms (rain), 4.7 ms (night, 4,347 roads), 2.7 ms zoomed in — no
+work needed. Night in the light theme reads (gold lit, grey shed half). Fixed: on a phone the
+underpass circles kept their desktop size (up to 26 px radius) on a map a third as wide, so the
+five central ones merged into one blob — they now scale with the map (down to half size), and the
+label placement uses the same radius.

@@ -126,10 +126,12 @@
   const fm = () => F.modes[state.mode];
   const depthNow = (name) => { const d = fm().depth[name], i = Math.min(d.length - 1, Math.max(0, Math.round(state.t.rain * 2))); return d[i]; };
   const closedNow = (name) => (fm().closed[name] || []).some(([a, b]) => a <= state.t.rain * 60 && (b == null || state.t.rain * 60 < b));
+  // an underpass's circle grows with its water; on a small map (a phone) the circles shrink with it
+  const upR = (d) => (8 + Math.min(18, d * 30)) * Math.min(1, Math.max(0.5, Math.min(W, H) / 700));
   function drawRain() {
     const labels = [];
     for (const u of F.underpasses) {
-      const d = depthNow(u.name), x = SX(u.x), y = SY(u.y), r = 8 + Math.min(18, d * 30);
+      const d = depthNow(u.name), x = SX(u.x), y = SY(u.y), r = upR(d);
       ctx.fillStyle = P.water; ctx.globalAlpha = 0.25 + Math.min(0.6, d); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
       ctx.strokeStyle = d >= 0.3 ? P["sig-red"] : P.water; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
       if (closedNow(u.name)) { ctx.strokeStyle = P.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 9, y); ctx.lineTo(x + 9, y); ctx.stroke(); }
@@ -140,7 +142,7 @@
     // underpasses sit close together: put each label above, below, right or left of its circle,
     // wherever it clears the circles and the labels already placed
     ctx.font = "700 11px Segoe UI, system-ui"; ctx.textAlign = "left"; ctx.fillStyle = P["sig-red"];
-    const boxes = [], circles = F.underpasses.map((u) => ({ x: SX(u.x), y: SY(u.y), r: 8 + Math.min(18, depthNow(u.name) * 30) }));
+    const boxes = [], circles = F.underpasses.map((u) => ({ x: SX(u.x), y: SY(u.y), r: upR(depthNow(u.name)) }));
     const hit = (b) => boxes.some((o) => b.x < o.x + o.w && o.x < b.x + b.w && b.y < o.y + o.h && o.y < b.y + b.h)
       || circles.some((c) => Math.max(b.x, Math.min(c.x, b.x + b.w)) - c.x <= c.r && Math.hypot(Math.max(b.x, Math.min(c.x, b.x + b.w)) - c.x, Math.max(b.y, Math.min(c.y, b.y + b.h)) - c.y) < c.r);
     for (const l of labels) {
