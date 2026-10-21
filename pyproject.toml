@@ -1,0 +1,22 @@
+[project]
+name = "lahore-twin"
+version = "0.6.0"
+description = "IoT simulation of a city like Lahore in one app: office, home, hospital, traffic, junction planner and city systems"
+readme = "README.md"
+requires-python = ">=3.10"
+license = { file = "LICENSE" }
+authors = [{ name = "Muhammad Hammas" }]
+dependencies = []          # the simulators, the server and the viewer use the standard library only
+
+[project.optional-dependencies]
+test = ["pytest"]
+media = ["playwright", "imageio-ffmpeg"]   # tools/demo_video.py only
+
+[project.urls]
+Repository = "https://github.com/hammasbuilds/lahore-twin"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.setuptools]
+packages = ["lahore_twin"]
