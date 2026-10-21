@@ -257,46 +257,6 @@ still cuts PM2.5 at the real hotspot by 12–28%.
 | Busy road-minutes in the dark | 8,695 | **1,803** |
 | Failed lamps known by morning | 0 of 42 | **42 of 42** |
 
-## How it works, animated
-
-Two isometric animations for every module and for every tool inside it, 46 in all, generated
-from the committed replays by `tools/isometric.py` and `tools/isometric_tools.py`. Each one has a
-video:
-
-- **Overview**: the stages an input passes through, each with the code that does it.
-- **Architecture**: the module or tool as layers of real components, with one real piece of data
-  hopping between them, shown exactly as it was recorded. That is the bus message with its
-  id, topic, payload and cause, the patient record, the vehicle's trip and the signal's
-  phase log. Each tool follows its own data, so no two show the same path.
-
-| Module / tool | Overview | Architecture |
-|---|---|---|
-| **The app**: from a typed value to a fresh simulation | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-app.mp4) · [page](docs/isometric/app.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-app-arch.mp4) · [page](docs/isometric/app-arch.html) |
-| **Office tower** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office.mp4) · [page](docs/isometric/office.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office-arch.mp4) · [page](docs/isometric/office-arch.html) |
-| · lights & AC | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office-lights.mp4) · [page](docs/isometric/office-lights.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office-lights-arch.mp4) · [page](docs/isometric/office-lights-arch.html) |
-| · attendance & roll-call | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office-attendance.mp4) · [page](docs/isometric/office-attendance.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office-attendance-arch.mp4) · [page](docs/isometric/office-attendance-arch.html) |
-| **Home + GridSense** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home.mp4) · [page](docs/isometric/home.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home-arch.mp4) · [page](docs/isometric/home-arch.html) |
-| · GridSense | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home-gridsense.mp4) · [page](docs/isometric/home-gridsense.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home-gridsense-arch.mp4) · [page](docs/isometric/home-gridsense-arch.html) |
-| · who's home | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home-people.mp4) · [page](docs/isometric/home-people.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home-people-arch.mp4) · [page](docs/isometric/home-people-arch.html) |
-| **Hospital** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital.mp4) · [page](docs/isometric/hospital.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-arch.mp4) · [page](docs/isometric/hospital-arch.html) |
-| · emergency department | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-ed.mp4) · [page](docs/isometric/hospital-ed.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-ed-arch.mp4) · [page](docs/isometric/hospital-ed-arch.html) |
-| · ward alarms & calls | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-alarms.mp4) · [page](docs/isometric/hospital-alarms.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-alarms-arch.mp4) · [page](docs/isometric/hospital-alarms-arch.html) |
-| · equipment locator | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-equipment.mp4) · [page](docs/isometric/hospital-equipment.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-equipment-arch.mp4) · [page](docs/isometric/hospital-equipment-arch.html) |
-| · families & passes | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-families.mp4) · [page](docs/isometric/hospital-families.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-families-arch.mp4) · [page](docs/isometric/hospital-families-arch.html) |
-| **Lahore traffic** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic.mp4) · [page](docs/isometric/traffic.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-arch.mp4) · [page](docs/isometric/traffic-arch.html) |
-| · trips & shops | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-trips.mp4) · [page](docs/isometric/traffic-trips.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-trips-arch.mp4) · [page](docs/isometric/traffic-trips-arch.html) |
-| · signals | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-signals.mp4) · [page](docs/isometric/traffic-signals.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-signals-arch.mp4) · [page](docs/isometric/traffic-signals-arch.html) |
-| · the streaming map | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-map.mp4) · [page](docs/isometric/traffic-map.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-map-arch.mp4) · [page](docs/isometric/traffic-map-arch.html) |
-| **Junction planner** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions.mp4) · [page](docs/isometric/junctions.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-arch.mp4) · [page](docs/isometric/junctions-arch.html) |
-| · junction fixes | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-fixes.mp4) · [page](docs/isometric/junctions-fixes.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-fixes-arch.mp4) · [page](docs/isometric/junctions-fixes-arch.html) |
-| · ambulance green wave | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-ambulance.mp4) · [page](docs/isometric/junctions-ambulance.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-ambulance-arch.mp4) · [page](docs/isometric/junctions-ambulance-arch.html) |
-| **City systems** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city.mp4) · [page](docs/isometric/city.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-arch.mp4) · [page](docs/isometric/city-arch.html) |
-| · smog sensors | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-smog.mp4) · [page](docs/isometric/city-smog.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-smog-arch.mp4) · [page](docs/isometric/city-smog-arch.html) |
-| · underpass flood alarms | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-rain.mp4) · [page](docs/isometric/city-rain.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-rain-arch.mp4) · [page](docs/isometric/city-rain-arch.html) |
-| · adaptive streetlights | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-night.mp4) · [page](docs/isometric/city-night.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-night-arch.mp4) · [page](docs/isometric/city-night-arch.html) |
-
-![Office architecture, hop by hop](docs/isometric/office-arch.png)
-
 ## How it works
 
 - **Engine** (`lahore_twin/`): a 1-second simulation per module on an MQTT-style bus in which
