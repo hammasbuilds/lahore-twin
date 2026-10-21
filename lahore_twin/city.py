@@ -312,9 +312,14 @@ def underpasses(net: Network) -> list[dict]:
     out = []
     for g in groups:
         names = [lk.name for lk in g if lk.name]
-        name = max(set(names), key=names.count) if names else "Underpass"
-        if "nderpass" not in name:
-            name += " underpass"
+        if names:
+            name = max(set(names), key=names.count)
+            name += "" if "nderpass" in name else " underpass"
+        else:                                   # unnamed on the map: name it by the road it passes under
+            gc = (sum(lk.pts[0][0] for lk in g) / len(g), sum(lk.pts[0][1] for lk in g) / len(g))
+            above = min((lk for lk in net.links if lk.layer >= 0 and lk.name),
+                        key=lambda lk: min(math.dist(gc, p) for p in lk.pts))
+            name = f"Underpass at {above.name}"
         roads = {lk.road for lk in g}
         area = sum(net.links[next(l.id for l in g if l.road == r)].length * max(l.lanes for l in g if l.road == r) * 3.2
                    * (1 if any(l.oneway for l in g if l.road == r) else 2) for r in roads)

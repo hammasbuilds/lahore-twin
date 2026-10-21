@@ -176,6 +176,24 @@ def main() -> None:
         page.wait_for_timeout(900)
         shot("15c-ambulance-green-wave")
 
+        # 6c city systems: smog as the sensors see it, the storm both ways, the night
+        page.click('#nav button[data-go="city"]')
+        f = wait_module("__city")
+        f.click('#views button[data-view="smog"]'); f.click('#modes button[data-mode="connected"]')
+        f.evaluate("() => { const X = window.__city; X.state.t.smog = window.CITY.smog.minutes - 2; X.frame(true); }")
+        page.wait_for_timeout(900)
+        shot("15d-city-smog")
+        f.click('#views button[data-view="rain"]'); f.click('#modes button[data-mode="today"]')
+        f.evaluate("() => { const X = window.__city; X.state.t.rain = 55; X.frame(true); }")
+        page.wait_for_timeout(900)
+        shot("15e-city-flood-today")
+        f.click('#modes button[data-mode="connected"]'); page.wait_for_timeout(900)
+        shot("15f-city-flood-connected")
+        f.click('#views button[data-view="night"]')
+        f.evaluate("() => { const X = window.__city; X.state.t.night = 130; X.frame(true); }")
+        page.wait_for_timeout(900)
+        shot("15g-city-streetlights")
+
         # 7 run with your own values
         page.click('#nav button[data-go="overview"]')
         page.click(f'.card[data-card="{RUN["module"]}"] [data-run]')

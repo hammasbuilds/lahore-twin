@@ -124,14 +124,27 @@
   const depthNow = (name) => { const d = fm().depth[name], i = Math.min(d.length - 1, Math.max(0, Math.round(state.t.rain * 2))); return d[i]; };
   const closedNow = (name) => (fm().closed[name] || []).some(([a, b]) => a <= state.t.rain * 60 && (b == null || state.t.rain * 60 < b));
   function drawRain() {
+    const labels = [];
     for (const u of F.underpasses) {
       const d = depthNow(u.name), x = SX(u.x), y = SY(u.y), r = 8 + Math.min(18, d * 30);
       ctx.fillStyle = P.water; ctx.globalAlpha = 0.25 + Math.min(0.6, d); ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.fill(); ctx.globalAlpha = 1;
       ctx.strokeStyle = d >= 0.3 ? P["sig-red"] : P.water; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(x, y, r, 0, 7); ctx.stroke();
       if (closedNow(u.name)) { ctx.strokeStyle = P.text; ctx.lineWidth = 3; ctx.beginPath(); ctx.moveTo(x - 9, y); ctx.lineTo(x + 9, y); ctx.stroke(); }
       const stuck = fm().stranded_events.filter(([t, n]) => n === u.name && t <= state.t.rain * 60).length;
-      if (stuck) { ctx.fillStyle = P["sig-red"]; ctx.font = "700 11px Segoe UI, system-ui"; ctx.textAlign = "center"; ctx.fillText(`${stuck} stalled`, x, y - r - 5); }
+      if (stuck) labels.push({ x, y, r, text: `${stuck} stalled` });
       hits.push({ x, y, r: r + 4, text: `${u.name} · ${d.toFixed(2)} m of water${closedNow(u.name) ? " · gate closed" : ""}${stuck ? ` · ${stuck} stalled` : ""}` });
+    }
+    // underpasses sit close together: put each label above, below, right or left of its circle,
+    // wherever it clears the circles and the labels already placed
+    ctx.font = "700 11px Segoe UI, system-ui"; ctx.textAlign = "left"; ctx.fillStyle = P["sig-red"];
+    const boxes = [], circles = F.underpasses.map((u) => ({ x: SX(u.x), y: SY(u.y), r: 8 + Math.min(18, depthNow(u.name) * 30) }));
+    const hit = (b) => boxes.some((o) => b.x < o.x + o.w && o.x < b.x + b.w && b.y < o.y + o.h && o.y < b.y + b.h)
+      || circles.some((c) => Math.max(b.x, Math.min(c.x, b.x + b.w)) - c.x <= c.r && Math.hypot(Math.max(b.x, Math.min(c.x, b.x + b.w)) - c.x, Math.max(b.y, Math.min(c.y, b.y + b.h)) - c.y) < c.r);
+    for (const l of labels) {
+      const w = ctx.measureText(l.text).width, h = 12;
+      const spots = [[l.x - w / 2, l.y - l.r - 4 - h], [l.x - w / 2, l.y + l.r + 4], [l.x + l.r + 4, l.y - h / 2], [l.x - l.r - 4 - w, l.y - h / 2]];
+      const [bx, by] = spots.find(([sx, sy]) => !hit({ x: sx, y: sy, w, h })) || spots[0];
+      boxes.push({ x: bx, y: by, w, h }); ctx.fillText(l.text, bx, by + h - 2);
     }
   }
   function renderRain() {
@@ -159,14 +172,14 @@
     const c = $("c-rain"); if (!c) return;
     const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight; c.width = w * dpr; c.height = h * dpr;
     const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = F.rain.length, L = 30, B = 16, xs = (i) => L + (w - L - 4) * i / (n - 1), ys = (v) => 4 + (h - B - 4) * (1 - v / 0.6);
+    const n = F.rain.length, L = 40, B = 16, xs = (i) => L + (w - L - 4) * i / (n - 1), ys = (v) => 4 + (h - B - 4) * (1 - v / 0.6);
     g.fillStyle = "rgba(239,68,68,.15)"; g.fillRect(xs(F.power_cut[0] / 30), 4, xs(F.power_cut[1] / 30) - xs(F.power_cut[0] / 30), h - B - 4);
     g.fillStyle = P.muted; g.globalAlpha = 0.35; F.rain.forEach((r, i) => { const bh = (h - B - 8) * r / 80; g.fillRect(xs(i), h - B - bh, Math.max(1, (w - L) / n), bh); }); g.globalAlpha = 1;
     for (const [v, col] of [[0.3, P["sig-red"]], [0.45, P["sig-red"]]]) { g.strokeStyle = col; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(L, ys(v)); g.lineTo(w - 4, ys(v)); g.stroke(); g.setLineDash([]); }
     g.strokeStyle = P.water; g.lineWidth = 1.5;
     for (const u of F.underpasses) { const d = fm().depth[u.name]; g.beginPath(); d.forEach((v, i) => (i ? g.lineTo(xs(i), ys(Math.min(0.6, v))) : g.moveTo(xs(i), ys(v)))); g.stroke(); }
-    g.fillStyle = P.muted; g.font = "10.5px Segoe UI, system-ui"; g.textAlign = "right"; for (const v of [0, 0.3, 0.6]) g.fillText(v.toFixed(1) + " m", L - 3, ys(v) + 3);
-    g.textAlign = "center"; for (let m = 0; m <= n / 2; m += 15) g.fillText(C.clock(R.meta.flood_start + m * 60), xs(m * 2), h - 3);
+    g.fillStyle = P.muted; g.font = "10.5px Segoe UI, system-ui"; g.textAlign = "right"; for (const v of [0, 0.3, 0.6]) g.fillText(v.toFixed(1) + " m", L - 3, Math.max(11, ys(v) + 3));
+    for (let m = 0; m <= n / 2; m += 15) { g.textAlign = m === 0 ? "left" : m + 15 > n / 2 ? "right" : "center"; g.fillText(C.clock(R.meta.flood_start + m * 60), xs(Math.min(n - 1, m * 2)), h - 3); }
     const x = xs(state.t.rain * 2); g.strokeStyle = P.text; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - B); g.stroke(); g.globalAlpha = 1;
   }
 
@@ -207,12 +220,12 @@
     const c = $("c-night"); if (!c) return;
     const dpr = window.devicePixelRatio || 1, w = c.clientWidth, h = c.clientHeight; c.width = w * dpr; c.height = h * dpr;
     const g = c.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const n = Lt.minutes, L = 34, B = 16, max = Math.max(...Lt.modes.today.kw, 1) * 1.1;
+    const n = Lt.minutes, L = 46, B = 16, max = Math.max(...Lt.modes.today.kw, 1) * 1.1;
     const xs = (i) => L + (w - L - 4) * i / (n - 1), ys = (v) => 4 + (h - B - 4) * (1 - v / max);
     g.fillStyle = "rgba(239,68,68,.15)"; g.fillRect(xs(Lt.outage[0] / 60), 4, xs(Lt.outage[1] / 60) - xs(Lt.outage[0] / 60), h - B - 4);
     for (const [k, col, wd] of [["today", P.muted, 1.2], ["connected", P.lamp, 2]]) { g.strokeStyle = col; g.lineWidth = wd; g.beginPath(); Lt.modes[k].kw.forEach((v, i) => (i ? g.lineTo(xs(i), ys(v)) : g.moveTo(xs(i), ys(v)))); g.stroke(); }
-    g.fillStyle = P.muted; g.font = "10.5px Segoe UI, system-ui"; g.textAlign = "right"; for (const v of [0, Math.round(max / 2)]) g.fillText(v + " kW", L - 3, ys(v) + 3);
-    g.textAlign = "center"; for (let m = 0; m <= n; m += 60) g.fillText(C.clock(R.meta.night_start + m * 60), xs(m), h - 3);
+    g.fillStyle = P.muted; g.font = "10.5px Segoe UI, system-ui"; g.textAlign = "right"; for (const v of [0, Math.round(max / 2)]) g.fillText(v + " kW", L - 3, Math.max(11, ys(v) + 3));
+    for (let m = 0; m <= n; m += 60) { g.textAlign = m === 0 ? "left" : m + 60 > n ? "right" : "center"; g.fillText(C.clock(R.meta.night_start + m * 60), xs(Math.min(n - 1, m)), h - 3); }
     const x = xs(state.t.night); g.strokeStyle = P.text; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(x, 4); g.lineTo(x, h - B); g.stroke(); g.globalAlpha = 1;
   }
 

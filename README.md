@@ -1,7 +1,8 @@
 # Lahore Twin
 
 IoT systems for a city like Lahore, simulated end to end in one app: an office tower,
-a home on solar during load-shedding, a hospital, and the city's traffic on real roads.
+a home on solar during load-shedding, a hospital, the city's traffic on real roads, a junction
+planner, and city-wide smog sensors, underpass flood alarms and streetlights.
 Every device — badge readers, motion and CO₂ sensors, inverters, bedside monitors, fridge
 probes, traffic signals — sits behind an MQTT-style topic, so a real sensor can replace a
 simulated one without changing the rules.
@@ -17,7 +18,7 @@ simulated one without changing the rules.
 | **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2; patients' attendants and visitors | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
 | **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes, 59 signals on a 60 s / 30 s plan; 7,097 trips in the evening peak with 1,763 stops at 432 real shops and amenities | adaptive signals cut median delay **105 → 60 s** and time stopped at signals **90 → 21** vehicle-hours | ready |
 | **Junction planner** | the evening's three worst junctions under five fixes (retime, adaptive, U-turn conversion, underpass), and ten Rescue 1122 calls from the real station | at Firozpur Road / Wahdat Road time lost falls **28.8 → 6.9–9.6** vehicle-hours; a green wave gets the ambulance to the call **11% sooner** (4:27 → 3:58) | ready |
-| City systems | smog sensors, underpass flooding alarms, smart streetlights | | planned |
+| **City systems** | on the same roads, driven by the traffic: PM2.5 on a smoggy November evening with 25 low-cost sensors; seven real underpasses in a monsoon storm with a power cut; 9,545 streetlights through a night of load-shedding | sensors cut the air map's error **91 → 55 µg/m³**; closed underpasses strand **28 → 0** vehicles; adaptive lights use **38% less** energy | ready |
 
 ## Run it
 
@@ -48,6 +49,7 @@ Python 3.10+, standard library only. No network: the map data ships in `plans/os
 | Home | day, season, load-shedding category, solar kWp, battery kWh | each floor and the roof with fans, ACs, tank and panels; power flow; dark minutes, comfort, bill; every controller decision with its reason |
 | Hospital | day, emergency arrivals (%), ward nurses per shift, alarm delay (s) | site, ED and ward floors with patients by triage colour; ED board, bed board, equipment list; waits, call and alarm response, search time, fridge excursions, bed turnaround |
 | Junction planner | day (seed), trips per hour; then pick a junction, a fix, a call and a way on the page | a close map of each junction with the fix drawn; time lost, queue, delay, extra km and pedestrian cost per fix; the ambulance on its route with a time–distance diagram |
+| City systems | evening (seed), trips per hour; then Smog / Rain / Night, Today / Connected, and what the city sees or the truth | PM2.5 map in US AQI bands with every sensor's reading and the hotspot found; underpass gauges, gates and stalled vehicles with depth and rain charts; every road's light level and power drawn; Today vs Connected for each |
 | Traffic | evening or morning peak, day (seed), trips per hour | a streaming map that loads around the camera; follow any vehicle and see why it is driving and where it stops; the busiest shops; signals with countdowns; delay, stops, speed and the worst junctions per rule set |
 
 Every module has an **About** panel with the same information, and a **Compare** tab that
@@ -88,6 +90,13 @@ puts its rule sets side by side for the whole day.
 
 ![Junction planner](docs/screenshots/15b-junction-planner.png)
 ![Ambulance green wave](docs/screenshots/15c-ambulance-green-wave.png)
+
+**City systems** — the PM2.5 map the 25 sensors make, an underpass storm without and with level sensors, and the streetlights through load-shedding.
+
+![Smog as the sensors map it](docs/screenshots/15d-city-smog.png)
+![Underpasses flooding, today](docs/screenshots/15e-city-flood-today.png)
+![Underpasses with level sensors](docs/screenshots/15f-city-flood-connected.png)
+![Streetlights at night](docs/screenshots/15g-city-streetlights.png)
 
 **Run with your values** — typed inputs, and the hospital day they produced (150% arrivals, 4 ward nurses, no alarm delay).
 
@@ -219,6 +228,34 @@ then to the nearest hospital with an emergency department:
 Field studies of signal preemption report 14–23% shorter emergency trips; this is 11% (9–11% over three
 evenings, seeds 7, 11 and 23). The calls
 are short (1.5–8 km, one to four signals), so there is less to gain than on a long corridor.
+
+City systems, the same evening (seed 7). Background haze, storm, pump and lamp figures are
+assumptions, labelled in the code and on each view.
+
+| Smog, 17:30–18:30 | One official monitor | + 25 low-cost sensors |
+|---|---|---|
+| Air-map error near roads, µg/m³ | 90.7 | **54.7** |
+| Hotspot placed (peak quarter-hour) | no | 424 m from the real one |
+| PM2.5 at the real hotspot, adaptive signals within 400 m of the found one | 733 | **644** |
+
+Area mean at the peak 203.5 µg/m³, worst street cell 1,018. Over three evenings the sensors place
+the hotspot 140–640 m off (their regression uses only the signals' loop detectors) and the action
+still cuts PM2.5 at the real hotspot by 12–28%.
+
+| Monsoon storm, 18:00–19:15, power cut 18:25–19:05 | Today | Connected |
+|---|---|---|
+| Deepest water, m | 0.52 | **0.17** |
+| Vehicles stalled in water | 28 | **0** |
+| Gridlocked behind them | 454 | **0** |
+| Rerouted round a closed underpass | 0 | 349 |
+| Trips finished | 4,670 | **5,146** |
+| Median delay, s | 84.6 | 89.1 |
+
+| Streetlights, 23:00–05:00 | Today | Connected |
+|---|---|---|
+| Energy, kWh | 5,340 | **3,290** (−38%) |
+| Busy road-minutes in the dark | 8,695 | **1,803** |
+| Failed lamps known by morning | 0 of 42 | **42 of 42** |
 
 ## How it works, animated
 

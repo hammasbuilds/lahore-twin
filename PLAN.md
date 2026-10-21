@@ -1480,3 +1480,14 @@ quarter-hour, for the truth and the network alike: 424 / 141 / 640 m (seeds 7, 1
 network places it a block or two off — detectors only count signal approaches — so the page now
 also reports what the action does at the *real* hotspot: 733 → 644, 709 → 592, 764 → 550 µg/m³
 (12–28%), since 400 m of adaptive signals still reach it.
+
+### Phase 6 round log
+
+**Round 1 (2026-10-21).** Recorded the walkthrough with the new City Systems shots and looked at
+each one. Fixed: the stalled-vehicle labels over neighbouring underpasses overlapped and one hid
+behind a circle — each label now goes above, below, right or left of its circle, wherever it
+clears circles and labels already placed; one underpass is unnamed in OpenStreetMap and showed as
+"Underpass" — now named by the road it passes under ("Underpass at Main Boulevard Gulberg"); the
+charts' axis labels were cut off ("42 kW", "19:") — wider margin, end ticks aligned inwards, top
+label kept inside; in the app shell the three switches pushed About onto a second header row —
+the subtitle hides below 1,400 px. README gained the city section, results and four screenshots.
