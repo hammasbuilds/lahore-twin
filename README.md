@@ -259,7 +259,7 @@ still cuts PM2.5 at the real hotspot by 12–28%.
 
 ## How it works, animated
 
-Two isometric animations for every module and for every tool inside it, 38 in all, generated
+Two isometric animations for every module and for every tool inside it, 46 in all, generated
 from the committed replays by `tools/isometric.py` and `tools/isometric_tools.py`. Each one has a
 video:
 
@@ -290,6 +290,10 @@ video:
 | **Junction planner** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions.mp4) · [page](docs/isometric/junctions.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-arch.mp4) · [page](docs/isometric/junctions-arch.html) |
 | · junction fixes | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-fixes.mp4) · [page](docs/isometric/junctions-fixes.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-fixes-arch.mp4) · [page](docs/isometric/junctions-fixes-arch.html) |
 | · ambulance green wave | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-ambulance.mp4) · [page](docs/isometric/junctions-ambulance.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-ambulance-arch.mp4) · [page](docs/isometric/junctions-ambulance-arch.html) |
+| **City systems** | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city.mp4) · [page](docs/isometric/city.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-arch.mp4) · [page](docs/isometric/city-arch.html) |
+| · smog sensors | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-smog.mp4) · [page](docs/isometric/city-smog.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-smog-arch.mp4) · [page](docs/isometric/city-smog-arch.html) |
+| · underpass flood alarms | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-rain.mp4) · [page](docs/isometric/city-rain.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-rain-arch.mp4) · [page](docs/isometric/city-rain-arch.html) |
+| · adaptive streetlights | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-night.mp4) · [page](docs/isometric/city-night.html) | [video](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-city-night-arch.mp4) · [page](docs/isometric/city-night-arch.html) |
 
 ![Office architecture, hop by hop](docs/isometric/office-arch.png)
 

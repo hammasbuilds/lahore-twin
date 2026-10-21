@@ -366,13 +366,72 @@ def junctions():
     return ov, deep
 
 
+# ------------------------------------------------------------------ city systems
+def _cell(G, x, y):
+    i = min(G["nx"] - 1, max(0, int((x - G["x0"]) // G["cell"])))
+    jj = min(G["ny"] - 1, max(0, int((y - G["y0"]) // G["cell"])))
+    return jj * G["nx"] + i
+
+
+def city():
+    Cy = load("city_replay.js")
+    sm, F, Lt = Cy["smog"]["metrics"], Cy["flood"], Cy["lights"]
+    fa, fb, la, lb = F["modes"]["today"], F["modes"]["connected"], Lt["modes"]["today"], Lt["modes"]["connected"]
+    u0 = F["underpasses"][0]["name"]
+    figs = ((f"{sm['map_error_today']:.0f} → {sm['map_error_sensors']:.0f}", "air-map error, µg/m³"), (f"{fa['stranded']} → {fb['stranded']}", "vehicles stalled in underpasses"),
+            (f"−{round(100 * (1 - lb['kwh'] / la['kwh']))}%", "streetlight energy"))
+    arch = "Three IoT systems on the traffic simulation's own vehicles: a dispersion grid with a land-use regression, underpass water balances, lamp-by-lamp dimming. No model, no embedding, no vector store."
+    ov = isometric.Anatomy(
+        key="city", project="Lahore Twin · City systems", repo=REPO,
+        tagline="Smog sensors, underpass flood alarms and streetlights on Lahore's real roads, driven by its traffic.",
+        given="an evening · 8,000 trips an hour · seed 7",
+        given_note="the inputs of “Run with your values”",
+        produced=f"map error {sm['map_error_today']} → {sm['map_error_sensors']} µg/m³; {fa['stranded']} → {fb['stranded']} stalled; {la['kwh']:,.0f} → {lb['kwh']:,.0f} kWh",
+        produced_note="Today against Connected, the same trips",
+        architecture=arch,
+        stages=(
+            Stage("Traffic", "The evening's trips on the real roads, minute by minute", "traffic_sim.TrafficSim", "vehicles"),
+            Stage("Smog", "Exhaust and idling per road, spread on a 100 m grid over the haze", "city.smog()", "PM2.5 field"),
+            Stage("Sensors", "One monitor, or 25 low-cost sensors and the loop counts", "city.sensor_sites() / smog()", "the city's map"),
+            Stage("Storm", "Rain into each underpass, pumps out until the feeder trips", "city.depth_series()", "water depth"),
+            Stage("Gates", "Level sensors close the underpass and reroute traffic", "city.flood()", "detours"),
+            Stage("Night", "Each road dims unless traffic is on or beside it", "city.streetlights()", "lamp levels"),
+            Stage("Show", "Smog, Rain and Night, Today against Connected", "viewer/city.js", "City Systems"),
+        ),
+        figures=figs)
+    deep = isodeep.Deep(
+        key="city", project="Lahore Twin · City systems", repo=REPO,
+        tagline="One evening, one storm, one night: the traffic's own vehicles through three city systems.",
+        architecture=arch,
+        layers=(Layer("road", "Traffic", "vehicles on the real roads"), Layer("phys", "Physics", "smoke, water, light"),
+                Layer("iot", "Sensors & controls", "what the city measures and does"), Layer("out", "Record & view", "replay and page")),
+        components=(C("sim", "Traffic simulation", "road", "traffic_sim.TrafficSim", 1),
+                    C("disp", "Dispersion grid", "phys", "city.Grid.spread()", 0), C("sump", "Underpass basin", "phys", "city.depth_series()", 1), C("lamp", "Lamp levels", "phys", "city.streetlights()", 2),
+                    C("lur", "Sensors + LUR", "iot", "city.smog()", 0), C("gate", "Level sensor + gate", "iot", "city.flood()", 1), C("dim", "Dimming controller", "iot", "city.streetlights()", 2),
+                    C("rec", "Recorder", "out", "export_city.run_all()", 0), C("ui", "City Systems", "out", "viewer/city.js", 2)),
+        hops=(
+            Hop("sim", "disp", j({"trips": Cy["smog"]["trips"], "minutes": Cy["smog"]["minutes"], "emits": "g per road per minute: exhaust per km + idling in queues"}), "The traffic module's vehicles are the smog's source.", "emissions"),
+            Hop("disp", "lur", j({"area_mean_peak": sm["area_mean_peak"], "worst_cell_peak": sm["worst_cell_peak"]}), "PM2.5 at street level, µg/m³, at the peak.", "PM2.5"),
+            Hop("lur", "sim", j({"hotspot_found_m": sm["hotspot_found_m"], "adaptive_signals": sm["adaptive_signals"], "real_hotspot": [sm["true_hotspot_before"], sm["true_hotspot_after"]]}), "Where the sensors find the hotspot, nearby signals go adaptive; same trips again.", "action"),
+            Hop("sump", "gate", j({"underpass": u0, "max_depth_m": [fa["max_depth"][u0], fb["max_depth"][u0]], "power_cut": [clock(Cy["meta"]["flood_start"] + F["power_cut"][0]), clock(Cy["meta"]["flood_start"] + F["power_cut"][1])]}), "Today against Connected: the generator and the gate.", "depth"),
+            Hop("gate", "sim", j({"stranded": [fa["stranded"], fb["stranded"]], "rerouted": fb["rerouted"], "trips_finished": [fa["completed"], fb["completed"]]}), "A closed underpass turns cars back to the surface road.", "detour"),
+            Hop("sim", "dim", j({"night_trips": Lt["trips"], "lamps": Lt["lamp_count"], "dim_to": Lt["dim"]}), "Which roads have traffic each minute decides each road's level.", "occupancy"),
+            Hop("dim", "lamp", j({"kwh": [la["kwh"], lb["kwh"]], "busy_road_minutes_dark": [la["busy_road_minutes_dark"], lb["busy_road_minutes_dark"]]}), "Today against Connected, the whole night.", "energy"),
+            Hop("rec", "ui", j({"views": ["Smog", "Rain", "Night"], "rule_sets": ["Today", "Connected"]}), "One replay, three views on the same base map.", "viewer"),
+        ),
+        given="an evening's trips on the real roads",
+        produced="air map, underpass depths, lamp levels: Today against Connected",
+        figures=figs, source="viewer/city_replay.js (seed 7)")
+    return ov, deep
+
+
 # ------------------------------------------------------------------ the app
 def app():
-    figs = (("5", "modules running"), ("1", "server, stdlib only"), ("0", "real devices needed"))
+    figs = (("6", "modules running"), ("1", "server, stdlib only"), ("0", "real devices needed"))
     arch = "One offline web app over stdlib-Python simulators; a local server re-runs a module with your values. No model, no embedding, no vector store."
     ov = isometric.Anatomy(
         key="app", project="Lahore Twin", repo=REPO,
-        tagline="IoT simulation of a city, one building at a time: office, home, hospital, traffic, junctions.",
+        tagline="IoT simulation of a city, one building at a time: office, home, hospital, traffic, junctions, city systems.",
         given="a module and your values, e.g. traffic · morning · 4,000 trips/h",
         given_note="typed into “Run with your values”",
         produced="that module's dashboard, simulated from your values",
@@ -410,7 +469,7 @@ def app():
     return ov, deep
 
 
-MODULES = {"app": app, "office": office, "home": home, "hospital": hospital, "traffic": traffic, "junctions": junctions}
+MODULES = {"app": app, "office": office, "home": home, "hospital": hospital, "traffic": traffic, "junctions": junctions, "city": city}
 
 
 def main() -> None:

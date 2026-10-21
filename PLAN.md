@@ -1491,3 +1491,9 @@ clears circles and labels already placed; one underpass is unnamed in OpenStreet
 charts' axis labels were cut off ("42 kW", "19:") — wider margin, end ticks aligned inwards, top
 label kept inside; in the app shell the three switches pushed About onto a second header row —
 the subtitle hides below 1,400 px. README gained the city section, results and four screenshots.
+Isometric: `city` (module) plus `city-smog`, `city-rain`, `city-night` (tools), each an overview
+and an architecture view with its own data, every page with a poster and a video (46 in all, 47
+release assets). *Found:* the rain view first picked the underpass with the most drivers
+stalled, Canal Road, which Connected never needed to close (0.14 m, under the 0.15 m gate depth),
+so its "gate closes" hop would have shown nothing; it now follows the underpass that stalled most
+drivers among those Connected closed (Ali Zaib Road: 7 stalled from 18:47 Today; gate shut 18:41).

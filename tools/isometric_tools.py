@@ -518,8 +518,127 @@ def junctions_ambulance():
         "viewer/junctions_replay.js (seed 7)", "One real call: dispatched, preempted signal by signal, to the hospital.")
 
 
+# ------------------------------------------------------------------ city systems
+def _cy():
+    return load("city_replay.js")
+
+
+def city_smog():
+    from isometric import _cell
+    Cy = _cy()
+    S = Cy["smog"]
+    m, G = S["metrics"], S["grid"]
+    fi = len(S["frames"]) - 1
+    k = max(range(len(S["sensors"])), key=lambda i: S["readings"][fi][i])
+    sen = S["sensors"][k]
+    truth_there = S["truth"][fi][_cell(G, sen["x"], sen["y"])]
+    t = clock(Cy["meta"]["smog_start"] + S["frames"][fi] * 60)
+    figs = ((f"{m['map_error_today']:.0f} → {m['map_error_sensors']:.0f}", "map error near roads, µg/m³"), (f"{m['hotspot_found_m']} m", "hotspot placed off"),
+            (f"{m['true_hotspot_before']:.0f} → {m['true_hotspot_after']:.0f}", "PM2.5 at the real hotspot"))
+    arch = "Gaussian dispersion of the traffic's own emissions on a 100 m grid; a land-use regression of 25 sensors on loop-detector counts, residuals by inverse distance. " + NOMODEL
+    return _pair(
+        "city-smog", "City systems · smog sensors", "A November evening: one official monitor against 25 low-cost sensors, and what the city does with the map.",
+        arch, "a November evening, 17:30-18:30", f"{S['trips']:,} trips, seed 7",
+        f"map error {m['map_error_today']} → {m['map_error_sensors']} µg/m³; hotspot {m['true_hotspot_before']} → {m['true_hotspot_after']}", "one monitor → 25 sensors + action",
+        (Stage("Emit", "Exhaust per km and idling per minute, per road", "city.Emissions", "g/min"),
+         Stage("Spread", "Gaussian, 250 m, on a 100 m grid over the inversion's haze", "city.Grid.spread() / background()", "truth"),
+         Stage("Read", "Each sensor with its own gain error and noise", "city.smog()", "readings"),
+         Stage("Calibrate", "One network-wide correction from the sensor beside the monitor", "city.smog()", "calibrated"),
+         Stage("Map", "Regress readings on loop-detector counts; interpolate the residuals", "city.smog() / idw()", "the city's map"),
+         Stage("Act", "Signals within 400 m of the hotspot go adaptive; re-run", "city.smog(adaptive_near)", "less idling")),
+        figs,
+        (Layer("src", "Traffic", "the source"), Layer("air", "Air", "what is really there"),
+         Layer("net", "Sensor network", "what the city can see"), Layer("act", "Action", "signals at the hotspot")),
+        (C("em", "Emissions", "src", "city.Emissions", 0), C("loop", "Loop detectors", "src", "Emissions.counts", 2),
+         C("grid", "Dispersion grid", "air", "city.Grid.spread()", 1),
+         C("sen", "Low-cost sensor", "net", "city.sensor_sites()", 0), C("lur", "Land-use regression", "net", "city.smog()", 2),
+         C("sig", "Adaptive signals", "act", "Signal.adaptive", 1)),
+        (Hop("em", "grid", j({"trips": S["trips"], "per_road_per_minute": "g of PM2.5: km driven x factor + seconds idling x factor"}), "Every vehicle of the traffic module, by kind.", "emissions"),
+         Hop("grid", "sen", j({"at": t, "sensor": sen["name"], "kind": sen["kind"], "truth_ugm3": truth_there}), "The air at the sensor's cell, as it really is.", "truth"),
+         Hop("sen", "lur", j({"at": t, "sensor": sen["name"], "gain": sen["gain"], "reading_ugm3": S["readings"][fi][k]}), "What the sensor reports after the network-wide correction.", "reading"),
+         Hop("loop", "lur", j({"counts": "vehicle-seconds on signal approaches only", "why": "a proxy for traffic, not a copy of the truth"}), "The signals' loop detectors give the regression its shape.", "counts"),
+         Hop("lur", "sig", j({"map_error": [m["map_error_today"], m["map_error_sensors"]], "hotspot_found_m": m["hotspot_found_m"], "adaptive_signals": m["adaptive_signals"]}), "The worst quarter-hour cell on the sensors' map; nearby signals go adaptive.", "hotspot"),
+         Hop("sig", "grid", j({"where_it_acted": [m["hotspot_before"], m["hotspot_after"]], "real_hotspot": [m["true_hotspot_before"], m["true_hotspot_after"]]}), "The same trips again, with less idling at the hotspot.", "µg/m³")),
+        "an evening's traffic and the regional haze", "the air map, its error, the hotspot and the action's effect",
+        "viewer/city_replay.js (seed 7)", f"One real reading: {sen['name']} at {t}, against the truth in its cell.")
+
+
+def city_rain():
+    Cy = _cy()
+    F = Cy["flood"]
+    a, b = F["modes"]["today"], F["modes"]["connected"]
+    # the underpass with the most drivers stalled Today among those Connected closed, so both stories are told
+    u = max((x for x in F["underpasses"] if b["closed_min"][x["name"]]), key=lambda x: a["stranded_at"][x["name"]])["name"]
+    t0 = Cy["meta"]["flood_start"]
+    first_stall = next(t for t, n in a["stranded_events"] if n == u)
+    shut = b["closed"][u][0][0] if b["closed"][u] else None
+    figs = ((f"{a['stranded']} → {b['stranded']}", "vehicles stalled"), (f"{max(a['max_depth'].values())} → {max(b['max_depth'].values())} m", "deepest water"),
+            (f"{a['completed']:,} → {b['completed']:,}", "trips finished"))
+    arch = "A water balance per real underpass (rain on the dip and its catchment in, pumps out while there is power), stall depths per vehicle kind, gates that reroute the traffic. " + NOMODEL
+    return _pair(
+        "city-rain", "City systems · underpass flood alarms", "A monsoon storm with a power cut: the water finds the drivers, or the gate closes first.",
+        arch, "a 60 mm/h storm, 18:00-19:15", f"power cut {clock(t0 + F['power_cut'][0])}-{clock(t0 + F['power_cut'][1])}, seed 7",
+        f"{a['stranded']} → {b['stranded']} stalled; {b['rerouted']} rerouted; {a['completed']:,} → {b['completed']:,} trips", "Today → Connected",
+        (Stage("Find", "Tunnel pieces on OpenStreetMap grouped into underpasses", "city.underpasses()", "7 basins"),
+         Stage("Fill", "Rain on the dip and 2 ha of streets draining in", "city.rain_mmh() / depth_series()", "depth"),
+         Stage("Pump", "0.25 m³/s until LESCO's feeder trips; then the generator", "city.depth_series()", "outflow"),
+         Stage("Stall", "Motorcycles at 0.30 m, cars at 0.45 m", "city.flood()", "stranded"),
+         Stage("Gate", "Close at 0.15 m, reopen at 0.05 m, reroute traffic", "city.flood() / Movements.closed", "detours")),
+        figs,
+        (Layer("sky", "Storm & grid", "rain and power"), Layer("pit", "Underpass", "the basin and its pumps"),
+         Layer("iot", "Level sensor", "gate and generator"), Layer("road", "Traffic", "who drives in")),
+        (C("rain", "Rain", "sky", "city.rain_mmh()", 0), C("feed", "LESCO feeder", "sky", "city.POWER_CUT", 2),
+         C("sump", "Basin + pumps", "pit", "city.depth_series()", 1),
+         C("lvl", "Level sensor", "iot", "city.flood()", 0), C("gate", "Gate + generator", "iot", "city.flood()", 2),
+         C("cars", "Vehicles", "road", "traffic_sim.TrafficSim", 1)),
+        (Hop("rain", "sump", j({"peak_mm_h": max(F["rain"]), "catchment_m2": F["underpasses"][0]["catchment_m2"]}), "Rain on the dip and the streets that drain into it.", "inflow"),
+         Hop("feed", "sump", j({"power_cut": [clock(t0 + F["power_cut"][0]), clock(t0 + F["power_cut"][1])], "generator_after_s": F["generator"]}), "The pumps stop when the feeder trips; Today's generator starts 30 min late, Connected's in 2.", "power"),
+         Hop("sump", "cars", j({"underpass": u, "first_stall": clock(t0 + first_stall), "stalled_here": a["stranded_at"][u], "max_depth_m": a["max_depth"][u]}), "Today: drivers find the water.", "stalled"),
+         Hop("sump", "lvl", j({"underpass": u, "close_at_m": 0.15, "max_depth_m": b["max_depth"][u]}), "Connected: the level sensor watches the same basin.", "level"),
+         Hop("lvl", "gate", j({"underpass": u, "closed_at": clock(t0 + shut) if shut is not None else None, "closed_min": b["closed_min"][u]}), "The gate closes before the water is deep enough to stall anyone.", "gate"),
+         Hop("gate", "cars", j({"rerouted": b["rerouted"], "stranded": b["stranded"], "delay_median_s": [a["delay_median_s"], b["delay_median_s"]]}), "Traffic heading in is sent over the surface road.", "detour")),
+        "a storm, a power cut and the evening's traffic", "depth per underpass, vehicles stalled, trips finished",
+        "viewer/city_replay.js (seed 7)", f"One real underpass, {u}, through the storm both ways.")
+
+
+def city_night():
+    Cy = _cy()
+    Lt = Cy["lights"]
+    a, b = Lt["modes"]["today"], Lt["modes"]["connected"]
+    t0 = Cy["meta"]["night_start"]
+    road = max(range(len(b["changes"])), key=lambda i: len(b["changes"][i] or []))
+    ch = b["changes"][road][:6]
+    fail = Lt["fails"][0]
+    figs = ((f"{a['kwh']:,.0f} → {b['kwh']:,.0f}", "kWh in a night"), (f"{a['busy_road_minutes_dark']:,} → {b['busy_road_minutes_dark']:,}", "busy road-minutes dark"),
+            (f"{a['failures_known_by_morning']} → {b['failures_known_by_morning']}", "failed lamps known"))
+    arch = "Lamp-by-lamp levels from the traffic simulation's occupancy each minute, a battery for main roads through load-shedding, failure reports. " + NOMODEL
+    return _pair(
+        "city-night", "City systems · adaptive streetlights", "A night of load-shedding: every lamp full all night, or dimmed until traffic comes.",
+        arch, f"{Lt['lamp_count']:,} lamps, 23:00-05:00", f"{Lt['trips']:,} night trips, seed 7",
+        f"{a['kwh']:,.0f} → {b['kwh']:,.0f} kWh; dark busy road-minutes {a['busy_road_minutes_dark']:,} → {b['busy_road_minutes_dark']:,}", "Today → Connected",
+        (Stage("Lamps", "Every road from residential up, 35-40 m apart", "city.streetlights()", f"{Lt['lamp_count']:,} lamps"),
+         Stage("Traffic", "Which road pieces have a vehicle, each minute", "TrafficSim (night run)", "occupancy"),
+         Stage("Dim", "30% unless traffic is on it or next to it", "city.streetlights()", "levels"),
+         Stage("Shed", "01:00-02:00 the east feeder goes; main roads on a battery", "city.OUTAGE", "kept lit"),
+         Stage("Report", "A failed lamp reports itself at once", "city.FAIL_RATE", "repairs")),
+        figs,
+        (Layer("road", "Traffic", "the night's vehicles"), Layer("ctl", "Controller", "per road piece"),
+         Layer("lamp", "Lamps & feeder", "power drawn")),
+        (C("occ", "Occupancy", "road", "streetlights() watched()", 0), C("veh", "Vehicles", "road", "TrafficSim", 2),
+         C("dim", "Dimming", "ctl", "city.streetlights()", 0), C("bat", "Battery (main roads)", "ctl", "city.streetlights()", 2),
+         C("lamp", "LED lamps", "lamp", "city.streetlights()", 0), C("feed", "Feeder", "lamp", "city.OUTAGE", 2)),
+        (Hop("veh", "occ", j({"night_trips": Lt["trips"], "sampled": "every 10 s, the road piece under each vehicle"}), "Which roads are in use, minute by minute.", "occupancy"),
+         Hop("occ", "dim", j({"road_piece": road, "level_changes": [[clock(t0 + mi * 60), lv] for mi, lv in ch]}), "This road piece's level as traffic comes and goes.", "levels"),
+         Hop("feed", "bat", j({"outage": [clock(t0 + Lt["outage"][0]), clock(t0 + Lt["outage"][1])], "east_half": "dark Today"}), "Load-shedding on the eastern feeder.", "outage"),
+         Hop("bat", "lamp", j({"main_roads": "lit on the battery", "busy_road_minutes_dark": [a["busy_road_minutes_dark"], b["busy_road_minutes_dark"]]}), "Main roads stay lit through the cut.", "kept lit"),
+         Hop("lamp", "dim", j({"failed_lamp": {"road_piece": fail[0], "at": clock(t0 + fail[1] * 60)}, "known_by_morning": [a["failures_known_by_morning"], b["failures_known_by_morning"]]}), "A failed lamp reports itself; Today it waits for a complaint.", "failure"),
+         Hop("dim", "feed", j({"kwh": [a["kwh"], b["kwh"]], "full_night_kwh": Lt["night_full_kwh"]}), "Power drawn over the night, Today against Connected.", "kWh")),
+        "a night's traffic and a load-shedding hour", "kWh, roads left dark, failures found",
+        "viewer/city_replay.js (seed 7)", "One real road piece dimming and brightening with its traffic.")
+
+
 TOOLS = {"office-lights": office_lights, "office-attendance": office_attendance, "home-gridsense": home_gridsense,
          "home-people": home_people, "hospital-ed": hospital_ed, "hospital-alarms": hospital_alarms,
          "hospital-equipment": hospital_equipment, "hospital-families": hospital_families, "traffic-trips": traffic_trips,
          "traffic-signals": traffic_signals, "traffic-map": traffic_map, "junctions-fixes": junctions_fixes,
-         "junctions-ambulance": junctions_ambulance}
+         "junctions-ambulance": junctions_ambulance, "city-smog": city_smog, "city-rain": city_rain, "city-night": city_night}

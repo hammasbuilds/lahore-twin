@@ -48,6 +48,14 @@
   "architecture_s": 40
  },
  {
+  "key": "city",
+  "title": "Lahore Twin \u00b7 City systems",
+  "overview": "city.html",
+  "architecture": "city-arch.html",
+  "overview_s": 27,
+  "architecture_s": 40
+ },
+ {
   "key": "office-lights",
   "title": "Office \u00b7 lights & AC",
   "overview": "office-lights.html",
@@ -150,5 +158,29 @@
   "architecture": "junctions-ambulance-arch.html",
   "overview_s": 20,
   "architecture_s": 26
+ },
+ {
+  "key": "city-smog",
+  "title": "City systems \u00b7 smog sensors",
+  "overview": "city-smog.html",
+  "architecture": "city-smog-arch.html",
+  "overview_s": 24,
+  "architecture_s": 30
+ },
+ {
+  "key": "city-rain",
+  "title": "City systems \u00b7 underpass flood alarms",
+  "overview": "city-rain.html",
+  "architecture": "city-rain-arch.html",
+  "overview_s": 20,
+  "architecture_s": 30
+ },
+ {
+  "key": "city-night",
+  "title": "City systems \u00b7 adaptive streetlights",
+  "overview": "city-night.html",
+  "architecture": "city-night-arch.html",
+  "overview_s": 20,
+  "architecture_s": 30
  }
 ]
