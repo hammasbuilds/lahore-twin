@@ -1373,3 +1373,47 @@ screenshots re-recorded.
 
 **Round 10 — final.** Full suite 110 passed, viewer core ok; planner, app and demo checks clean.
 Phase 5 complete; next: phase 6, city systems.
+
+## Phase 6 — City systems: smog, underpass flooding, streetlights
+
+**Research (2026-10-21).**
+- *Smog.* Low-cost sensors put Lahore's annual PM2.5 near 105–125 µg/m³ with hourly peaks near
+  900; official monitoring is sparse ("a data gap"). Winter means run 53–101% above summer and
+  monsoon. Vehicles were 36% of PM2.5 in the last source apportionment (2010 data — dated).
+  [EGU24-453](https://meetingorganizer.copernicus.org/EGU24/EGU24-453.html),
+  [EGU26-17139](https://meetingorganizer.copernicus.org/EGU26/EGU26-17139.html),
+  [Khanum et al. 2017](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC5581825/),
+  [MDPI 2022](https://www.mdpi.com/2076-3417/12/10/5102)
+- *Underpass flooding.* Every monsoon Lahore's underpasses fill: Kalma Chowk, Defence, Masjid
+  Chowk; drivers stranded, motorcycles pushed through water. Pumps stop when LESCO's supply
+  fails; WASA runs disposal stations on generators. 50 mm in an early spell, up to 263 mm in a
+  day (July 2026). No published pump capacities or hourly intensities were found — assumptions.
+  [ARY 2026](https://arynews.tv/torrential-rain-submerges-lahore),
+  [ProPakistani 2023](https://propakistani.pk/2023/06/26/underpasses-become-swimming-pools-in-lahore-after-heavy-rainfall/),
+  [Pakistan Observer](https://pakobserver.net/three-mega-projects-underpass-submerged-in-rainwater/)
+- *Streetlights.* Motion-adaptive dimming of LED roadway lights saved 27–42% more than static
+  dimming in the UC Davis field study; "80%" claims are vendor upper bounds.
+  [CLTC UC Davis](https://cltc.ucdavis.edu/publication/lda-research-matters-eyes-road)
+
+**What it does** — on the same OpenStreetMap roads, driven by the traffic simulation:
+- *Smog (a November evening).* PM2.5 along every road from a regional background, an evening
+  inversion, and the traffic module's own vehicles (vehicle-km and idling at queues per link).
+  Today: one official monitor. Connected: 25 low-cost sensors at real schools, hospitals and
+  junctions (noisy, drifting, calibrated against the monitor). Outputs: the hotspots each network
+  finds against the truth, exposure at schools and hospitals, and what a smog-emergency rule does
+  (closing a hotspot road to heavy vehicles, re-run on the same trips).
+- *Underpass flooding (a monsoon storm).* Each real underpass a sump: rain on its catchment in,
+  pumps out — until the feeder trips. Today: drivers find the water. Connected: water-level
+  sensors close the underpass at a safe depth, warn upstream, start the generator, and route
+  traffic over the surface road (re-run). Outputs: depth over time per underpass, vehicles
+  stranded, minutes closed, delay from the diversion.
+- *Streetlights (a night).* Every road lit dusk to dawn. Today: all on at full power, failed
+  lamps found when someone complains. Connected: dim to 30% with no traffic (traffic from the
+  simulation, minute by minute), brighten for a vehicle, report a failed lamp at once, ride
+  through load-shedding on a battery for main roads. Outputs: kWh, dark segment-minutes, lamp
+  failures found and fixed.
+
+**UI.** One module page, three views (Smog / Rain / Night) on the streaming map: a PM2.5 heat
+along the roads with sensor dots; underpasses as gauges with gates; streetlights as a glow that
+dims and brightens. Same shell, tokens and themes; accent per view (haze amber, water blue,
+lamp yellow). Shares, rates and capacities that are assumptions are labelled.
