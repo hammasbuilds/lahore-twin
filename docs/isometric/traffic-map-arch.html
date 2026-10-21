@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Traffic · the streaming map - architecture, hop by hop</title>
+<style>
+  :root { --bg:#0a0e16; --panel:#121927; --edge:#232d40; --ink:#eef2f8; --muted:#93a1b8; --accent:#2dd4bf; --warm:#f7a74f; }
+  * { box-sizing:border-box }
+  body { margin:0; background:#06090f; color:var(--ink); font:14px/1.45 "Segoe UI",system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center; min-height:100vh }
+  .frame { width:1280px; height:720px; position:relative; overflow:hidden;
+    background:radial-gradient(1100px 640px at 34% 58%,#15202f 0%,#0a0e16 72%) }
+  header { position:absolute; top:20px; left:30px; right:470px; z-index:3 }
+  h1 { margin:0; font-size:22px } .repo { color:var(--accent); font:12px ui-monospace,Consolas,monospace }
+  .tagline { color:var(--muted); font-size:13px; margin-top:2px }
+  .arch { margin-top:7px; display:inline-block; font-size:11.5px; color:#cfd9ea; background:#182132;
+    border:1px solid var(--edge); border-left:3px solid var(--warm); padding:4px 9px; border-radius:4px }
+  svg { position:absolute; inset:0 }
+  .pl-top { fill:#1c2638; stroke:#2c3a55; stroke-width:1 } .pl-side { fill:#121a28 } .pl-end { fill:#162031 }
+  .c-top { fill:#2a3854; stroke:#3b4d72; stroke-width:1 } .c-front { fill:#1a2336 } .c-right { fill:#202b42 }
+  .comp.on .c-top { fill:var(--accent); stroke:var(--accent) } .comp.src .c-top { fill:#3a4d73 }
+  text { font-family:"Segoe UI",system-ui,sans-serif }
+  .c-title { fill:var(--ink); font-size:11.5px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:#0a0e16; stroke-width:3px }
+  .layer-name { fill:#cfd9ea; font-size:12px; font-weight:700; text-anchor:end; letter-spacing:.3px }
+  .layer-role { fill:var(--muted); font-size:10px; text-anchor:end }
+  .wire { stroke:#2f3d5a; stroke-width:2; stroke-dasharray:4 5 } .wire.on { stroke:var(--warm); stroke-dasharray:none; stroke-width:2.5 }
+  .wire.done { stroke:#4a5d86; stroke-dasharray:none }
+  .packet circle.core { fill:var(--warm) } .packet circle.halo { fill:var(--warm); opacity:.22 }
+  .side { position:absolute; top:18px; right:22px; width:432px; bottom:18px; display:flex; flex-direction:column; gap:9px; z-index:4 }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:8px; padding:10px 13px }
+  .card h2 { margin:0 0 5px; font-size:10px; letter-spacing:1.4px; color:var(--muted); text-transform:uppercase; font-weight:700 }
+  .io { display:grid; grid-template-columns:1fr 1fr; gap:9px }
+  .io .card div { font-size:12px }
+  .in { border-left:3px solid var(--warm) } .out { border-left:3px solid var(--accent) }
+  .hop { flex:1; display:flex; flex-direction:column; min-height:0 }
+  .hop .route { font-size:14px; font-weight:650 } .hop .route i { color:var(--warm); font-style:normal }
+  .hop .wirelbl { font:11px ui-monospace,Consolas,monospace; color:var(--accent); margin:2px 0 6px }
+  pre.unit { margin:0; background:#0b111c; border:1px solid var(--edge); border-radius:6px; padding:8px 10px;
+    font:11.5px/1.45 ui-monospace,Consolas,monospace; color:#e8f0ff; white-space:pre-wrap; word-break:break-word; max-height:190px; overflow:hidden }
+  .says { margin-top:7px; font-size:12.5px; color:#d9e2f0 }
+  .code { margin-top:5px; font:10.5px ui-monospace,Consolas,monospace; color:var(--muted) }
+  ol.trace { margin:0; padding:0; list-style:none; font-size:11px; color:var(--muted); columns:2; column-gap:12px }
+  ol.trace li { padding:1px 0; break-inside:avoid } ol.trace li span { display:inline-block; width:18px; color:#5d6b85 }
+  ol.trace li.on { color:var(--ink) } ol.trace li.on span { color:var(--warm) } ol.trace li.done { color:#a9b6cc }
+  .figs { position:absolute; left:30px; bottom:50px; display:flex; gap:18px; z-index:4 }
+  .fig b { display:block; font-size:17px; color:var(--accent) } .fig span { font-size:10px; color:var(--muted) }
+  .controls { position:absolute; left:30px; bottom:16px; z-index:5; display:flex; gap:8px; align-items:center }
+  button { font:inherit; font-size:12px; color:var(--ink); background:#1b2434; border:1px solid var(--edge); border-radius:5px; padding:4px 10px; cursor:pointer }
+  button:hover { border-color:var(--accent) } .meta { font-size:11px; color:var(--muted) }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <h1>Traffic · the streaming map <span class="repo">github.com/hammasbuilds/lahore-twin</span></h1>
+    <div class="tagline">Real records: a tile, one vehicle&#x27;s metre deltas, decoded to a point on the road.</div>
+    <div class="arch">A compact replay (routes once, positions as whole-metre deltas) streamed into a canvas map by tiles. No model, no embedding, no vector store.</div>
+  </header>
+  <svg viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+    <g class="plate p0"><polygon class="pl-side"  points="270.0,469.4 487.6,595.0 487.6,600.7 270.0,475.1"/><polygon class="pl-end"  points="549.7,559.1 487.6,595.0 487.6,600.7 549.7,564.9"/><polygon class="pl-top"  points="332.2,433.5 549.7,559.1 487.6,595.0 270.0,469.4"/></g><g class="plate p1"><polygon class="pl-side"  points="330.1,384.5 547.7,510.1 547.7,515.8 330.1,390.2"/><polygon class="pl-end"  points="609.8,474.2 547.7,510.1 547.7,515.8 609.8,479.9"/><polygon class="pl-top"  points="392.3,348.6 609.8,474.2 547.7,510.1 330.1,384.5"/></g><g class="plate p2"><polygon class="pl-side"  points="390.2,299.5 607.7,425.1 607.7,430.9 390.2,305.3"/><polygon class="pl-end"  points="669.9,389.2 607.7,425.1 607.7,430.9 669.9,395.0"/><polygon class="pl-top"  points="452.3,263.6 669.9,389.2 607.7,425.1 390.2,299.5"/></g><g class="plate p3"><polygon class="pl-side"  points="450.3,214.6 667.8,340.2 667.8,345.9 450.3,220.3"/><polygon class="pl-end"  points="730.0,304.3 667.8,340.2 667.8,345.9 730.0,310.1"/><polygon class="pl-top"  points="512.4,178.7 730.0,304.3 667.8,340.2 450.3,214.6"/></g><text class="layer-name" x="260.0" y="473.4">Replay file</text><text class="layer-role" x="260.0" y="487.4">what was recorded</text><text class="layer-name" x="320.1" y="388.5">Streaming</text><text class="layer-role" x="320.1" y="402.5">tiles in view</text><text class="layer-name" x="380.2" y="303.5">Drawing</text><text class="layer-role" x="380.2" y="317.5">roads, vehicles</text><text class="layer-name" x="440.3" y="218.6">You</text><text class="layer-role" x="440.3" y="232.6">camera, follow</text><line class="wire" id="w0" x1="403.7" y1="490.6" x2="399.5" y2="368.6"/><line class="wire" id="w1" x1="583.9" y1="235.8" x2="399.5" y2="368.6"/><line class="wire" id="w2" x1="403.7" y1="490.6" x2="528.0" y2="442.7"/><line class="wire" id="w3" x1="528.0" y1="442.7" x2="588.1" y2="357.8"/><line class="wire" id="w4" x1="588.1" y1="357.8" x2="583.9" y2="235.8"/><g class="comp" id="c-rep"><polygon class="c-front"  points="363.3,486.4 410.9,513.9 410.9,534.0 363.3,506.5"/><polygon class="c-right"  points="444.1,494.8 410.9,513.9 410.9,534.0 444.1,514.9"/><polygon class="c-top"  points="396.4,467.2 444.1,494.8 410.9,513.9 363.3,486.4"/><text class="c-title" x="403.7" y="476.6">traffic_replay.js</text></g><g class="comp" id="c-tiles"><polygon class="c-front"  points="359.1,364.4 406.8,391.9 406.8,412.0 359.1,384.5"/><polygon class="c-right"  points="439.9,372.7 406.8,391.9 406.8,412.0 439.9,392.8"/><polygon class="c-top"  points="392.3,345.2 439.9,372.7 406.8,391.9 359.1,364.4"/><text class="c-title" x="399.5" y="354.6">Tile index</text></g><g class="comp" id="c-dec"><polygon class="c-front"  points="487.6,438.5 535.2,466.0 535.2,486.1 487.6,458.6"/><polygon class="c-right"  points="568.4,446.9 535.2,466.0 535.2,486.1 568.4,467.0"/><polygon class="c-top"  points="520.7,419.4 568.4,446.9 535.2,466.0 487.6,438.5"/><text class="c-title" x="528.0" y="428.7">Decoder</text></g><g class="comp" id="c-roads"><polygon class="c-front"  points="419.2,279.4 466.8,306.9 466.8,327.0 419.2,299.5"/><polygon class="c-right"  points="500.0,287.8 466.8,306.9 466.8,327.0 500.0,307.9"/><polygon class="c-top"  points="452.3,260.3 500.0,287.8 466.8,306.9 419.2,279.4"/><text class="c-title" x="459.6" y="269.6">Road painter</text></g><g class="comp" id="c-veh"><polygon class="c-front"  points="547.7,353.6 595.3,381.1 595.3,401.2 547.7,373.7"/><polygon class="c-right"  points="628.5,362.0 595.3,381.1 595.3,401.2 628.5,382.1"/><polygon class="c-top"  points="580.8,334.5 628.5,362.0 595.3,381.1 547.7,353.6"/><text class="c-title" x="588.1" y="343.8">Vehicle painter</text></g><g class="comp" id="c-cam"><polygon class="c-front"  points="543.5,231.6 591.2,259.1 591.2,279.2 543.5,251.7"/><polygon class="c-right"  points="624.3,240.0 591.2,259.1 591.2,279.2 624.3,260.1"/><polygon class="c-top"  points="576.7,212.4 624.3,240.0 591.2,259.1 543.5,231.6"/><text class="c-title" x="583.9" y="221.8">Camera &amp; follow</text></g>
+    <g class="packet" id="packet"><circle class="halo" r="13"/><circle class="core" r="6"/></g>
+  </svg>
+  <div class="side">
+    <div class="io"><div class="card in"><h2>Input</h2><div>the recorded evening</div></div>
+      <div class="card out"><h2>Output</h2><div>a map you can fly over and ride along in</div></div></div>
+    <div class="card hop"><h2 id="hopno">Hop</h2>
+      <div class="route" id="route"></div><div class="wirelbl" id="wirelbl"></div>
+      <pre class="unit" id="unit"></pre><div class="says" id="says"></div><div class="code" id="code"></div></div>
+    <div class="card"><h2>The path, hop by hop</h2><ol class="trace"><li id="t0"><span>1</span>traffic_replay.js → Tile index</li><li id="t1"><span>2</span>Camera &amp; follow → Tile index</li><li id="t2"><span>3</span>traffic_replay.js → Decoder</li><li id="t3"><span>4</span>Decoder → Vehicle painter</li><li id="t4"><span>5</span>Vehicle painter → Camera &amp; follow</li></ol></div>
+  </div>
+  <div class="figs"><div class="fig"><b>197</b><span>map tiles of 400 m</span></div><div class="fig"><b>5,395</b><span>road pieces</span></div><div class="fig"><b>4 s</b><span>position samples</span></div></div>
+  <div class="controls"><button id="toggle">Pause</button><button id="replay">Replay</button>
+    <span class="meta">5 hops &middot; 26s loop &middot; data copied from viewer/traffic_replay.js</span></div>
+</div>
+<script>
+(function () {
+  var D = {"hops": [{"a": [403.6546738289811, 490.56854838709677], "b": [399.5107888323782, 368.55241935483866], "src": "rep", "dst": "tiles", "unit": "{\n  \"tile_m\": 400.0,\n  \"tiles\": 197,\n  \"example\": {\"3,-2\": [0, 1, 2, 3, 5, 6]}\n}", "says": "Roads are indexed by 400 m tile.", "wire": "tiles", "srcT": "traffic_replay.js", "dstT": "Tile index", "code": "viewer/traffic.js visibleTiles()"}, {"a": [583.9136711812099, 235.77016129032253], "b": [399.5107888323782, 368.55241935483866], "src": "cam", "dst": "tiles", "unit": "{\n  \"zoom\": \"street level\",\n  \"in_view\": \"6 tiles\",\n  \"released_after_s\": 2\n}", "says": "Only tiles near the camera are drawn; ones left behind are let go.", "wire": "view", "srcT": "Camera & follow", "dstT": "Tile index", "code": "viewer/traffic.js visibleTiles()"}, {"a": [403.6546738289811, 490.56854838709677], "b": [527.97122372707, 442.71908602150535], "src": "rep", "dst": "dec", "unit": "{\n  \"vehicle\": [\"motorcycle\", 4, 4, 363],\n  \"deltas_m\": [6, 21, 10, 36, 46, 47, 46, 47, 47, 44, 38, 12],\n  \"lane_changes\": [[0, 0], [30, 1], [44, 0]]\n}", "says": "One vehicle: kind, times, and how far it moved every 4 s, in whole metres.", "wire": "record", "srcT": "traffic_replay.js", "dstT": "Decoder", "code": "viewer/traffic.js vehiclesOf()"}, {"a": [527.97122372707, 442.71908602150535], "b": [588.0575561778129, 357.7862903225806], "src": "dec", "dst": "veh", "unit": "{\n  \"route_links\": 44,\n  \"cum_m\": 400,\n  \"drives_on\": \"the left\"\n}", "says": "Summed deltas give the distance along its route; the link and lane give its point on the road.", "wire": "position", "srcT": "Decoder", "dstT": "Vehicle painter", "code": "viewer/traffic.js vehAt()"}, {"a": [588.0575561778129, 357.7862903225806], "b": [583.9136711812099, 235.77016129032253], "src": "veh", "dst": "cam", "unit": "{\n  \"follow\": \"vehicle #4\",\n  \"minimap\": true\n}", "says": "Follow it: the camera glides with it, the map streams in ahead.", "wire": "camera", "srcT": "Vehicle painter", "dstT": "Camera & follow", "code": "viewer/traffic.js frame()"}], "travel": 0.9, "hold": 3.6, "lead": 1.0, "total": 26.0};
+  var $ = function (id) { return document.getElementById(id); };
+  var q = new URLSearchParams(location.search), t0 = performance.now(), off = 0, paused = false;
+  if (q.has("t")) { off = parseFloat(q.get("t")) || 0; paused = true; }
+  if (q.get("play") === "0") paused = true;
+  var last = -1;
+  function show(k) {
+    var h = D.hops[k];
+    $("hopno").textContent = "Hop " + (k + 1) + " of " + D.hops.length;
+    $("route").innerHTML = h.srcT.replace(/</g, "&lt;") + " <i>&rarr;</i> " + h.dstT.replace(/</g, "&lt;");
+    $("wirelbl").textContent = h.wire || "";
+    $("unit").textContent = h.unit; $("says").textContent = h.says; $("code").textContent = "handled in " + h.code;
+    document.querySelectorAll(".comp").forEach(function (c) { c.classList.remove("on", "src"); });
+    var a = $("c-" + h.src), b = $("c-" + h.dst); if (a) a.classList.add("src"); if (b) b.classList.add("on");
+    D.hops.forEach(function (_, i) {
+      var w = $("w" + i), li = $("t" + i);
+      w.classList.toggle("on", i === k); w.classList.toggle("done", i < k);
+      li.classList.toggle("on", i === k); li.classList.toggle("done", i < k);
+    });
+  }
+  function at(t) {
+    t = t % D.total;
+    var u = Math.max(0, t - D.lead), per = D.travel + D.hold, k = Math.min(D.hops.length - 1, Math.floor(u / per)), f = (u - k * per) / D.travel;
+    var h = D.hops[k], x, y;
+    if (t < D.lead) { x = h.a[0]; y = h.a[1]; }
+    else if (f < 1) { var e = f * f * (3 - 2 * f); x = h.a[0] + (h.b[0] - h.a[0]) * e; y = h.a[1] + (h.b[1] - h.a[1]) * e - Math.sin(Math.PI * f) * 18; }
+    else { x = h.b[0]; y = h.b[1]; }
+    $("packet").setAttribute("transform", "translate(" + x.toFixed(1) + "," + y.toFixed(1) + ")");
+    if (k !== last) { last = k; show(k); }
+  }
+  function frame(now) { if (!paused) at(off + (now - t0) / 1000); requestAnimationFrame(frame); }
+  at(off); requestAnimationFrame(frame);
+  $("toggle").onclick = function () { if (paused) { t0 = performance.now(); } else { off += (performance.now() - t0) / 1000; } paused = !paused; this.textContent = paused ? "Play" : "Pause"; };
+  $("replay").onclick = function () { off = 0; t0 = performance.now(); paused = false; last = -1; $("toggle").textContent = "Pause"; };
+  window.__iso = { seek: function (s) { off = s; t0 = performance.now(); at(s); }, total: D.total };
+})();
+</script>
+</body>
+</html>

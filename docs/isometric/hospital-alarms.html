@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hospital · ward alarms &amp; calls - how an input becomes an output</title>
+<style>
+  :root {
+    --bg:#0b0f17; --panel:#141a26; --edge:#222c3d; --ink:#eef2f8; --muted:#94a2b9;
+    --accent:#4f8ff7; --warm:#f7a74f; --run:17.05s;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#070a10;color:var(--ink);
+    font:15px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif;
+    display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .frame{width:1280px;height:720px;position:relative;overflow:hidden;
+    background:radial-gradient(1150px 640px at 58% 36%,#16202f 0%,#0b0f17 74%)}
+
+  header{position:absolute;top:24px;left:34px;right:300px;z-index:3}
+  h1{margin:0;font-size:24px;letter-spacing:-.2px}
+  .repo{color:var(--accent);font-size:12.5px;font-family:ui-monospace,Consolas,monospace}
+  .tagline{color:var(--muted);font-size:13.5px;margin-top:3px}
+  .arch{margin-top:8px;display:inline-block;font-size:12px;color:#cfd9ea;background:#1a2333;
+    border:1px solid var(--edge);border-left:3px solid var(--warm);padding:5px 10px;
+    border-radius:4px}
+
+  svg{position:absolute;inset:0}
+  .face-top{fill:#27324a;stroke:rgba(58,72,101,.55);stroke-width:1}
+  .face-left{fill:#19212f}
+  .face-right{fill:#1f2939}
+  .face-lit{fill:var(--accent);opacity:0}
+  text{font-family:"Segoe UI",system-ui,sans-serif;text-anchor:middle}
+  .step-no{fill:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.4px}
+  .step-title{fill:var(--ink);font-size:14.5px;font-weight:650}
+  .step-carries{fill:var(--warm);font-size:11px;font-family:ui-monospace,Consolas,monospace}
+  .stage-label{opacity:.40}
+  .packet{animation:fly var(--run) linear infinite}
+
+  .card{position:absolute;width:252px;background:var(--panel);border:1px solid var(--edge);
+    border-radius:8px;padding:11px 13px;z-index:3}
+  .card h2{margin:0 0 6px;font-size:10.5px;letter-spacing:1.4px;color:var(--muted);
+    text-transform:uppercase}
+  .card .val{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-word}
+  .card .val div{padding:1px 0}
+  .card .sub{margin-top:7px;font-size:11.5px;color:var(--muted)}
+  .given{left:34px;bottom:152px;border-left:3px solid var(--warm)}
+  .produced{right:34px;bottom:152px;border-left:3px solid var(--accent)}
+
+  .reader{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;width:640px;
+    height:116px;z-index:4}
+  .read{position:absolute;inset:0;background:#121a28;border:1px solid var(--edge);
+    border-radius:8px;padding:10px 15px;opacity:0}
+  .read-no{font-size:10px;letter-spacing:1.3px;color:var(--muted);text-transform:uppercase}
+  .read-title{font-size:15.5px;font-weight:650;margin:1px 0 3px}
+  .does{font-size:13px;color:#d9e2f0}
+  .why{font-size:12px;color:var(--warm);margin-top:3px}
+  .code{position:absolute;right:13px;top:10px;font-size:10.5px;color:var(--muted);
+    font-family:ui-monospace,Consolas,monospace}
+
+  .figs{position:absolute;top:24px;right:34px;display:flex;gap:15px;z-index:4}
+  .fig{text-align:right}
+  .fig b{display:block;font-size:18px;color:var(--accent)}
+  .fig span{font-size:10px;color:var(--muted)}
+
+  .controls{position:absolute;left:34px;bottom:22px;z-index:5;display:flex;gap:8px;
+    align-items:center}
+  button{font:inherit;font-size:12px;color:var(--ink);background:#1b2434;
+    border:1px solid var(--edge);border-radius:5px;padding:5px 11px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .meta{font-size:11px;color:var(--muted)}
+  body.paused .frame *{animation-play-state:paused!important}
+  @media (prefers-reduced-motion:reduce){.frame *{animation-play-state:paused!important}}
+
+@keyframes lit0{0%,11.730%{opacity:0}13.196%{opacity:.66}26.686%{opacity:.52}27.886%,100%{opacity:.08}}
+@keyframes label0{0%,11.730%{opacity:.40}13.196%,26.686%{opacity:1}27.886%,100%{opacity:.40}}
+@keyframes read0{0%,7.742%{opacity:0}8.042%,27.566%{opacity:1}27.866%,100%{opacity:0}}
+@keyframes lit1{0%,31.672%{opacity:0}33.138%{opacity:.66}46.628%{opacity:.52}47.828%,100%{opacity:.08}}
+@keyframes label1{0%,31.672%{opacity:.40}33.138%,46.628%{opacity:1}47.828%,100%{opacity:.40}}
+@keyframes read1{0%,27.683%{opacity:0}27.983%,47.507%{opacity:1}47.807%,100%{opacity:0}}
+@keyframes lit2{0%,51.613%{opacity:0}53.079%{opacity:.66}66.569%{opacity:.52}67.769%,100%{opacity:.08}}
+@keyframes label2{0%,51.613%{opacity:.40}53.079%,66.569%{opacity:1}67.769%,100%{opacity:.40}}
+@keyframes read2{0%,47.625%{opacity:0}47.925%,67.449%{opacity:1}67.749%,100%{opacity:0}}
+@keyframes lit3{0%,71.554%{opacity:0}73.021%{opacity:.66}86.510%{opacity:.52}87.710%,100%{opacity:.08}}
+@keyframes label3{0%,71.554%{opacity:.40}73.021%,86.510%{opacity:1}87.710%,100%{opacity:.40}}
+@keyframes read3{0%,67.566%{opacity:0}67.866%,87.390%{opacity:1}87.690%,100%{opacity:0}}
+@keyframes fly{0%{transform:translate(214.98px,156.79px);opacity:0}2.053%{opacity:1}11.730%{transform:translate(414.98px,226.79px)}31.672%{transform:translate(564.99px,239.73px)}51.613%{transform:translate(715.01px,252.67px)}71.554%{transform:translate(865.02px,265.61px)}90.029%{transform:translate(1065.02px,337.61px);opacity:1}100%{transform:translate(1065.02px,337.61px);opacity:0}}
+.s0 .face-lit{animation:lit0 var(--run) linear infinite}
+.s1 .face-lit{animation:lit1 var(--run) linear infinite}
+.s2 .face-lit{animation:lit2 var(--run) linear infinite}
+.s3 .face-lit{animation:lit3 var(--run) linear infinite}
+.l0{animation:label0 var(--run) linear infinite}
+.l1{animation:label1 var(--run) linear infinite}
+.l2{animation:label2 var(--run) linear infinite}
+.l3{animation:label3 var(--run) linear infinite}
+.r0{animation:read0 var(--run) linear infinite}
+.r1{animation:read1 var(--run) linear infinite}
+.r2{animation:read2 var(--run) linear infinite}
+.r3{animation:read3 var(--run) linear infinite}
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <h1>Hospital · ward alarms &amp; calls <span class="repo">github.com/hammasbuilds/lahore-twin</span></h1>
+    <div class="tagline">Monitor alarms and call buttons on a 36-bed ward, Today against Connected.</div>
+    <div class="arch">Alarms and calls routed to the bed&#x27;s own nurse&#x27;s badge, with a short delay for non-critical alarms. No model, no embedding, no vector store.</div>
+  </header>
+  <div class="figs"><div class="fig"><b>99 → 38</b><span>alarms that sounded</span></div><div class="fig"><b>15</b><span>brief real events held</span></div><div class="fig"><b>0.3 min</b><span>call answered, median</span></div></div>
+
+  <svg viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+    <g class="slab s0"><polygon class="face-left" points="348.82,250.19 414.98,288.39 414.98,303.17 348.82,264.98"/><polygon class="face-right" points="481.13,250.19 414.98,288.39 414.98,303.17 481.13,264.98"/><polygon class="face-top" points="414.98,212.00 481.13,250.19 414.98,288.39 348.82,250.19"/><polygon class="face-lit" points="414.98,212.00 481.13,250.19 414.98,288.39 348.82,250.19"/></g><g class="slab s1"><polygon class="face-left" points="498.84,263.14 564.99,301.33 564.99,316.12 498.84,277.92"/><polygon class="face-right" points="631.15,263.14 564.99,301.33 564.99,316.12 631.15,277.92"/><polygon class="face-top" points="564.99,224.94 631.15,263.14 564.99,301.33 498.84,263.14"/><polygon class="face-lit" points="564.99,224.94 631.15,263.14 564.99,301.33 498.84,263.14"/></g><g class="slab s2"><polygon class="face-left" points="648.85,276.08 715.01,314.27 715.01,329.06 648.85,290.86"/><polygon class="face-right" points="781.16,276.08 715.01,314.27 715.01,329.06 781.16,290.86"/><polygon class="face-top" points="715.01,237.88 781.16,276.08 715.01,314.27 648.85,276.08"/><polygon class="face-lit" points="715.01,237.88 781.16,276.08 715.01,314.27 648.85,276.08"/></g><g class="slab s3"><polygon class="face-left" points="798.87,289.02 865.02,327.21 865.02,342.00 798.87,303.81"/><polygon class="face-right" points="931.18,289.02 865.02,327.21 865.02,342.00 931.18,303.81"/><polygon class="face-top" points="865.02,250.83 931.18,289.02 865.02,327.21 798.87,289.02"/><polygon class="face-lit" points="865.02,250.83 931.18,289.02 865.02,327.21 798.87,289.02"/></g>
+    <g class="stage-label l0"><text class="step-no" x="414.98" y="196.19">STEP 1</text><text class="step-title" x="414.98" y="217.19">Monitor</text><text class="step-carries" x="414.98" y="298.19">alarm</text></g><g class="stage-label l1"><text class="step-no" x="564.99" y="209.14">STEP 2</text><text class="step-title" x="564.99" y="230.14">Delay</text><text class="step-carries" x="564.99" y="311.14">held / sounded</text></g><g class="stage-label l2"><text class="step-no" x="715.01" y="222.08">STEP 3</text><text class="step-title" x="715.01" y="243.08">Route</text><text class="step-carries" x="715.01" y="324.08">page</text></g><g class="stage-label l3"><text class="step-no" x="865.02" y="235.02">STEP 4</text><text class="step-title" x="865.02" y="256.02">Answer</text><text class="step-carries" x="865.02" y="337.02">answered</text></g>
+    <g class="packet">
+      <circle r="14" fill="var(--warm)" opacity=".20"/>
+      <circle r="6.5" fill="var(--warm)"/>
+    </g>
+  </svg>
+
+  <div class="card given">
+    <h2>Input &mdash; what we gave it</h2>
+    <div class="val"><div>day 7 · 3 ward nurses · 15 s</div><div>alarm delay</div></div>
+    <div class="sub">the inputs of “Run with your values”</div>
+  </div>
+  <div class="card produced">
+    <h2>Output &mdash; what came back</h2>
+    <div class="val"><div>alarms 99 → 38, 15 brief real</div><div>events not sounded</div></div>
+    <div class="sub">the same alarms both ways</div>
+  </div>
+
+  <div class="reader"><div class="read r0"><div class="read-no">Step 1 of 4</div><div class="read-title">Monitor</div><div class="does">HDU monitors raise alarms, most of them artefacts</div><code class="code">hospital.build()</code></div><div class="read r1"><div class="read-no">Step 2 of 4</div><div class="read-title">Delay</div><div class="does">Non-critical alarms wait 15 s; critical ones do not</div><code class="code">hospital_sim.HospitalSim.ward_alarm()</code></div><div class="read r2"><div class="read-no">Step 3 of 4</div><div class="read-title">Route</div><div class="does">To the bed&#x27;s own nurse&#x27;s badge</div><code class="code">hospital_sim.HospitalSim._alarm_task()</code></div><div class="read r3"><div class="read-no">Step 4 of 4</div><div class="read-title">Answer</div><div class="does">The nurse walks to the bed</div><code class="code">hospital_sim.HospitalSim.staff_loop()</code></div></div>
+
+  <div class="controls">
+    <button id="toggle">Pause</button>
+    <button id="replay">Replay</button>
+    <span class="meta">4 real stages &middot; 17s loop</span>
+  </div>
+</div>
+<script>
+  document.getElementById("toggle").addEventListener("click", function () {
+    var paused = document.body.classList.toggle("paused");
+    this.textContent = paused ? "Play" : "Pause";
+  });
+  document.getElementById("replay").addEventListener("click", function () {
+    document.body.classList.remove("paused");
+    document.getElementById("toggle").textContent = "Pause";
+    document.querySelectorAll(".frame *").forEach(function (node) {
+      var name = getComputedStyle(node).animationName;
+      if (name && name !== "none") { node.style.animation = "none"; node.offsetHeight;
+        node.style.animation = ""; }
+    });
+  });
+</script>
+</body>
+</html>

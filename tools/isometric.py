@@ -416,7 +416,8 @@ MODULES = {"app": app, "office": office, "home": home, "hospital": hospital, "tr
 def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
     index = []
-    for key, build in MODULES.items():
+    from isometric_tools import TOOLS          # one pair per tool inside each module, as well as per module
+    for key, build in {**MODULES, **TOOLS}.items():
         ov, deep = build()
         # the board's convention: <proj>.* for the overview, <proj>-arch.* for the architecture view
         (OUT / f"{key}.html").write_text(isometric.render(ov), encoding="utf-8", newline="\n")

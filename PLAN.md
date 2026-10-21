@@ -1324,3 +1324,9 @@ adaptive helps there. Ambulance to the call, green wave against no priority: −
 - *Found:* the badge hop first showed `"gate": "corr1"` — a field the recorded message does not
   have (its payload was not exported); replaced by the door named in the message's own text. The
   stack sat too low and ran into the figures; the renderer now fits it into the free area.
+- *Per tool, all with video (user, 2026-10-21: "don't repeat another session's mistakes"):* a
+  pair for every tool inside each module as well — office lights & AC / attendance & roll-call,
+  GridSense / who's home, emergency department / ward alarms / equipment locator / families,
+  trips & shops / signals / the streaming map, junction fixes / ambulance green wave — each
+  following its own data (`tools/isometric_tools.py`). 38 pages, and every one has its MP4 and
+  poster: none left without a video, no architecture view skipped because tools share layers.

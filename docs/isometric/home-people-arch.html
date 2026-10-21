@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Home · who&#x27;s home - architecture, hop by hop</title>
+<style>
+  :root { --bg:#0a0e16; --panel:#121927; --edge:#232d40; --ink:#eef2f8; --muted:#93a1b8; --accent:#2dd4bf; --warm:#f7a74f; }
+  * { box-sizing:border-box }
+  body { margin:0; background:#06090f; color:var(--ink); font:14px/1.45 "Segoe UI",system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center; min-height:100vh }
+  .frame { width:1280px; height:720px; position:relative; overflow:hidden;
+    background:radial-gradient(1100px 640px at 34% 58%,#15202f 0%,#0a0e16 72%) }
+  header { position:absolute; top:20px; left:30px; right:470px; z-index:3 }
+  h1 { margin:0; font-size:22px } .repo { color:var(--accent); font:12px ui-monospace,Consolas,monospace }
+  .tagline { color:var(--muted); font-size:13px; margin-top:2px }
+  .arch { margin-top:7px; display:inline-block; font-size:11.5px; color:#cfd9ea; background:#182132;
+    border:1px solid var(--edge); border-left:3px solid var(--warm); padding:4px 9px; border-radius:4px }
+  svg { position:absolute; inset:0 }
+  .pl-top { fill:#1c2638; stroke:#2c3a55; stroke-width:1 } .pl-side { fill:#121a28 } .pl-end { fill:#162031 }
+  .c-top { fill:#2a3854; stroke:#3b4d72; stroke-width:1 } .c-front { fill:#1a2336 } .c-right { fill:#202b42 }
+  .comp.on .c-top { fill:var(--accent); stroke:var(--accent) } .comp.src .c-top { fill:#3a4d73 }
+  text { font-family:"Segoe UI",system-ui,sans-serif }
+  .c-title { fill:var(--ink); font-size:11.5px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:#0a0e16; stroke-width:3px }
+  .layer-name { fill:#cfd9ea; font-size:12px; font-weight:700; text-anchor:end; letter-spacing:.3px }
+  .layer-role { fill:var(--muted); font-size:10px; text-anchor:end }
+  .wire { stroke:#2f3d5a; stroke-width:2; stroke-dasharray:4 5 } .wire.on { stroke:var(--warm); stroke-dasharray:none; stroke-width:2.5 }
+  .wire.done { stroke:#4a5d86; stroke-dasharray:none }
+  .packet circle.core { fill:var(--warm) } .packet circle.halo { fill:var(--warm); opacity:.22 }
+  .side { position:absolute; top:18px; right:22px; width:432px; bottom:18px; display:flex; flex-direction:column; gap:9px; z-index:4 }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:8px; padding:10px 13px }
+  .card h2 { margin:0 0 5px; font-size:10px; letter-spacing:1.4px; color:var(--muted); text-transform:uppercase; font-weight:700 }
+  .io { display:grid; grid-template-columns:1fr 1fr; gap:9px }
+  .io .card div { font-size:12px }
+  .in { border-left:3px solid var(--warm) } .out { border-left:3px solid var(--accent) }
+  .hop { flex:1; display:flex; flex-direction:column; min-height:0 }
+  .hop .route { font-size:14px; font-weight:650 } .hop .route i { color:var(--warm); font-style:normal }
+  .hop .wirelbl { font:11px ui-monospace,Consolas,monospace; color:var(--accent); margin:2px 0 6px }
+  pre.unit { margin:0; background:#0b111c; border:1px solid var(--edge); border-radius:6px; padding:8px 10px;
+    font:11.5px/1.45 ui-monospace,Consolas,monospace; color:#e8f0ff; white-space:pre-wrap; word-break:break-word; max-height:190px; overflow:hidden }
+  .says { margin-top:7px; font-size:12.5px; color:#d9e2f0 }
+  .code { margin-top:5px; font:10.5px ui-monospace,Consolas,monospace; color:var(--muted) }
+  ol.trace { margin:0; padding:0; list-style:none; font-size:11px; color:var(--muted); columns:2; column-gap:12px }
+  ol.trace li { padding:1px 0; break-inside:avoid } ol.trace li span { display:inline-block; width:18px; color:#5d6b85 }
+  ol.trace li.on { color:var(--ink) } ol.trace li.on span { color:var(--warm) } ol.trace li.done { color:#a9b6cc }
+  .figs { position:absolute; left:30px; bottom:50px; display:flex; gap:18px; z-index:4 }
+  .fig b { display:block; font-size:17px; color:var(--accent) } .fig span { font-size:10px; color:var(--muted) }
+  .controls { position:absolute; left:30px; bottom:16px; z-index:5; display:flex; gap:8px; align-items:center }
+  button { font:inherit; font-size:12px; color:var(--ink); background:#1b2434; border:1px solid var(--edge); border-radius:5px; padding:4px 10px; cursor:pointer }
+  button:hover { border-color:var(--accent) } .meta { font-size:11px; color:var(--muted) }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <h1>Home · who&#x27;s home <span class="repo">github.com/hammasbuilds/lahore-twin</span></h1>
+    <div class="tagline">Real crossings from one day: the school van out, relatives in, the drawing-room fan on.</div>
+    <div class="arch">A beam counter at the gate and presence per room driving fans and lights. No model, no embedding, no vector store.</div>
+  </header>
+  <svg viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+    <g class="plate p0"><polygon class="pl-side"  points="270.0,469.4 487.6,595.0 487.6,600.7 270.0,475.1"/><polygon class="pl-end"  points="549.7,559.1 487.6,595.0 487.6,600.7 549.7,564.9"/><polygon class="pl-top"  points="332.2,433.5 549.7,559.1 487.6,595.0 270.0,469.4"/></g><g class="plate p1"><polygon class="pl-side"  points="330.1,384.5 547.7,510.1 547.7,515.8 330.1,390.2"/><polygon class="pl-end"  points="609.8,474.2 547.7,510.1 547.7,515.8 609.8,479.9"/><polygon class="pl-top"  points="392.3,348.6 609.8,474.2 547.7,510.1 330.1,384.5"/></g><g class="plate p2"><polygon class="pl-side"  points="390.2,299.5 607.7,425.1 607.7,430.9 390.2,305.3"/><polygon class="pl-end"  points="669.9,389.2 607.7,425.1 607.7,430.9 669.9,395.0"/><polygon class="pl-top"  points="452.3,263.6 669.9,389.2 607.7,425.1 390.2,299.5"/></g><g class="plate p3"><polygon class="pl-side"  points="450.3,214.6 667.8,340.2 667.8,345.9 450.3,220.3"/><polygon class="pl-end"  points="730.0,304.3 667.8,340.2 667.8,345.9 730.0,310.1"/><polygon class="pl-top"  points="512.4,178.7 730.0,304.3 667.8,340.2 450.3,214.6"/></g><text class="layer-name" x="260.0" y="473.4">Family &amp; guests</text><text class="layer-role" x="260.0" y="487.4">who comes and goes</text><text class="layer-name" x="320.1" y="388.5">Gate &amp; rooms</text><text class="layer-role" x="320.1" y="402.5">counter, presence</text><text class="layer-name" x="380.2" y="303.5">Bus &amp; rules</text><text class="layer-role" x="380.2" y="317.5">wants and commands</text><text class="layer-name" x="440.3" y="218.6">Devices &amp; view</text><text class="layer-role" x="440.3" y="232.6">fans, People tab</text><line class="wire" id="w0" x1="403.7" y1="490.6" x2="399.5" y2="368.6"/><line class="wire" id="w1" x1="399.5" y1="368.6" x2="459.6" y2="283.6"/><line class="wire" id="w2" x1="403.7" y1="490.6" x2="399.5" y2="368.6"/><line class="wire" id="w3" x1="399.5" y1="368.6" x2="459.6" y2="283.6"/><line class="wire" id="w4" x1="459.6" y1="283.6" x2="588.1" y2="357.8"/><line class="wire" id="w5" x1="588.1" y1="357.8" x2="648.1" y2="272.9"/><line class="wire" id="w6" x1="459.6" y1="283.6" x2="519.7" y2="198.7"/><g class="comp" id="c-fam"><polygon class="c-front"  points="363.3,486.4 410.9,513.9 410.9,534.0 363.3,506.5"/><polygon class="c-right"  points="444.1,494.8 410.9,513.9 410.9,534.0 444.1,514.9"/><polygon class="c-top"  points="396.4,467.2 444.1,494.8 410.9,513.9 363.3,486.4"/><text class="c-title" x="403.7" y="476.6">Family &amp; guests</text></g><g class="comp" id="c-gate"><polygon class="c-front"  points="359.1,364.4 406.8,391.9 406.8,412.0 359.1,384.5"/><polygon class="c-right"  points="439.9,372.7 406.8,391.9 406.8,412.0 439.9,392.8"/><polygon class="c-top"  points="392.3,345.2 439.9,372.7 406.8,391.9 359.1,364.4"/><text class="c-title" x="399.5" y="354.6">Gate counter</text></g><g class="comp" id="c-bus"><polygon class="c-front"  points="419.2,279.4 466.8,306.9 466.8,327.0 419.2,299.5"/><polygon class="c-right"  points="500.0,287.8 466.8,306.9 466.8,327.0 500.0,307.9"/><polygon class="c-top"  points="452.3,260.3 500.0,287.8 466.8,306.9 419.2,279.4"/><text class="c-title" x="459.6" y="269.6">Bus</text></g><g class="comp" id="c-rule"><polygon class="c-front"  points="547.7,353.6 595.3,381.1 595.3,401.2 547.7,373.7"/><polygon class="c-right"  points="628.5,362.0 595.3,381.1 595.3,401.2 628.5,382.1"/><polygon class="c-top"  points="580.8,334.5 628.5,362.0 595.3,381.1 547.7,353.6"/><text class="c-title" x="588.1" y="343.8">Room wants</text></g><g class="comp" id="c-dev"><polygon class="c-front"  points="607.7,268.7 655.4,296.2 655.4,316.3 607.7,288.8"/><polygon class="c-right"  points="688.5,277.0 655.4,296.2 655.4,316.3 688.5,297.1"/><polygon class="c-top"  points="640.9,249.5 688.5,277.0 655.4,296.2 607.7,268.7"/><text class="c-title" x="648.1" y="258.9">Drawing-room fan</text></g><g class="comp" id="c-ui"><polygon class="c-front"  points="479.3,194.5 526.9,222.0 526.9,242.1 479.3,214.6"/><polygon class="c-right"  points="560.1,202.9 526.9,222.0 526.9,242.1 560.1,223.0"/><polygon class="c-top"  points="512.4,175.4 560.1,202.9 526.9,222.0 479.3,194.5"/><text class="c-title" x="519.7" y="184.7">People tab</text></g>
+    <g class="packet" id="packet"><circle class="halo" r="13"/><circle class="core" r="6"/></g>
+  </svg>
+  <div class="side">
+    <div class="io"><div class="card in"><h2>Input</h2><div>a family&#x27;s day and its visitors</div></div>
+      <div class="card out"><h2>Output</h2><div>a head count, a gate log, devices following people</div></div></div>
+    <div class="card hop"><h2 id="hopno">Hop</h2>
+      <div class="route" id="route"></div><div class="wirelbl" id="wirelbl"></div>
+      <pre class="unit" id="unit"></pre><div class="says" id="says"></div><div class="code" id="code"></div></div>
+    <div class="card"><h2>The path, hop by hop</h2><ol class="trace"><li id="t0"><span>1</span>Family &amp; guests → Gate counter</li><li id="t1"><span>2</span>Gate counter → Bus</li><li id="t2"><span>3</span>Family &amp; guests → Gate counter</li><li id="t3"><span>4</span>Gate counter → Bus</li><li id="t4"><span>5</span>Bus → Room wants</li><li id="t5"><span>6</span>Room wants → Drawing-room fan</li><li id="t6"><span>7</span>Bus → People tab</li></ol></div>
+  </div>
+  <div class="figs"><div class="fig"><b>24</b><span>gate crossings</span></div><div class="fig"><b>3</b><span>guests</span></div><div class="fig"><b>9</b><span>most at home</span></div></div>
+  <div class="controls"><button id="toggle">Pause</button><button id="replay">Replay</button>
+    <span class="meta">7 hops &middot; 35s loop &middot; data copied from viewer/home_replay.js (June, day 7)</span></div>
+</div>
+<script>
+(function () {
+  var D = {"hops": [{"a": [403.6546738289811, 490.56854838709677], "b": [399.5107888323782, 368.55241935483866], "src": "fam", "dst": "gate", "unit": "{\n  \"t\": \"07:20:11\",\n  \"person\": \"Leila Larsen\",\n  \"role\": \"school\",\n  \"way\": \"out\"\n}", "says": "The school van at the gate: a child walks out.", "wire": "beam", "srcT": "Family & guests", "dstT": "Gate counter", "code": "home_sim.HomeSim._gate()"}, {"a": [399.5107888323782, 368.55241935483866], "b": [459.5971212831211, 283.619623655914], "src": "gate", "dst": "bus", "unit": "{\n  \"id\": 11288,\n  \"t\": 26411,\n  \"topic\": \"home/gate/count\",\n  \"text\": \"Gate: Leila Larsen went out \u2014 5 at home\",\n  \"cause\": null,\n  \"payload\": 5\n}", "says": "The counter publishes how many are home.", "wire": "home/gate/count", "srcT": "Gate counter", "dstT": "Bus", "code": "bus.Bus.publish()"}, {"a": [403.6546738289811, 490.56854838709677], "b": [399.5107888323782, 368.55241935483866], "src": "fam", "dst": "gate", "unit": "{\n  \"t\": \"19:48:05\",\n  \"person\": \"Ali Malik\",\n  \"role\": \"relative\",\n  \"way\": \"in\"\n}", "says": "Evening: relatives arrive and sit in the drawing room.", "wire": "beam", "srcT": "Family & guests", "dstT": "Gate counter", "code": "home_sim.HomeSim._gate()"}, {"a": [399.5107888323782, 368.55241935483866], "b": [459.5971212831211, 283.619623655914], "src": "gate", "dst": "bus", "unit": "{\n  \"id\": 30264,\n  \"t\": 71285,\n  \"topic\": \"home/gate/count\",\n  \"text\": \"Gate: Ali Malik came in \u2014 6 at home\",\n  \"cause\": null,\n  \"payload\": 6\n}", "says": "The head count rises with every guest.", "wire": "home/gate/count", "srcT": "Gate counter", "dstT": "Bus", "code": "bus.Bus.publish()"}, {"a": [459.5971212831211, 283.619623655914], "b": [588.0575561778129, 357.7862903225806], "src": "bus", "dst": "rule", "unit": "{\n  \"id\": 30269,\n  \"t\": 71300,\n  \"topic\": \"home/drawing/fan/want\",\n  \"text\": \"Wants the fan in Drawing room\",\n  \"cause\": null,\n  \"payload\": true\n}", "says": "People in the drawing room, and it is warm: they want the fan.", "wire": "home/drawing/fan/want", "srcT": "Bus", "dstT": "Room wants", "code": "home_sim.HomeSim._update_wants()"}, {"a": [588.0575561778129, 357.7862903225806], "b": [648.1438886285557, 272.8534946236559], "src": "rule", "dst": "dev", "unit": "{\n  \"id\": 30271,\n  \"t\": 71300,\n  \"topic\": \"home/drawing/fan\",\n  \"text\": \"Fan on (Drawing room) \u2014 someone wants it\",\n  \"cause\": 30269,\n  \"payload\": true\n}", "says": "Fan on, citing 30269.", "wire": "home/drawing/fan", "srcT": "Room wants", "dstT": "Drawing-room fan", "code": "home_sim.HomeSim"}, {"a": [459.5971212831211, 283.619623655914], "b": [519.683453733864, 198.68682795698922], "src": "bus", "dst": "ui", "unit": "{\n  \"at_home\": 6,\n  \"tab\": \"People\",\n  \"log\": \"Gate counter\"\n}", "says": "The People tab: who is home, who is out and why, the gate log.", "wire": "viewer", "srcT": "Bus", "dstT": "People tab", "code": "viewer/home.js"}], "travel": 0.9, "hold": 3.6, "lead": 1.0, "total": 35.0};
+  var $ = function (id) { return document.getElementById(id); };
+  var q = new URLSearchParams(location.search), t0 = performance.now(), off = 0, paused = false;
+  if (q.has("t")) { off = parseFloat(q.get("t")) || 0; paused = true; }
+  if (q.get("play") === "0") paused = true;
+  var last = -1;
+  function show(k) {
+    var h = D.hops[k];
+    $("hopno").textContent = "Hop " + (k + 1) + " of " + D.hops.length;
+    $("route").innerHTML = h.srcT.replace(/</g, "&lt;") + " <i>&rarr;</i> " + h.dstT.replace(/</g, "&lt;");
+    $("wirelbl").textContent = h.wire || "";
+    $("unit").textContent = h.unit; $("says").textContent = h.says; $("code").textContent = "handled in " + h.code;
+    document.querySelectorAll(".comp").forEach(function (c) { c.classList.remove("on", "src"); });
+    var a = $("c-" + h.src), b = $("c-" + h.dst); if (a) a.classList.add("src"); if (b) b.classList.add("on");
+    D.hops.forEach(function (_, i) {
+      var w = $("w" + i), li = $("t" + i);
+      w.classList.toggle("on", i === k); w.classList.toggle("done", i < k);
+      li.classList.toggle("on", i === k); li.classList.toggle("done", i < k);
+    });
+  }
+  function at(t) {
+    t = t % D.total;
+    var u = Math.max(0, t - D.lead), per = D.travel + D.hold, k = Math.min(D.hops.length - 1, Math.floor(u / per)), f = (u - k * per) / D.travel;
+    var h = D.hops[k], x, y;
+    if (t < D.lead) { x = h.a[0]; y = h.a[1]; }
+    else if (f < 1) { var e = f * f * (3 - 2 * f); x = h.a[0] + (h.b[0] - h.a[0]) * e; y = h.a[1] + (h.b[1] - h.a[1]) * e - Math.sin(Math.PI * f) * 18; }
+    else { x = h.b[0]; y = h.b[1]; }
+    $("packet").setAttribute("transform", "translate(" + x.toFixed(1) + "," + y.toFixed(1) + ")");
+    if (k !== last) { last = k; show(k); }
+  }
+  function frame(now) { if (!paused) at(off + (now - t0) / 1000); requestAnimationFrame(frame); }
+  at(off); requestAnimationFrame(frame);
+  $("toggle").onclick = function () { if (paused) { t0 = performance.now(); } else { off += (performance.now() - t0) / 1000; } paused = !paused; this.textContent = paused ? "Play" : "Pause"; };
+  $("replay").onclick = function () { off = 0; t0 = performance.now(); paused = false; last = -1; $("toggle").textContent = "Pause"; };
+  window.__iso = { seek: function (s) { off = s; t0 = performance.now(); at(s); }, total: D.total };
+})();
+</script>
+</body>
+</html>
