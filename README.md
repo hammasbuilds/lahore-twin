@@ -220,6 +220,28 @@ Field studies of signal preemption report 14–23% shorter emergency trips; this
 evenings, seeds 7, 11 and 23). The calls
 are short (1.5–8 km, one to four signals), so there is less to gain than on a long corridor.
 
+## How it works, animated
+
+Two isometric animations per module, generated from the committed replays by
+`tools/isometric.py`:
+
+- **Overview**: the stages an input passes through, each with the code that does it.
+- **Architecture**: the module as layers of real components, with one real piece of data
+  hopping between them, shown exactly as it was recorded. That is the bus message with its
+  id, topic, payload and cause, the patient record, the vehicle's trip and the signal's
+  phase log.
+
+| Module | Overview | Architecture |
+|---|---|---|
+| The app: from a typed value to a fresh simulation | [overview](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-app.mp4) · [page](docs/isometric/app.html) | [architecture](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-app-arch.mp4) · [page](docs/isometric/app-arch.html) |
+| Office tower | [overview](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office.mp4) · [page](docs/isometric/office.html) | [architecture](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-office-arch.mp4) · [page](docs/isometric/office-arch.html) |
+| Home + GridSense | [overview](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home.mp4) · [page](docs/isometric/home.html) | [architecture](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-home-arch.mp4) · [page](docs/isometric/home-arch.html) |
+| Hospital | [overview](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital.mp4) · [page](docs/isometric/hospital.html) | [architecture](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-hospital-arch.mp4) · [page](docs/isometric/hospital-arch.html) |
+| Lahore traffic | [overview](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic.mp4) · [page](docs/isometric/traffic.html) | [architecture](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-traffic-arch.mp4) · [page](docs/isometric/traffic-arch.html) |
+| Junction planner | [overview](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions.mp4) · [page](docs/isometric/junctions.html) | [architecture](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-junctions-arch.mp4) · [page](docs/isometric/junctions-arch.html) |
+
+![Office architecture, hop by hop](docs/isometric/office-arch.png)
+
 ## How it works
 
 - **Engine** (`lahore_twin/`): a 1-second simulation per module on an MQTT-style bus in which

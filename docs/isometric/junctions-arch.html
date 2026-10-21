@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lahore Twin · Junction planner - architecture, hop by hop</title>
+<style>
+  :root { --bg:#0a0e16; --panel:#121927; --edge:#232d40; --ink:#eef2f8; --muted:#93a1b8; --accent:#2dd4bf; --warm:#f7a74f; }
+  * { box-sizing:border-box }
+  body { margin:0; background:#06090f; color:var(--ink); font:14px/1.45 "Segoe UI",system-ui,sans-serif;
+    display:flex; align-items:center; justify-content:center; min-height:100vh }
+  .frame { width:1280px; height:720px; position:relative; overflow:hidden;
+    background:radial-gradient(1100px 640px at 34% 58%,#15202f 0%,#0a0e16 72%) }
+  header { position:absolute; top:20px; left:30px; right:470px; z-index:3 }
+  h1 { margin:0; font-size:22px } .repo { color:var(--accent); font:12px ui-monospace,Consolas,monospace }
+  .tagline { color:var(--muted); font-size:13px; margin-top:2px }
+  .arch { margin-top:7px; display:inline-block; font-size:11.5px; color:#cfd9ea; background:#182132;
+    border:1px solid var(--edge); border-left:3px solid var(--warm); padding:4px 9px; border-radius:4px }
+  svg { position:absolute; inset:0 }
+  .pl-top { fill:#1c2638; stroke:#2c3a55; stroke-width:1 } .pl-side { fill:#121a28 } .pl-end { fill:#162031 }
+  .c-top { fill:#2a3854; stroke:#3b4d72; stroke-width:1 } .c-front { fill:#1a2336 } .c-right { fill:#202b42 }
+  .comp.on .c-top { fill:var(--accent); stroke:var(--accent) } .comp.src .c-top { fill:#3a4d73 }
+  text { font-family:"Segoe UI",system-ui,sans-serif }
+  .c-title { fill:var(--ink); font-size:11.5px; font-weight:600; text-anchor:middle; paint-order:stroke; stroke:#0a0e16; stroke-width:3px }
+  .layer-name { fill:#cfd9ea; font-size:12px; font-weight:700; text-anchor:end; letter-spacing:.3px }
+  .layer-role { fill:var(--muted); font-size:10px; text-anchor:end }
+  .wire { stroke:#2f3d5a; stroke-width:2; stroke-dasharray:4 5 } .wire.on { stroke:var(--warm); stroke-dasharray:none; stroke-width:2.5 }
+  .wire.done { stroke:#4a5d86; stroke-dasharray:none }
+  .packet circle.core { fill:var(--warm) } .packet circle.halo { fill:var(--warm); opacity:.22 }
+  .side { position:absolute; top:18px; right:22px; width:432px; bottom:18px; display:flex; flex-direction:column; gap:9px; z-index:4 }
+  .card { background:var(--panel); border:1px solid var(--edge); border-radius:8px; padding:10px 13px }
+  .card h2 { margin:0 0 5px; font-size:10px; letter-spacing:1.4px; color:var(--muted); text-transform:uppercase; font-weight:700 }
+  .io { display:grid; grid-template-columns:1fr 1fr; gap:9px }
+  .io .card div { font-size:12px }
+  .in { border-left:3px solid var(--warm) } .out { border-left:3px solid var(--accent) }
+  .hop { flex:1; display:flex; flex-direction:column; min-height:0 }
+  .hop .route { font-size:14px; font-weight:650 } .hop .route i { color:var(--warm); font-style:normal }
+  .hop .wirelbl { font:11px ui-monospace,Consolas,monospace; color:var(--accent); margin:2px 0 6px }
+  pre.unit { margin:0; background:#0b111c; border:1px solid var(--edge); border-radius:6px; padding:8px 10px;
+    font:11.5px/1.45 ui-monospace,Consolas,monospace; color:#e8f0ff; white-space:pre-wrap; word-break:break-word; max-height:190px; overflow:hidden }
+  .says { margin-top:7px; font-size:12.5px; color:#d9e2f0 }
+  .code { margin-top:5px; font:10.5px ui-monospace,Consolas,monospace; color:var(--muted) }
+  ol.trace { margin:0; padding:0; list-style:none; font-size:11px; color:var(--muted); columns:2; column-gap:12px }
+  ol.trace li { padding:1px 0; break-inside:avoid } ol.trace li span { display:inline-block; width:18px; color:#5d6b85 }
+  ol.trace li.on { color:var(--ink) } ol.trace li.on span { color:var(--warm) } ol.trace li.done { color:#a9b6cc }
+  .figs { position:absolute; left:30px; bottom:50px; display:flex; gap:18px; z-index:4 }
+  .fig b { display:block; font-size:17px; color:var(--accent) } .fig span { font-size:10px; color:var(--muted) }
+  .controls { position:absolute; left:30px; bottom:16px; z-index:5; display:flex; gap:8px; align-items:center }
+  button { font:inherit; font-size:12px; color:var(--ink); background:#1b2434; border:1px solid var(--edge); border-radius:5px; padding:4px 10px; cursor:pointer }
+  button:hover { border-color:var(--accent) } .meta { font-size:11px; color:var(--muted) }
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <h1>Lahore Twin · Junction planner <span class="repo">github.com/hammasbuilds/lahore-twin</span></h1>
+    <div class="tagline">Real results: Firozpur Road / Wahdat Road converted to U-turns, and one Rescue 1122 call under a green wave.</div>
+    <div class="arch">The traffic simulation re-run per fix, with turn bans, rerouting and signal preemption. No model, no embedding, no vector store.</div>
+  </header>
+  <svg viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+    <g class="plate p0"><polygon class="pl-side"  points="281.6,489.5 464.3,595.0 464.3,599.8 281.6,494.3"/><polygon class="pl-end"  points="516.5,564.9 464.3,595.0 464.3,599.8 516.5,569.7"/><polygon class="pl-top"  points="333.8,459.4 516.5,564.9 464.3,595.0 281.6,489.5"/></g><g class="plate p1"><polygon class="pl-side"  points="332.1,418.2 514.8,523.7 514.8,528.5 332.1,423.0"/><polygon class="pl-end"  points="567.0,493.5 514.8,523.7 514.8,528.5 567.0,498.4"/><polygon class="pl-top"  points="384.3,388.1 567.0,493.5 514.8,523.7 332.1,418.2"/></g><g class="plate p2"><polygon class="pl-side"  points="382.6,346.9 565.2,452.4 565.2,457.2 382.6,351.7"/><polygon class="pl-end"  points="617.4,422.2 565.2,452.4 565.2,457.2 617.4,427.0"/><polygon class="pl-top"  points="434.8,316.7 617.4,422.2 565.2,452.4 382.6,346.9"/></g><g class="plate p3"><polygon class="pl-side"  points="433.0,275.6 615.7,381.0 615.7,385.9 433.0,280.4"/><polygon class="pl-end"  points="667.9,350.9 615.7,381.0 615.7,385.9 667.9,355.7"/><polygon class="pl-top"  points="485.2,245.4 667.9,350.9 615.7,381.0 433.0,275.6"/></g><g class="plate p4"><polygon class="pl-side"  points="483.5,204.2 666.2,309.7 666.2,314.5 483.5,209.1"/><polygon class="pl-end"  points="718.4,279.6 666.2,309.7 666.2,314.5 718.4,284.4"/><polygon class="pl-top"  points="535.7,174.1 718.4,279.6 666.2,309.7 483.5,204.2"/></g><text class="layer-name" x="271.6" y="493.5">Network</text><text class="layer-role" x="271.6" y="507.5">roads, movements, gaps</text><text class="layer-name" x="322.1" y="422.2">Fixes</text><text class="layer-role" x="322.1" y="436.2">what changes per scenario</text><text class="layer-name" x="372.6" y="350.9">Simulation</text><text class="layer-role" x="372.6" y="364.9">the same trips, re-run</text><text class="layer-name" x="423.0" y="279.6">Rescue 1122</text><text class="layer-role" x="423.0" y="293.6">calls and priority</text><text class="layer-name" x="473.5" y="208.2">Record &amp; view</text><text class="layer-role" x="473.5" y="222.2">results, maps, diagrams</text><line class="wire" id="w0" x1="339.9" y1="476.2" x2="447.8" y2="538.4"/><line class="wire" id="w1" x1="447.8" y1="538.4" x2="390.4" y2="404.8"/><line class="wire" id="w2" x1="390.4" y1="404.8" x2="494.8" y2="364.7"/><line class="wire" id="w3" x1="498.3" y1="467.1" x2="494.8" y2="364.7"/><line class="wire" id="w4" x1="491.3" y1="262.2" x2="599.2" y2="324.5"/><line class="wire" id="w5" x1="599.2" y1="324.5" x2="494.8" y2="364.7"/><line class="wire" id="w6" x1="494.8" y1="364.7" x2="541.8" y2="190.9"/><line class="wire" id="w7" x1="541.8" y1="190.9" x2="649.6" y2="253.2"/><g class="comp" id="c-rank"><polygon class="c-front"  points="306.0,472.7 346.0,495.8 346.0,512.6 306.0,489.5"/><polygon class="c-right"  points="373.9,479.7 346.0,495.8 346.0,512.6 373.9,496.6"/><polygon class="c-top"  points="333.8,456.6 373.9,479.7 346.0,495.8 306.0,472.7"/><text class="c-title" x="339.9" y="462.2">Junction ranking</text></g><g class="comp" id="c-mv"><polygon class="c-front"  points="413.9,534.9 453.9,558.0 453.9,574.9 413.9,551.8"/><polygon class="c-right"  points="481.7,542.0 453.9,558.0 453.9,574.9 481.7,558.8"/><polygon class="c-top"  points="441.7,518.9 481.7,542.0 453.9,558.0 413.9,534.9"/><text class="c-title" x="447.8" y="524.4">Movements</text></g><g class="comp" id="c-uturn"><polygon class="c-front"  points="356.5,401.3 396.5,424.4 396.5,441.3 356.5,418.2"/><polygon class="c-right"  points="424.3,408.4 396.5,424.4 396.5,441.3 424.3,425.2"/><polygon class="c-top"  points="384.3,385.3 424.3,408.4 396.5,424.4 356.5,401.3"/><text class="c-title" x="390.4" y="390.8">U-turn conversion</text></g><g class="comp" id="c-web"><polygon class="c-front"  points="464.3,463.6 504.3,486.7 504.3,503.6 464.3,480.5"/><polygon class="c-right"  points="532.2,470.6 504.3,486.7 504.3,503.6 532.2,487.5"/><polygon class="c-top"  points="492.2,447.5 532.2,470.6 504.3,486.7 464.3,463.6"/><text class="c-title" x="498.3" y="453.1">Webster retime</text></g><g class="comp" id="c-run"><polygon class="c-front"  points="460.9,361.1 500.9,384.3 500.9,401.1 460.9,378.0"/><polygon class="c-right"  points="528.7,368.2 500.9,384.3 500.9,401.1 528.7,385.1"/><polygon class="c-top"  points="488.7,345.1 528.7,368.2 500.9,384.3 460.9,361.1"/><text class="c-title" x="494.8" y="350.7">Scenario run</text></g><g class="comp" id="c-call"><polygon class="c-front"  points="457.4,258.7 497.4,281.8 497.4,298.7 457.4,275.6"/><polygon class="c-right"  points="525.2,265.7 497.4,281.8 497.4,298.7 525.2,282.6"/><polygon class="c-top"  points="485.2,242.6 525.2,265.7 497.4,281.8 457.4,258.7"/><text class="c-title" x="491.3" y="248.2">Ambulance call</text></g><g class="comp" id="c-pre"><polygon class="c-front"  points="565.2,321.0 605.3,344.1 605.3,360.9 565.2,337.8"/><polygon class="c-right"  points="633.1,328.0 605.3,344.1 605.3,360.9 633.1,344.9"/><polygon class="c-top"  points="593.1,304.9 633.1,328.0 605.3,344.1 565.2,321.0"/><text class="c-title" x="599.2" y="310.5">Preemption</text></g><g class="comp" id="c-rec"><polygon class="c-front"  points="507.8,187.4 547.8,210.5 547.8,227.3 507.8,204.2"/><polygon class="c-right"  points="575.7,194.4 547.8,210.5 547.8,227.3 575.7,211.3"/><polygon class="c-top"  points="535.7,171.3 575.7,194.4 547.8,210.5 507.8,187.4"/><text class="c-title" x="541.8" y="176.9">Recorder</text></g><g class="comp" id="c-ui"><polygon class="c-front"  points="615.7,249.6 655.7,272.8 655.7,289.6 615.7,266.5"/><polygon class="c-right"  points="683.6,256.7 655.7,272.8 655.7,289.6 683.6,273.6"/><polygon class="c-top"  points="643.5,233.6 683.6,256.7 655.7,272.8 615.7,249.6"/><text class="c-title" x="649.6" y="239.2">Planner</text></g>
+    <g class="packet" id="packet"><circle class="halo" r="13"/><circle class="core" r="6"/></g>
+  </svg>
+  <div class="side">
+    <div class="io"><div class="card in"><h2>Input</h2><div>an evening peak and its worst junctions; ten ambulance calls</div></div>
+      <div class="card out"><h2>Output</h2><div>time lost per fix, its costs; ambulance times three ways</div></div></div>
+    <div class="card hop"><h2 id="hopno">Hop</h2>
+      <div class="route" id="route"></div><div class="wirelbl" id="wirelbl"></div>
+      <pre class="unit" id="unit"></pre><div class="says" id="says"></div><div class="code" id="code"></div></div>
+    <div class="card"><h2>The path, hop by hop</h2><ol class="trace"><li id="t0"><span>1</span>Junction ranking → Movements</li><li id="t1"><span>2</span>Movements → U-turn conversion</li><li id="t2"><span>3</span>U-turn conversion → Scenario run</li><li id="t3"><span>4</span>Webster retime → Scenario run</li><li id="t4"><span>5</span>Ambulance call → Preemption</li><li id="t5"><span>6</span>Preemption → Scenario run</li><li id="t6"><span>7</span>Scenario run → Recorder</li><li id="t7"><span>8</span>Recorder → Planner</li></ol></div>
+  </div>
+  <div class="figs"><div class="fig"><b>28.8 → 6.9</b><span>veh-h lost, U-turn conversion</span></div><div class="fig"><b>4:27 → 3:58</b><span>ambulance to the call</span></div><div class="fig"><b>+333 km</b><span>the U-turn&#x27;s cost</span></div></div>
+  <div class="controls"><button id="toggle">Pause</button><button id="replay">Replay</button>
+    <span class="meta">8 hops &middot; 40s loop &middot; data copied from viewer/junctions_replay.js (seed 7)</span></div>
+</div>
+<script>
+(function () {
+  var D = {"hops": [{"a": [339.93191859623056, 476.16591422121894], "b": [447.8038864987708, 538.4458239277652], "src": "rank", "dst": "mv", "unit": "{\n  \"junction\": \"Firozpur Road / Wahdat Road\",\n  \"main_road\": [\"Firozpur Road\"],\n  \"lost_today_veh_h\": 28.8\n}", "says": "The worst junction of the evening, and its main road.", "wire": "worst", "srcT": "Junction ranking", "dstT": "Movements", "code": "junctions.Movements"}, {"a": [447.8038864987708, 538.4458239277652], "b": [390.38816164741877, 404.8453724604966], "src": "mv", "dst": "uturn", "unit": "{\n  \"allowed\": \"main road straight on, left turns\",\n  \"banned\": \"crossing and right turns\",\n  \"gaps\": [[-95.0, -209.8], [191.9, 148.8]]\n}", "says": "Movements are judged whole, approach to exit; U-turn gaps open in the median 150-400 m away.", "wire": "turn bans", "srcT": "Movements", "dstT": "U-turn conversion", "code": "junctions.uturn_conversion()"}, {"a": [390.38816164741877, 404.8453724604966], "b": [494.78038864987707, 364.6647855530474], "src": "uturn", "dst": "run", "unit": "{\n  \"rerouted\": 759,\n  \"junction_veh_h\": 6.9,\n  \"queue_peak\": 40,\n  \"km_extra\": 333.0,\n  \"pedestrian_crossing\": \"none: the signal-protected crossing is gone\"\n}", "says": "Trips that crossed are rerouted to the gaps and the same trips are run again.", "wire": "scenario", "srcT": "U-turn conversion", "dstT": "Scenario run", "code": "junctions.run_fix()"}, {"a": [498.260129549959, 467.1252821670429], "b": [494.78038864987707, 364.6647855530474], "src": "web", "dst": "run", "unit": "{\n  \"greens_s\": [36, 15],\n  \"junction_veh_h\": 9.6\n}", "says": "Webster's method on the real per-lane demand: the side road gets the long green, because the main road's through traffic is on the flyover.", "wire": "retime", "srcT": "Webster retime", "dstT": "Scenario run", "code": "junctions.run_fix()"}, {"a": [491.3006477497951, 262.20428893905193], "b": [599.1726156523354, 324.4841986455982], "src": "call", "dst": "pre", "unit": "{\n  \"dispatched\": \"17:31:12\",\n  \"route_m\": 1511,\n  \"signals\": [\"Firozpur Road / Wahdat Road\", \"Fazal Elahi Road / Firozpur Road\", \"Ahmed Munir Shaheed Road / Malik Fazal Din Road\"],\n  \"to\": \"to Nobel Hospital\"\n}", "says": "A call: from the real Rescue 1122 station, ten minutes there, to the nearest emergency department.", "wire": "call", "srcT": "Ambulance call", "dstT": "Preemption", "code": "TrafficSim._preempt_requests()"}, {"a": [599.1726156523354, 324.4841986455982], "b": [494.78038864987707, 364.6647855530474], "src": "pre", "dst": "run", "unit": "{\n  \"none\": 116,\n  \"siren\": 104,\n  \"greenwave\": 82\n}", "says": "Each signal within 300 m turns green for it, keeping amber and all-red; the same call, three ways.", "wire": "response, s", "srcT": "Preemption", "dstT": "Scenario run", "code": "junctions.run_fix()"}, {"a": [494.78038864987707, 364.6647855530474], "b": [541.7568908009832, 190.8837471783296], "src": "run", "dst": "rec", "unit": "{\n  \"baseline\": 28.8,\n  \"retime\": 9.6,\n  \"adaptive\": 9.2,\n  \"uturn\": 6.9,\n  \"underpass\": 9.5\n}", "says": "Every fix's results, queue series and the ambulance traces are written once.", "wire": "results", "srcT": "Scenario run", "dstT": "Recorder", "code": "export_junctions.run_all()"}, {"a": [541.7568908009832, 190.8837471783296], "b": [649.6288587035235, 253.16365688487585], "src": "rec", "dst": "ui", "unit": "{\n  \"view\": [\"Fix a junction\", \"Ambulance\"],\n  \"diagram\": \"time against distance\"\n}", "says": "The planner draws the fix on the real roads and the green-wave diagram.", "wire": "viewer", "srcT": "Recorder", "dstT": "Planner", "code": "viewer/junctions.js"}], "travel": 0.9, "hold": 3.6, "lead": 1.0, "total": 39.5};
+  var $ = function (id) { return document.getElementById(id); };
+  var q = new URLSearchParams(location.search), t0 = performance.now(), off = 0, paused = false;
+  if (q.has("t")) { off = parseFloat(q.get("t")) || 0; paused = true; }
+  if (q.get("play") === "0") paused = true;
+  var last = -1;
+  function show(k) {
+    var h = D.hops[k];
+    $("hopno").textContent = "Hop " + (k + 1) + " of " + D.hops.length;
+    $("route").innerHTML = h.srcT.replace(/</g, "&lt;") + " <i>&rarr;</i> " + h.dstT.replace(/</g, "&lt;");
+    $("wirelbl").textContent = h.wire || "";
+    $("unit").textContent = h.unit; $("says").textContent = h.says; $("code").textContent = "handled in " + h.code;
+    document.querySelectorAll(".comp").forEach(function (c) { c.classList.remove("on", "src"); });
+    var a = $("c-" + h.src), b = $("c-" + h.dst); if (a) a.classList.add("src"); if (b) b.classList.add("on");
+    D.hops.forEach(function (_, i) {
+      var w = $("w" + i), li = $("t" + i);
+      w.classList.toggle("on", i === k); w.classList.toggle("done", i < k);
+      li.classList.toggle("on", i === k); li.classList.toggle("done", i < k);
+    });
+  }
+  function at(t) {
+    t = t % D.total;
+    var u = Math.max(0, t - D.lead), per = D.travel + D.hold, k = Math.min(D.hops.length - 1, Math.floor(u / per)), f = (u - k * per) / D.travel;
+    var h = D.hops[k], x, y;
+    if (t < D.lead) { x = h.a[0]; y = h.a[1]; }
+    else if (f < 1) { var e = f * f * (3 - 2 * f); x = h.a[0] + (h.b[0] - h.a[0]) * e; y = h.a[1] + (h.b[1] - h.a[1]) * e - Math.sin(Math.PI * f) * 18; }
+    else { x = h.b[0]; y = h.b[1]; }
+    $("packet").setAttribute("transform", "translate(" + x.toFixed(1) + "," + y.toFixed(1) + ")");
+    if (k !== last) { last = k; show(k); }
+  }
+  function frame(now) { if (!paused) at(off + (now - t0) / 1000); requestAnimationFrame(frame); }
+  at(off); requestAnimationFrame(frame);
+  $("toggle").onclick = function () { if (paused) { t0 = performance.now(); } else { off += (performance.now() - t0) / 1000; } paused = !paused; this.textContent = paused ? "Play" : "Pause"; };
+  $("replay").onclick = function () { off = 0; t0 = performance.now(); paused = false; last = -1; $("toggle").textContent = "Pause"; };
+  window.__iso = { seek: function (s) { off = s; t0 = performance.now(); at(s); }, total: D.total };
+})();
+</script>
+</body>
+</html>

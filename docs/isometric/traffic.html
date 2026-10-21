@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lahore Twin · Lahore traffic - how an input becomes an output</title>
+<style>
+  :root {
+    --bg:#0b0f17; --panel:#141a26; --edge:#222c3d; --ink:#eef2f8; --muted:#94a2b9;
+    --accent:#4f8ff7; --warm:#f7a74f; --run:27.25s;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:#070a10;color:var(--ink);
+    font:15px/1.5 "Segoe UI",system-ui,-apple-system,sans-serif;
+    display:flex;align-items:center;justify-content:center;min-height:100vh}
+  .frame{width:1280px;height:720px;position:relative;overflow:hidden;
+    background:radial-gradient(1150px 640px at 58% 36%,#16202f 0%,#0b0f17 74%)}
+
+  header{position:absolute;top:24px;left:34px;right:300px;z-index:3}
+  h1{margin:0;font-size:24px;letter-spacing:-.2px}
+  .repo{color:var(--accent);font-size:12.5px;font-family:ui-monospace,Consolas,monospace}
+  .tagline{color:var(--muted);font-size:13.5px;margin-top:3px}
+  .arch{margin-top:8px;display:inline-block;font-size:12px;color:#cfd9ea;background:#1a2333;
+    border:1px solid var(--edge);border-left:3px solid var(--warm);padding:5px 10px;
+    border-radius:4px}
+
+  svg{position:absolute;inset:0}
+  .face-top{fill:#27324a;stroke:rgba(58,72,101,.55);stroke-width:1}
+  .face-left{fill:#19212f}
+  .face-right{fill:#1f2939}
+  .face-lit{fill:var(--accent);opacity:0}
+  text{font-family:"Segoe UI",system-ui,sans-serif;text-anchor:middle}
+  .step-no{fill:var(--muted);font-size:10px;font-weight:700;letter-spacing:1.4px}
+  .step-title{fill:var(--ink);font-size:14.5px;font-weight:650}
+  .step-carries{fill:var(--warm);font-size:11px;font-family:ui-monospace,Consolas,monospace}
+  .stage-label{opacity:.40}
+  .packet{animation:fly var(--run) linear infinite}
+
+  .card{position:absolute;width:252px;background:var(--panel);border:1px solid var(--edge);
+    border-radius:8px;padding:11px 13px;z-index:3}
+  .card h2{margin:0 0 6px;font-size:10.5px;letter-spacing:1.4px;color:var(--muted);
+    text-transform:uppercase}
+  .card .val{font-family:ui-monospace,Consolas,monospace;font-size:12px;word-break:break-word}
+  .card .val div{padding:1px 0}
+  .card .sub{margin-top:7px;font-size:11.5px;color:var(--muted)}
+  .given{left:34px;bottom:152px;border-left:3px solid var(--warm)}
+  .produced{right:34px;bottom:152px;border-left:3px solid var(--accent)}
+
+  .reader{position:absolute;left:50%;transform:translateX(-50%);bottom:22px;width:640px;
+    height:116px;z-index:4}
+  .read{position:absolute;inset:0;background:#121a28;border:1px solid var(--edge);
+    border-radius:8px;padding:10px 15px;opacity:0}
+  .read-no{font-size:10px;letter-spacing:1.3px;color:var(--muted);text-transform:uppercase}
+  .read-title{font-size:15.5px;font-weight:650;margin:1px 0 3px}
+  .does{font-size:13px;color:#d9e2f0}
+  .why{font-size:12px;color:var(--warm);margin-top:3px}
+  .code{position:absolute;right:13px;top:10px;font-size:10.5px;color:var(--muted);
+    font-family:ui-monospace,Consolas,monospace}
+
+  .figs{position:absolute;top:24px;right:34px;display:flex;gap:15px;z-index:4}
+  .fig{text-align:right}
+  .fig b{display:block;font-size:18px;color:var(--accent)}
+  .fig span{font-size:10px;color:var(--muted)}
+
+  .controls{position:absolute;left:34px;bottom:22px;z-index:5;display:flex;gap:8px;
+    align-items:center}
+  button{font:inherit;font-size:12px;color:var(--ink);background:#1b2434;
+    border:1px solid var(--edge);border-radius:5px;padding:5px 11px;cursor:pointer}
+  button:hover{border-color:var(--accent)}
+  .meta{font-size:11px;color:var(--muted)}
+  body.paused .frame *{animation-play-state:paused!important}
+  @media (prefers-reduced-motion:reduce){.frame *{animation-play-state:paused!important}}
+
+@keyframes lit0{0%,7.339%{opacity:0}8.257%{opacity:.66}16.697%{opacity:.52}17.897%,100%{opacity:.08}}
+@keyframes label0{0%,7.339%{opacity:.40}8.257%,16.697%{opacity:1}17.897%,100%{opacity:.40}}
+@keyframes read0{0%,4.844%{opacity:0}5.144%,17.248%{opacity:1}17.548%,100%{opacity:0}}
+@keyframes lit1{0%,19.817%{opacity:0}20.734%{opacity:.66}29.174%{opacity:.52}30.374%,100%{opacity:.08}}
+@keyframes label1{0%,19.817%{opacity:.40}20.734%,29.174%{opacity:1}30.374%,100%{opacity:.40}}
+@keyframes read1{0%,17.321%{opacity:0}17.621%,29.725%{opacity:1}30.025%,100%{opacity:0}}
+@keyframes lit2{0%,32.294%{opacity:0}33.211%{opacity:.66}41.651%{opacity:.52}42.851%,100%{opacity:.08}}
+@keyframes label2{0%,32.294%{opacity:.40}33.211%,41.651%{opacity:1}42.851%,100%{opacity:.40}}
+@keyframes read2{0%,29.798%{opacity:0}30.098%,42.202%{opacity:1}42.502%,100%{opacity:0}}
+@keyframes lit3{0%,44.771%{opacity:0}45.688%{opacity:.66}54.128%{opacity:.52}55.328%,100%{opacity:.08}}
+@keyframes label3{0%,44.771%{opacity:.40}45.688%,54.128%{opacity:1}55.328%,100%{opacity:.40}}
+@keyframes read3{0%,42.275%{opacity:0}42.575%,54.679%{opacity:1}54.979%,100%{opacity:0}}
+@keyframes lit4{0%,57.248%{opacity:0}58.165%{opacity:.66}66.606%{opacity:.52}67.806%,100%{opacity:.08}}
+@keyframes label4{0%,57.248%{opacity:.40}58.165%,66.606%{opacity:1}67.806%,100%{opacity:.40}}
+@keyframes read4{0%,54.752%{opacity:0}55.052%,67.156%{opacity:1}67.456%,100%{opacity:0}}
+@keyframes lit5{0%,69.725%{opacity:0}70.642%{opacity:.66}79.083%{opacity:.52}80.283%,100%{opacity:.08}}
+@keyframes label5{0%,69.725%{opacity:.40}70.642%,79.083%{opacity:1}80.283%,100%{opacity:.40}}
+@keyframes read5{0%,67.229%{opacity:0}67.529%,79.633%{opacity:1}79.933%,100%{opacity:0}}
+@keyframes lit6{0%,82.202%{opacity:0}83.119%{opacity:.66}91.560%{opacity:.52}92.760%,100%{opacity:.08}}
+@keyframes label6{0%,82.202%{opacity:.40}83.119%,91.560%{opacity:1}92.760%,100%{opacity:.40}}
+@keyframes read6{0%,79.706%{opacity:0}80.006%,92.110%{opacity:1}92.410%,100%{opacity:0}}
+@keyframes fly{0%{transform:translate(93.46px,153.38px);opacity:0}1.284%{opacity:1}7.339%{transform:translate(293.46px,223.38px)}19.817%{transform:translate(408.97px,233.35px)}32.294%{transform:translate(524.49px,243.32px)}44.771%{transform:translate(640.00px,253.28px)}57.248%{transform:translate(755.51px,263.25px)}69.725%{transform:translate(871.03px,273.21px)}82.202%{transform:translate(986.54px,283.18px)}93.761%{transform:translate(1186.54px,355.18px);opacity:1}100%{transform:translate(1186.54px,355.18px);opacity:0}}
+.s0 .face-lit{animation:lit0 var(--run) linear infinite}
+.s1 .face-lit{animation:lit1 var(--run) linear infinite}
+.s2 .face-lit{animation:lit2 var(--run) linear infinite}
+.s3 .face-lit{animation:lit3 var(--run) linear infinite}
+.s4 .face-lit{animation:lit4 var(--run) linear infinite}
+.s5 .face-lit{animation:lit5 var(--run) linear infinite}
+.s6 .face-lit{animation:lit6 var(--run) linear infinite}
+.l0{animation:label0 var(--run) linear infinite}
+.l1{animation:label1 var(--run) linear infinite}
+.l2{animation:label2 var(--run) linear infinite}
+.l3{animation:label3 var(--run) linear infinite}
+.l4{animation:label4 var(--run) linear infinite}
+.l5{animation:label5 var(--run) linear infinite}
+.l6{animation:label6 var(--run) linear infinite}
+.r0{animation:read0 var(--run) linear infinite}
+.r1{animation:read1 var(--run) linear infinite}
+.r2{animation:read2 var(--run) linear infinite}
+.r3{animation:read3 var(--run) linear infinite}
+.r4{animation:read4 var(--run) linear infinite}
+.r5{animation:read5 var(--run) linear infinite}
+.r6{animation:read6 var(--run) linear infinite}
+</style>
+</head>
+<body>
+<div class="frame">
+  <header>
+    <h1>Lahore Twin · Lahore traffic <span class="repo">github.com/hammasbuilds/lahore-twin</span></h1>
+    <div class="tagline">An evening peak on Gulberg&#x27;s real roads: trips with reasons, real shops, 59 signals.</div>
+    <div class="arch">A microscopic traffic simulation (car-following + lane changing) on OpenStreetMap roads; signal controllers are rules. No model, no embedding, no vector store.</div>
+  </header>
+  <div class="figs"><div class="fig"><b>105 → 60 s</b><span>median delay, fixed → adaptive</span></div><div class="fig"><b>1,763</b><span>stops at real shops</span></div><div class="fig"><b>7,097</b><span>trips in the evening peak</span></div></div>
+
+  <svg viewBox="0 0 1280 720" width="1280" height="720" aria-hidden="true">
+    <g class="slab s0"><polygon class="face-left" points="242.51,241.41 293.46,270.82 293.46,282.21 242.51,252.80"/><polygon class="face-right" points="344.40,241.41 293.46,270.82 293.46,282.21 344.40,252.80"/><polygon class="face-top" points="293.46,212.00 344.40,241.41 293.46,270.82 242.51,241.41"/><polygon class="face-lit" points="293.46,212.00 344.40,241.41 293.46,270.82 242.51,241.41"/></g><g class="slab s1"><polygon class="face-left" points="358.03,251.38 408.97,280.79 408.97,292.17 358.03,262.76"/><polygon class="face-right" points="459.91,251.38 408.97,280.79 408.97,292.17 459.91,262.76"/><polygon class="face-top" points="408.97,221.97 459.91,251.38 408.97,280.79 358.03,251.38"/><polygon class="face-lit" points="408.97,221.97 459.91,251.38 408.97,280.79 358.03,251.38"/></g><g class="slab s2"><polygon class="face-left" points="473.54,261.34 524.49,290.75 524.49,302.14 473.54,272.73"/><polygon class="face-right" points="575.43,261.34 524.49,290.75 524.49,302.14 575.43,272.73"/><polygon class="face-top" points="524.49,231.93 575.43,261.34 524.49,290.75 473.54,261.34"/><polygon class="face-lit" points="524.49,231.93 575.43,261.34 524.49,290.75 473.54,261.34"/></g><g class="slab s3"><polygon class="face-left" points="589.06,271.31 640.00,300.72 640.00,312.10 589.06,282.69"/><polygon class="face-right" points="690.94,271.31 640.00,300.72 640.00,312.10 690.94,282.69"/><polygon class="face-top" points="640.00,241.90 690.94,271.31 640.00,300.72 589.06,271.31"/><polygon class="face-lit" points="640.00,241.90 690.94,271.31 640.00,300.72 589.06,271.31"/></g><g class="slab s4"><polygon class="face-left" points="704.57,281.27 755.51,310.68 755.51,322.07 704.57,292.66"/><polygon class="face-right" points="806.46,281.27 755.51,310.68 755.51,322.07 806.46,292.66"/><polygon class="face-top" points="755.51,251.86 806.46,281.27 755.51,310.68 704.57,281.27"/><polygon class="face-lit" points="755.51,251.86 806.46,281.27 755.51,310.68 704.57,281.27"/></g><g class="slab s5"><polygon class="face-left" points="820.09,291.24 871.03,320.65 871.03,332.03 820.09,302.62"/><polygon class="face-right" points="921.97,291.24 871.03,320.65 871.03,332.03 921.97,302.62"/><polygon class="face-top" points="871.03,261.83 921.97,291.24 871.03,320.65 820.09,291.24"/><polygon class="face-lit" points="871.03,261.83 921.97,291.24 871.03,320.65 820.09,291.24"/></g><g class="slab s6"><polygon class="face-left" points="935.60,301.20 986.54,330.62 986.54,342.00 935.60,312.59"/><polygon class="face-right" points="1037.49,301.20 986.54,330.62 986.54,342.00 1037.49,312.59"/><polygon class="face-top" points="986.54,271.79 1037.49,301.20 986.54,330.62 935.60,301.20"/><polygon class="face-lit" points="986.54,271.79 1037.49,301.20 986.54,330.62 935.60,301.20"/></g>
+    <g class="stage-label l0"><text class="step-no" x="293.46" y="187.41">STEP 1</text><text class="step-title" x="293.46" y="208.41">Real roads</text><text class="step-carries" x="293.46" y="289.41">9,698 links</text></g><g class="stage-label l1"><text class="step-no" x="408.97" y="197.38">STEP 2</text><text class="step-title" x="408.97" y="218.38">Trips with reasons</text><text class="step-carries" x="408.97" y="299.38">routes + stops</text></g><g class="stage-label l2"><text class="step-no" x="524.49" y="207.34">STEP 3</text><text class="step-title" x="524.49" y="228.34">Signals</text><text class="step-carries" x="524.49" y="309.34">phase log</text></g><g class="stage-label l3"><text class="step-no" x="640.00" y="217.31">STEP 4</text><text class="step-title" x="640.00" y="238.31">Drive</text><text class="step-carries" x="640.00" y="319.31">positions/s</text></g><g class="stage-label l4"><text class="step-no" x="755.51" y="227.27">STEP 5</text><text class="step-title" x="755.51" y="248.27">Measure</text><text class="step-carries" x="755.51" y="329.27">metrics</text></g><g class="stage-label l5"><text class="step-no" x="871.03" y="237.24">STEP 6</text><text class="step-title" x="871.03" y="258.24">Record</text><text class="step-carries" x="871.03" y="339.24">traffic_replay.js</text></g><g class="stage-label l6"><text class="step-no" x="986.54" y="247.20">STEP 7</text><text class="step-title" x="986.54" y="268.20">Show</text><text class="step-carries" x="986.54" y="349.20">the dashboard</text></g>
+    <g class="packet">
+      <circle r="14" fill="var(--warm)" opacity=".20"/>
+      <circle r="6.5" fill="var(--warm)"/>
+    </g>
+  </svg>
+
+  <div class="card given">
+    <h2>Input &mdash; what we gave it</h2>
+    <div class="val"><div>evening · 8,000 trips an hour ·</div><div>seed 7</div></div>
+    <div class="sub">the inputs of “Run with your values”</div>
+  </div>
+  <div class="card produced">
+    <h2>Output &mdash; what came back</h2>
+    <div class="val"><div>median delay 105 s fixed, 60 s</div><div>adaptive; the worst junctions</div></div>
+    <div class="sub">the same trips under both signal plans</div>
+  </div>
+
+  <div class="reader"><div class="read r0"><div class="read-no">Step 1 of 7</div><div class="read-title">Real roads</div><div class="does">OpenStreetMap ways split into directed links with lanes and layers</div><code class="code">roads.load()</code></div><div class="read r1"><div class="read-no">Step 2 of 7</div><div class="read-title">Trips with reasons</div><div class="does">Shopping, pharmacy, school run, fuel, at 432 real places</div><code class="code">traffic_sim.make_demand()</code></div><div class="read r2"><div class="read-no">Step 3 of 7</div><div class="read-title">Signals</div><div class="does">60 s / 30 s fixed plans or loop-detector adaptive</div><code class="code">traffic_sim.TrafficSim.tick_signals()</code></div><div class="read r3"><div class="read-no">Step 4 of 7</div><div class="read-title">Drive</div><div class="does">Car-following, lane changes, give-way, kerb stops, parking</div><code class="code">traffic_sim.TrafficSim.step()</code></div><div class="read r4"><div class="read-no">Step 5 of 7</div><div class="read-title">Measure</div><div class="does">Delay, stops, junction losses, gridlock, stops at shops</div><code class="code">traffic_sim.TrafficSim.metrics()</code></div><div class="read r5"><div class="read-no">Step 6 of 7</div><div class="read-title">Record</div><div class="does">Routes once, positions as small deltas, tiles</div><code class="code">export_traffic.run_all()</code></div><div class="read r6"><div class="read-no">Step 7 of 7</div><div class="read-title">Show</div><div class="does">A map that streams around the camera, follow, places</div><code class="code">viewer/traffic.js</code></div></div>
+
+  <div class="controls">
+    <button id="toggle">Pause</button>
+    <button id="replay">Replay</button>
+    <span class="meta">7 real stages &middot; 27s loop</span>
+  </div>
+</div>
+<script>
+  document.getElementById("toggle").addEventListener("click", function () {
+    var paused = document.body.classList.toggle("paused");
+    this.textContent = paused ? "Play" : "Pause";
+  });
+  document.getElementById("replay").addEventListener("click", function () {
+    document.body.classList.remove("paused");
+    document.getElementById("toggle").textContent = "Pause";
+    document.querySelectorAll(".frame *").forEach(function (node) {
+      var name = getComputedStyle(node).animationName;
+      if (name && name !== "none") { node.style.animation = "none"; node.offsetHeight;
+        node.style.animation = ""; }
+    });
+  });
+</script>
+</body>
+</html>

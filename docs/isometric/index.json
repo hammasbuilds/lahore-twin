@@ -1,0 +1,50 @@
+[
+ {
+  "key": "app",
+  "title": "Lahore Twin",
+  "overview": "app.html",
+  "architecture": "app-arch.html",
+  "overview_s": 20,
+  "architecture_s": 30
+ },
+ {
+  "key": "office",
+  "title": "Lahore Twin \u00b7 Office tower",
+  "overview": "office.html",
+  "architecture": "office-arch.html",
+  "overview_s": 27,
+  "architecture_s": 44
+ },
+ {
+  "key": "home",
+  "title": "Lahore Twin \u00b7 Home + GridSense",
+  "overview": "home.html",
+  "architecture": "home-arch.html",
+  "overview_s": 27,
+  "architecture_s": 40
+ },
+ {
+  "key": "hospital",
+  "title": "Lahore Twin \u00b7 Hospital",
+  "overview": "hospital.html",
+  "architecture": "hospital-arch.html",
+  "overview_s": 27,
+  "architecture_s": 44
+ },
+ {
+  "key": "traffic",
+  "title": "Lahore Twin \u00b7 Lahore traffic",
+  "overview": "traffic.html",
+  "architecture": "traffic-arch.html",
+  "overview_s": 27,
+  "architecture_s": 35
+ },
+ {
+  "key": "junctions",
+  "title": "Lahore Twin \u00b7 Junction planner",
+  "overview": "junctions.html",
+  "architecture": "junctions-arch.html",
+  "overview_s": 27,
+  "architecture_s": 40
+ }
+]

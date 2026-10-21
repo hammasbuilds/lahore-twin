@@ -1307,3 +1307,20 @@ lowest each time (+333–337 km driven). A fix can hurt: at Khayaban-e-Jamia Pun
 Boulevard Garden Town (seed 11) retiming and the underpass lose 3.0 against 2.8 today; only
 adaptive helps there. Ambulance to the call, green wave against no priority: −11% (seed 7),
 −10% (11), −9% (23); siren −3 to −4%. Recorded in the README as a range.
+
+## Isometric animations (user request, 2026-10-21)
+
+- *Asked for:* isometric animations of every project for LinkedIn — input, the whole path
+  through the architecture, output — then "more architecture, down to the token level", keeping
+  both kinds; in GitHub and on the Launchpad board.
+- *Built:* `tools/isometric.py` writes, per module (app, office, home, hospital, traffic,
+  junctions), an **overview** (`mediakit.isometric`: stages with the code that does each) and an
+  **architecture** view (`mediakit.isodeep`, new in the shared media kit: the module as layers of
+  real components and one piece of data hopping between them, shown exactly as recorded — every
+  unit is copied from the committed replays when the pages are generated). MP4s recorded with
+  `mediakit.isorecord` (system Chrome, H.264 for LinkedIn): on the v0.4.0 release, and beside
+  the pages locally (gitignored). Registered in Launchpad (`--isometric docs/isometric`), so the
+  board's shared gallery lists all twelve.
+- *Found:* the badge hop first showed `"gate": "corr1"` — a field the recorded message does not
+  have (its payload was not exported); replaced by the door named in the message's own text. The
+  stack sat too low and ran into the figures; the renderer now fits it into the free area.
