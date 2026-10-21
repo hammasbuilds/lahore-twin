@@ -1527,3 +1527,9 @@ energy, dark busy road-minutes 8,739 → 2,068 and 7,945 → 1,782. The self-run
 five City scenes (`ui_check_demo.js`, 37 captions, no errors). Fixed: the smog caption ended
 "and the hotspot found" — it now gives what the action did at the real hotspot (733 → 644 µg/m³);
 the night caption showed kWh to one decimal and left out the battery on main roads.
+
+**Round 6.** The overview card and the About panel read against the measurements: map error cut
+21–40% over three evenings (the About says 20–40%), half a metre of water, 38% less energy — all
+as measured. Fixed: on the overview, the junction planner's "4:27 → 3:58" broke across two lines
+after the arrow; card figures now stay on one line (checked at 1,440, 1,280 and 390 px: nothing
+overflows its column).
