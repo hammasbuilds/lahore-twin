@@ -1473,3 +1473,10 @@ AQI colour, and the darkest Hazardous shades were unreadable on the dark panel �
 now carries the band and the number stays in the text colour; the UI's power check compared
 Today and Connected inside the load-shedding hour, where Connected rightly draws more (main
 roads lit on a battery, Today's east simply dark) — moved to minute 60.
+*Found on the hour-long run:* the about text said the sensors find the hotspot "within about 150 m"
+(a 20-minute figure); over the hour it was 566 m. The hotspot was the single worst cell in the last
+minute, which jumps between junctions as queues come and go. Now the worst cell over the peak
+quarter-hour, for the truth and the network alike: 424 / 141 / 640 m (seeds 7, 11, 23). The
+network places it a block or two off — detectors only count signal approaches — so the page now
+also reports what the action does at the *real* hotspot: 733 → 644, 709 → 592, 764 → 550 µg/m³
+(12–28%), since 400 m of adaptive signals still reach it.

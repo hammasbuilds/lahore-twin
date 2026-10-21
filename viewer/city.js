@@ -111,7 +111,8 @@
       <tr><td>Sensors</td><td class="num">1 official</td><td class="num">1 + 25 low-cost</td></tr>
       <tr><td>Map error near roads, µg/m³</td><td class="num">${m.map_error_today}</td><td class="num best">${m.map_error_sensors}</td></tr>
       <tr><td>Hotspot found</td><td class="num">no</td><td class="num best">${m.hotspot_found_m} m away</td></tr>
-      <tr><td>Hotspot at the peak, µg/m³</td><td class="num">${m.hotspot_before}</td><td class="num best">${m.hotspot_after}</td></tr></table>`;
+      <tr><td>Where it acted, µg/m³ at the peak</td><td class="num">${m.hotspot_before}</td><td class="num best">${m.hotspot_after}</td></tr>
+      <tr><td>At the real hotspot</td><td class="num">${m.true_hotspot_before}</td><td class="num best">${m.true_hotspot_after}</td></tr></table>`;
     h += `<p class="note">Today the city has one official monitor, so its map is one number. Connected adds 25 low-cost sensors — 15 at schools, hospitals and colleges, 10 on main-road junction poles — each with its own gain error and noise, corrected against the one beside the monitor; the map is a regression of their readings on the traffic the signals' loop detectors count. Where it finds the worst hotspot, ${m.adaptive_signals} signals within 400 m go adaptive, cutting idling; the same trips are run again. The area mean at the peak is ${m.area_mean_peak} µg/m³ — Hazardous on the US AQI scale, as Lahore's winter evenings are.</p>`;
     h += `<h3>The sensors now</h3><ul class="sensors">` + S.sensors.map((s, n) => ({ s, v: S.readings[k][n] })).sort((a, b) => b.v - a.v).map(({ s, v }) => `<li><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--${band(v)[1]})"></i>${esc(s.name.slice(0, 24))}</span><b class="num">${v}</b></li>`).join("") + `</ul>`;
     $("pane").innerHTML = h;

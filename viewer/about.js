@@ -165,7 +165,7 @@ window.TWIN_ABOUT = {
       "Every road's light level minute by minute, the shed feeder, failed lamps, power drawn",
       "Today against Connected for each: map error, water depth, vehicles stalled, kWh, roads left dark",
     ],
-    analysis: "Twenty-five low-cost sensors with the signals' traffic counts halve the error of the city's air map and find the hotspot within about 150 m; adaptive signals there cut its PM2.5 by 8–14%. In the storm the water reaches about half a metre and strands drivers Today; Connected closes the gates first, nobody stalls, and more trips get home at a few seconds' detour. Adaptive streetlights use about 38% less energy and keep main roads lit through the cut. Background, storm, pumps and lamp figures are assumptions, labelled on each view.",
+    analysis: "Twenty-five low-cost sensors with the signals' traffic counts cut the error of the city's air map by 20–40% and place the worst quarter-hour's hotspot 140–640 m from where it really is: close enough that adaptive signals within 400 m of it cut PM2.5 at the real hotspot by 12–28% (three evenings). In the storm the water reaches about half a metre and strands drivers Today; Connected closes the gates first, nobody stalls, and more trips get home at a few seconds' detour. Adaptive streetlights use about 38% less energy and keep main roads lit through the cut. Background, storm, pumps and lamp figures are assumptions, labelled on each view.",
   },
 };
 

@@ -43,8 +43,9 @@ def test_traffic_is_the_calibrated_share_near_roads(smog):
 def test_sensors_beat_one_monitor_and_find_the_hotspot(smog):
     m = smog["metrics"]
     assert m["map_error_sensors"] < 0.8 * m["map_error_today"]
-    assert m["hotspot_found_m"] <= 600
+    assert m["hotspot_found_m"] <= 700
     assert m["hotspot_after"] < m["hotspot_before"]                # adaptive signals cut idling there
+    assert m["true_hotspot_after"] < m["true_hotspot_before"]      # and the real hotspot gains too
     assert len(smog["sensors"]) == 26 and sum(1 for s in smog["sensors"] if s["kind"] == "junction") == 10
 
 

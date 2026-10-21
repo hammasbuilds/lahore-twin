@@ -221,10 +221,12 @@ def smog(seed: int = 7, per_hour: int = 8000, minutes: int = 60) -> dict:
         a = my - b * mx
         res = [(s["x"], s["y"], y - (a + b * x)) for s, x, y in zip(sensors, xs_, ys_)]
         est_conn[m] = [a + b * proxy[k] + idw(res, *grid.centre(k)) for k in range(grid.nx * grid.ny)]
-    # the hotspot: the worst cell at the peak, by truth and by each network
+    # the hotspot: the worst cell over the peak quarter-hour, by truth and by the network. One
+    # minute's worst cell jumps between junctions as queues come and go; a city acts on a mean
+    def worst(fields):
+        return max(range(grid.nx * grid.ny), key=lambda k: sum(fields[m][k] for m in peak))
+    true_hot, conn_hot = worst(truth), worst(est_conn)
     last = minutes - 1
-    true_hot = max(range(len(truth[last])), key=lambda k: truth[last][k])
-    conn_hot = max(range(len(est_conn[last])), key=lambda k: est_conn[last][k])
     hx, hy = grid.centre(conn_hot)
     # act: adaptive signals within 400 m of the hotspot the sensors found; same trips again
     sim1, em1 = run(adaptive_near=(hx, hy, 400.0))
@@ -246,6 +248,11 @@ def smog(seed: int = 7, per_hour: int = 8000, minutes: int = 60) -> dict:
                          for m in peak for k in near) / (len(peak) * len(near)), 1)
 
     near_hot = [k for k in range(len(truth[last])) if math.dist(grid.centre(k), (hx, hy)) <= 400]
+    tx, ty = grid.centre(true_hot)
+    true_cells = [k for k in range(len(truth[last])) if math.dist(grid.centre(k), (tx, ty)) <= 400]
+
+    def mean_at(f, cells):
+        return round(sum(f[m][k] for m in peak for k in cells) / (len(peak) * len(cells)), 1)
     return {
         "grid": grid, "truth": truth, "after": after, "est_conn": est_conn, "est_today": est_today, "readings": readings,
         "sensors": sensors, "official": official, "scale": scale, "trips": len(trips), "minutes": minutes,
@@ -256,8 +263,9 @@ def smog(seed: int = 7, per_hour: int = 8000, minutes: int = 60) -> dict:
             "map_error_today": err(est_today), "map_error_sensors": err(est_conn),
             "hotspot_found_m": round(math.dist(grid.centre(true_hot), (hx, hy))),
             "schools_peak": exposure(truth, schools), "hospitals_peak": exposure(truth, hosp),
-            "hotspot_before": round(sum(truth[m][k] for m in peak for k in near_hot) / (len(peak) * len(near_hot)), 1),
-            "hotspot_after": round(sum(after[m][k] for m in peak for k in near_hot) / (len(peak) * len(near_hot)), 1),
+            "hotspot_before": mean_at(truth, near_hot), "hotspot_after": mean_at(after, near_hot),
+            # the action is taken where the network thinks the hotspot is; this is what it does at the real one
+            "true_hotspot_before": mean_at(truth, true_cells), "true_hotspot_after": mean_at(after, true_cells),
             # schools, colleges, hospitals and clinics within 800 m of the hotspot the sensors found
             "sensitive_sites_near_hotspot": len([q for q in sensitive if math.dist((q["x"], q["y"]), (hx, hy)) <= 800]),
             "sensitive_near_hotspot_before": exposure(truth, sensitive, hx, hy, 800),
