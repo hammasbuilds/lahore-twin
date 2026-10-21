@@ -1436,3 +1436,17 @@ gain error and noise, corrected network-wide against the co-located sensor.
   against what the signals' loop detectors count (only signal approaches, so no copy of the
   truth) — and interpolates the residuals; error scored near roads. Map error 83–103 → 55–58
   µg/m³; hotspot found within 0–141 m; adaptive signals there cut its PM2.5 8–14% (seeds 7, 11, 23).
+
+**Built (phase 6, flood backend).** Seven real underpasses (OSM tunnel pieces grouped within 200 m)
+as basins: rain on the dip and 2 ha of streets draining into it; 0.25 m³/s pumps until LESCO's
+feeder trips (18:25–19:05); Today a generator runs 30 min into the cut, Connected 2 min (level
+sensor). Motorcycles and rickshaws stall at 0.30 m, cars 0.45 m; Connected closes the gate at
+0.15 m, reopens at 0.05 m, and reroutes every vehicle heading in (Movements with the closed links).
+*Found:* two separate underpasses shared a name and overwrote each other's results; one mapped as
+39 m of dip filled to 4.64 m (OSM maps only part of a dip) — dips now have a 1,200 m² floor
+(most here are mapped short, so five share that floor and one depth curve — said so); shrinking
+the catchment with the dip then made the storm harmless (0.19 m), which contradicts every report
+of Lahore's underpasses filling — the 2 ha catchment is the surrounding streets and stays.
+*Seed 7:* Today 0.41–0.52 m, 28 vehicles stalled, 453 gridlocked queued behind them (all at
+underpasses); Connected 0.09–0.17 m, five underpasses closed 34 min, 349 rerouted, 0 stranded,
+0 gridlocked, 4,670 → 5,146 trips finished, median delay +4.5 s for the diversion.

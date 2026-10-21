@@ -27,6 +27,7 @@ from __future__ import annotations
 import math
 import random
 
+from .junctions import Movements
 from .roads import Network, load
 from .traffic_sim import TrafficSim, build_signals, make_demand, snap_pois
 
@@ -265,3 +266,147 @@ def smog(seed: int = 7, per_hour: int = 8000, minutes: int = 60) -> dict:
         },
         "hotspot": [round(hx, 1), round(hy, 1)],
     }
+
+
+# ------------------------------------------------------------------ underpass flooding
+# Assumptions, labelled: the storm, the catchment that drains into each dip, pump capacity, the
+# feeder trip, how long it takes someone to start a generator by hand, and stall depths.
+STORM_START, STORM_PEAK_MMH = 0, 60.0          # minutes after 18:00; mm per hour at the peak
+PUMP_M3S = 0.25                                # per underpass
+CATCHMENT_M2 = 20000.0                         # streets around the dip that drain into it
+MIN_DIP_M2 = 1200.0                            # OSM may map only part of a dip; with its ramps it is at least this
+POWER_CUT = (25 * 60, 65 * 60)                 # LESCO feeder trips, 18:25-19:05 (seconds)
+GEN_TODAY, GEN_CONNECTED = 30 * 60, 2 * 60     # time to get the generator running after the cut
+STALL = {"motorcycle": 0.30, "rickshaw": 0.30, "car": 0.45, "bus": 0.70, "ambulance": 0.60}
+CLOSE_AT, OPEN_AT = 0.15, 0.05                 # Connected: gate closes / reopens at these depths (m)
+
+
+def rain_mmh(t: float) -> float:
+    """Storm intensity at t seconds after 18:00: up for 20 min, 20 min at the peak, down over 40."""
+    m = t / 60 - STORM_START
+    if m < 0 or m > 80:
+        return 0.0
+    if m < 20:
+        return STORM_PEAK_MMH * m / 20
+    if m < 40:
+        return STORM_PEAK_MMH
+    return STORM_PEAK_MMH * (80 - m) / 40
+
+
+def underpasses(net: Network) -> list[dict]:
+    """The real underpasses: tunnel links (layer -1) grouped where they lie within 200 m."""
+    tun = [lk for lk in net.links if lk.layer < 0]
+    groups: list[list] = []
+    for lk in tun:
+        c = ((lk.pts[0][0] + lk.pts[-1][0]) / 2, (lk.pts[0][1] + lk.pts[-1][1]) / 2)
+        g = next((g for g in groups if any(math.dist(c, ((o.pts[0][0] + o.pts[-1][0]) / 2, (o.pts[0][1] + o.pts[-1][1]) / 2)) < 200 for o in g)), None)
+        (g.append(lk) if g else groups.append([lk]))
+    out = []
+    for g in groups:
+        names = [lk.name for lk in g if lk.name]
+        name = max(set(names), key=names.count) if names else "Underpass"
+        if "nderpass" not in name:
+            name += " underpass"
+        roads = {lk.road for lk in g}
+        area = sum(net.links[next(l.id for l in g if l.road == r)].length * max(l.lanes for l in g if l.road == r) * 3.2
+                   * (1 if any(l.oneway for l in g if l.road == r) else 2) for r in roads)
+        xs = [p for lk in g for p in (lk.pts[0], lk.pts[-1])]
+        n = sum(1 for o in out if o["name"].startswith(name))
+        if n:
+            name = f"{name} ({n + 1})"          # two separate underpasses on one road
+        area = max(area, MIN_DIP_M2)
+        out.append({"name": name, "links": [lk.id for lk in g], "dip_m2": round(area, 1),
+                    "catchment_m2": CATCHMENT_M2,
+                    "x": sum(p[0] for p in xs) / len(xs), "y": sum(p[1] for p in xs) / len(xs)})
+    return out
+
+
+def depth_series(up: dict, generator_after: int, seconds: int) -> list[float]:
+    """Water depth (m) in the dip, every second: rain on dip + catchment in, pumps out while powered."""
+    v, out = 0.0, []
+    for t in range(seconds):
+        q_in = rain_mmh(t) / 1000 / 3600 * (up["dip_m2"] + up["catchment_m2"])
+        powered = not (POWER_CUT[0] <= t < POWER_CUT[1]) or t >= POWER_CUT[0] + generator_after
+        q_out = PUMP_M3S if powered else 0.0
+        v = max(0.0, v + q_in - q_out)
+        out.append(v / up["dip_m2"])
+    return out
+
+
+def flood(seed: int = 7, per_hour: int = 6000, minutes: int = 60) -> dict:
+    net = load()
+    ups = underpasses(net)
+    T = minutes * 60 + 900
+    trips = make_demand(net, seed=seed, minutes=minutes, per_hour=per_hour, period="evening")
+    res = {}
+    for mode, gen in (("today", GEN_TODAY), ("connected", GEN_CONNECTED)):
+        depth = {u["name"]: depth_series(u, gen, T) for u in ups}
+        link_up = {lid: u["name"] for u in ups for lid in u["links"]}
+        sim = TrafficSim(net, trips, "fixed", minutes=minutes)
+        stranded: dict[int, tuple[int, str]] = {}
+        closed: dict[str, list] = {u["name"]: [] for u in ups}
+        is_closed = {u["name"]: False for u in ups}
+        rerouted = set()
+        mv = Movements(net)
+        step = sim.step
+
+        def reroute(v, t):
+            """From where it is to its next fixed point, avoiding the closed underpasses."""
+            nxt = [e for e in v.errands[v.ei:] if e[0] > v.ri]
+            k = min(e[0] for e in nxt) if nxt else len(v.route) - 1
+            if not any(lid in mv.closed for lid in v.route[v.ri + 1:k + 1]):
+                return
+            mid = mv.route(v.route[v.ri], v.route[k])
+            if mid is None:
+                return
+            new = v.route[:v.ri + 1] + mid + v.route[k + 1:]
+            shift = len(new) - len(v.route)
+            v.errands = [((e[0] + shift,) + tuple(e[1:])) if e[0] > v.ri else e for e in v.errands]
+            v.route = new
+            rerouted.add(v.id)
+
+        def watched(t):
+            if mode == "connected":
+                changed = False
+                for u in ups:
+                    d = depth[u["name"]][t]
+                    if not is_closed[u["name"]] and d >= CLOSE_AT:
+                        is_closed[u["name"]] = changed = True
+                        closed[u["name"]].append([t, None])
+                    elif is_closed[u["name"]] and d <= OPEN_AT:
+                        is_closed[u["name"]] = False
+                        closed[u["name"]][-1][1] = t
+                        changed = True
+                if changed:
+                    mv.closed = {lid for u in ups if is_closed[u["name"]] for lid in u["links"]}
+                if mv.closed and (changed or t % 30 == 0):
+                    for v in sim.active + [w for q in sim.waiting.values() for w in q]:
+                        reroute(v, t)
+            step(t)
+            # water deeper than a vehicle can take: it stalls where it is
+            for v in sim.active:
+                lid = v.route[v.ri]
+                if lid in link_up and v.id not in stranded and depth[link_up[lid]][t] >= STALL[v.kind]:
+                    stranded[v.id] = (t, link_up[lid])
+                    v.hold_until = 10 ** 9
+        mv.closed = set()
+        sim.step = watched
+        sim.run()
+        m = sim.metrics()
+        # where the gridlock is: at an underpass (stranded, or queued behind one), or on the surface
+        stuck = [v for v in sim.active if v.still_since is not None and sim.t - v.still_since > 300 and v.id not in stranded]
+
+        def near_up(v):
+            lk = net.links[v.route[v.ri]]
+            return min(math.dist(lk.pts[-1], (u["x"], u["y"])) for u in ups) < 400
+        res[mode] = {"gridlocked_near_underpass": sum(1 for v in stuck if near_up(v)),
+                     "gridlocked_elsewhere": sum(1 for v in stuck if not near_up(v)),
+                     "depth": {k: [round(d, 3) for d in v[::30]] for k, v in depth.items()},
+                     "max_depth": {k: round(max(v), 2) for k, v in depth.items()},
+                     "stranded": len(stranded), "stranded_at": {k: sum(1 for _, (_, u) in stranded.items() if u == k) for k in depth},
+                     "closed": closed, "closed_min": {k: round(sum(((b or T) - a) for a, b in v) / 60) for k, v in closed.items()},
+                     "rerouted": len(rerouted), "delay_median_s": m["delay_median_s"], "completed": m["completed"],
+                     "gridlocked": m["gridlocked"], "trips": m["trips"]}
+    return {"underpasses": [{k: (round(v, 1) if isinstance(v, float) else v) for k, v in u.items()} for u in ups],
+            "modes": res, "rain": [round(rain_mmh(t), 1) for t in range(0, T, 30)], "power_cut": list(POWER_CUT),
+            "generator": {"today": GEN_TODAY, "connected": GEN_CONNECTED}, "trips": len(trips), "minutes": minutes}
