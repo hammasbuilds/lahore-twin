@@ -419,12 +419,12 @@ def main() -> None:
     for key, build in MODULES.items():
         ov, deep = build()
         # the board's convention: <proj>.* for the overview, <proj>-arch.* for the architecture view
-        (OUT / f"{key}.html").write_text(isometric.render(ov), encoding="utf-8")
-        (OUT / f"{key}-arch.html").write_text(isodeep.render(deep), encoding="utf-8")
+        (OUT / f"{key}.html").write_text(isometric.render(ov), encoding="utf-8", newline="\n")
+        (OUT / f"{key}-arch.html").write_text(isodeep.render(deep), encoding="utf-8", newline="\n")
         index.append({"key": key, "title": ov.project, "overview": f"{key}.html", "architecture": f"{key}-arch.html",
                       "overview_s": round(ov.seconds), "architecture_s": round(deep.seconds)})
         print(f"{key:10} overview {ov.seconds:4.0f}s · architecture {deep.seconds:4.0f}s ({len(deep.hops)} hops)")
-    (OUT / "index.json").write_text(json.dumps(index, indent=1), encoding="utf-8")
+    (OUT / "index.json").write_text(json.dumps(index, indent=1), encoding="utf-8", newline="\n")
 
 
 if __name__ == "__main__":
