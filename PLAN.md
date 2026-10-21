@@ -1487,3 +1487,10 @@ finished 7,966 → 8,129 (was 7,866). At 8,000 nothing moves: median delay 60.3 
 6,820 either way; the junction planner and ambulance results are unchanged to the decimal. Test:
 a car standing on the loop ends the green at MIN_GREEN + GAP_OUT; the same car moving keeps it
 (fails on the old code). Replays regenerated; README and About figures updated (19.6 veh-h).
+
+**Round 9.** Re-recorded the walkthrough (`demo_video.py`, no errors) and every screenshot after
+rounds 1–8, and read them. Fixed: the traffic Compare tab was headed "Same vehicles, same morning"
+on the evening replay — the word was typed into the heading; it now comes from the run, and the
+fallback for a replay without a period is the evening, the default. Checked, not a bug: the map
+labels "Firozpur Road" and "Ferozepur Road Fly Over" side by side — OpenStreetMap maps the flyover
+as its own way with its own name.

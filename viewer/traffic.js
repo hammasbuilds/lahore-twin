@@ -9,7 +9,7 @@
   const R = window.TRAFFIC;
   const C = TwinCore;
   const T0 = R.meta.start != null ? R.meta.start : 7.5 * 3600;     // 17:30 for the evening, 07:30 for the morning
-  const PERIOD = R.meta.period || "morning";
+  const PERIOD = R.meta.period || "evening";
   const POIS = (R.pois || []).map(([x, y, k, name], i) => ({ i, x, y, kind: (R.poi_kinds || [])[k], name }));
   // what each kind of place is, for the map and its key
   const POI_GROUP = { shop: "shop", mall: "shop", marketplace: "shop", supermarket: "shop", bakery: "food",
@@ -459,7 +459,7 @@
     ["Stops at shops and amenities", "errand_stops"], ["Trips that ended at one", "ended_at_a_place"], ["Rickshaw and wagon passenger stops", "passenger_stops"]];
   function renderCompare() {
     const f = R.modes.fixed.metrics, a = R.modes.adaptive.metrics;
-    let html = `<h3>Same vehicles, same morning</h3><table class="cmp"><tr><th></th><th>Fixed</th><th>Adaptive</th></tr>`;
+    let html = `<h3>Same vehicles, same ${PERIOD}</h3><table class="cmp"><tr><th></th><th>Fixed</th><th>Adaptive</th></tr>`;
     const better = { travel_time_median_s: -1, delay_median_s: -1, delay_mean_s: -1, delay_total_veh_h: -1, stops_mean: -1, speed_mean_kmh: 1, signal_delay_veh_h: -1, completed: 1, still_driving: -1, gridlocked: -1, not_yet_entered: -1 };
     for (const [label, key] of ROWS) {
       const x = f[key], y = a[key], dir = better[key];
