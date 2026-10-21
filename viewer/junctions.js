@@ -222,12 +222,13 @@
     const rows = [["To the call, mean", "response_mean_s", mmss], ["On to hospital, mean", "to_hospital_mean_s", mmss], ["Calls compared", "compared_hospital", (v) => v], ["Red lights met", "reds", (v) => v],
       ["Signals turned for it", "preemptions", (v) => v], ["Everyone else's median delay, s", "network_delay_median_s", (v) => fmt(v)]];
     for (const [label, key, f] of rows) html += `<tr><td>${label}</td>${Object.keys(MODES).map((k) => `<td class="num">${f(S[k][key])}</td>`).join("")}</tr>`;
-    html += `</table><h3>Calls</h3><ul class="calls">` + CALLS.map((cc, i) => {
+    html += `</table><h3>Time against distance, this call (${C.clock(T0 + c.t0)})</h3><div class="key">${Object.entries(MODES).map(([k, n]) => `<span><i style="background:${MODE_COL()[k]}"></i>${n}</span>`).join("")}<span><i style="background:var(--sig-green)"></i>green for it (${MODES[state.mode]})</span></div><canvas class="chart" id="c-td" style="height:230px" aria-label="Time-distance diagram: to the call, then on to hospital"></canvas>`;
+    html += `<p class="note">Left, from dispatch to the call; right, from leaving the call to the hospital, each on its own clock (the ten minutes at the call are left out). Each horizontal band is a signal on the route, green when it showed green for the ambulance's direction under the chosen way. A steep line is fast; a flat step is waiting. Siren: cars ahead pull over where they can and it crosses a red slowly after stopping. Green wave: Safe City turns each signal green about 25 s ahead of it (≤300 m), keeping amber and all-red. The hospital is the nearest with an emergency department. Field studies of signal preemption report 14–23% shorter emergency trips.</p>`;
+    html += `<h3>Calls</h3><ul class="calls">` + CALLS.map((cc, i) => {
       const r = cc.modes[state.mode];
-      return `<li data-call="${i}" tabindex="0" role="button" class="${i === state.call ? "sel" : ""}"><span class="num">${C.clock(T0 + cc.t0)}</span><span>${esc(cc.hospital || "")} <span class="muted">· ${(cc.length / 1000).toFixed(1)} km, ${cc.signals.length} signal${cc.signals.length === 1 ? "" : "s"}</span></span><span class="num">${r ? mmss(r.response_s) : "–"}</span></li>`;
+      const where = cc.hospital ? esc(cc.hospital) : `<span class="muted">still on its way when the run ended</span>`;
+      return `<li data-call="${i}" tabindex="0" role="button" class="${i === state.call ? "sel" : ""}"><span class="num">${C.clock(T0 + cc.t0)}</span><span>${where} <span class="muted">· ${(cc.length / 1000).toFixed(1)} km, ${cc.signals.length} signal${cc.signals.length === 1 ? "" : "s"}</span></span><span class="num">${r ? mmss(r.response_s) : "–"}</span></li>`;
     }).join("") + `</ul>`;
-    html += `<h3>Time against distance, this call</h3><div class="key">${Object.entries(MODES).map(([k, n]) => `<span><i style="background:${MODE_COL()[k]}"></i>${n}</span>`).join("")}<span><i style="background:var(--sig-green)"></i>green for it (${MODES[state.mode]})</span></div><canvas class="chart" id="c-td" style="height:230px" aria-label="Time-distance diagram"></canvas>`;
-    html += `<p class="note">Each horizontal band is a signal on the route, green when it showed green for the ambulance's direction under the chosen way. A steep line is fast; a flat step is waiting. Siren: cars ahead pull over where they can and it crosses a red slowly after stopping. Green wave: Safe City turns each signal green about 25 s ahead of it (≤300 m), keeping amber and all-red. Response is from dispatch at the Rescue 1122 station on OpenStreetMap; the call is ten minutes; the hospital is the nearest with an emergency department. Field studies of signal preemption report 14–23% shorter emergency trips.</p>`;
     $("pane-amb").innerHTML = html;
     drawTD();
   }
@@ -236,26 +237,58 @@
     const c = CALLS[state.call];
     const dpr = window.devicePixelRatio || 1, w = cvs.clientWidth, h = cvs.clientHeight;
     cvs.width = w * dpr; cvs.height = h * dpr; const g = cvs.getContext("2d"); g.setTransform(dpr, 0, 0, dpr, 0, 0);
-    const traces = Object.keys(MODES).map((k) => c.modes[k]).filter(Boolean);
-    const tA = c.t0, tB = Math.max(...traces.map((m) => m.trace.length ? m.trace[m.trace.length - 1][0] : c.t0 + 60));
-    const L = 40, B = 18, xs = (t) => L + (w - L - 6) * (t - tA) / (tB - tA), ys = (d) => 6 + (h - B - 6) * (1 - d / c.length);
-    const m = c.modes[state.mode];
+    const modes = Object.keys(MODES).filter((k) => c.modes[k] && c.modes[k].trace.length);
+    // where the call is along the route: the distance the ambulance stood at during the call
+    const atScene = (mm) => { const s0 = mm.scene_at && mm.scene_at[0]; const p = s0 == null ? null : mm.trace.find(([t]) => t >= s0); return p ? p[1] : null; };
+    const dScene = Math.max(...modes.map((k) => atScene(c.modes[k]) || 0)) || c.length;
+    const end1 = Math.max(...modes.map((k) => (c.modes[k].scene_at || [])[0] || c.modes[k].trace[c.modes[k].trace.length - 1][0]));
+    const leg2 = modes.map((k) => { const mm = c.modes[k], s1 = mm.scene_at && mm.scene_at[1]; return s1 == null ? 0 : mm.trace[mm.trace.length - 1][0] - s1; });
+    const end2 = Math.max(30, ...leg2);
+    const L = 40, B = 18, gap = 16, span = w - L - 6 - gap, w1 = span * 0.55, w2 = span - w1;
+    const ys = (d) => 6 + (h - B - 6) * (1 - d / c.length);
+    const x1 = (t) => L + w1 * (t - c.t0) / Math.max(1, end1 - c.t0);
+    const x2 = (dt) => L + w1 + gap + w2 * dt / end2;
+    const sel = c.modes[state.mode];
+    const s1sel = sel && sel.scene_at ? sel.scene_at[1] : null;
+    // signal bands, each in the panel of the leg it is on
     c.signals.forEach(([d], k) => {
-      g.fillStyle = palette["sig-red"]; g.globalAlpha = 0.35; g.fillRect(L, ys(d) - 2, w - L - 6, 4);
+      const first = d <= dScene, xa = first ? L : L + w1 + gap, wd = first ? w1 : w2;
+      g.fillStyle = palette["sig-red"]; g.globalAlpha = 0.35; g.fillRect(xa, ys(d) - 2, wd, 4);
       g.fillStyle = palette["sig-green"]; g.globalAlpha = 0.9;
-      if (m) for (const [a, b] of m.greens[k]) if (b > tA && a < tB) g.fillRect(xs(Math.max(a, tA)), ys(d) - 2, xs(Math.min(b, tB)) - xs(Math.max(a, tA)), 4);
+      if (!sel) return;
+      for (const [a, b] of sel.greens[k]) {
+        if (first) { if (b > c.t0 && a < end1) g.fillRect(x1(Math.max(a, c.t0)), ys(d) - 2, x1(Math.min(b, end1)) - x1(Math.max(a, c.t0)), 4); }
+        else if (s1sel != null && b > s1sel && a < s1sel + end2) g.fillRect(x2(Math.max(a - s1sel, 0)), ys(d) - 2, x2(Math.min(b - s1sel, end2)) - x2(Math.max(a - s1sel, 0)), 4);
+      }
     });
     g.globalAlpha = 1;
+    // axes
     g.fillStyle = palette.muted; g.font = "10.5px Segoe UI, system-ui"; g.textAlign = "right";
     for (let km = 0; km <= c.length / 1000; km += 1) g.fillText(km + " km", L - 4, ys(km * 1000) + 3);
     g.textAlign = "center";
-    for (let t = Math.ceil(tA / 120) * 120; t < tB; t += 120) g.fillText(C.clock(T0 + t), xs(t), h - 4);
-    for (const [k] of Object.entries(MODES)) {
-      const mm = c.modes[k]; if (!mm) continue;
-      g.strokeStyle = MODE_COL()[k]; g.lineWidth = k === state.mode ? 2.4 : 1.3; g.beginPath();
-      mm.trace.forEach(([t, d], i) => (i ? g.lineTo(xs(t), ys(d)) : g.moveTo(xs(t), ys(d)))); g.stroke();
+    const step1 = (end1 - c.t0) > 400 ? 120 : 60;
+    for (let t = 0; t <= end1 - c.t0; t += step1) g.fillText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`, x1(c.t0 + t), h - 4);
+    const step2 = end2 > 400 ? 120 : 60;
+    for (let t = 0; t <= end2; t += step2) g.fillText(`${Math.floor(t / 60)}:${String(t % 60).padStart(2, "0")}`, x2(t), h - 4);
+    g.strokeStyle = palette.line; g.setLineDash([3, 3]); g.beginPath(); g.moveTo(L + w1 + gap / 2, 4); g.lineTo(L + w1 + gap / 2, h - B); g.stroke(); g.setLineDash([]);
+    g.fillStyle = palette.muted; g.textAlign = "left"; g.fillText("to the call", L + 4, 14); g.fillText("on to hospital", L + w1 + gap + 4, 14);
+    // one trace per way, split at the call
+    for (const k of modes) {
+      const mm = c.modes[k], s0 = mm.scene_at ? mm.scene_at[0] : Infinity, s1 = mm.scene_at ? mm.scene_at[1] : null;
+      g.strokeStyle = MODE_COL()[k]; g.lineWidth = k === state.mode ? 2.4 : 1.3;
+      g.beginPath(); let started = false;
+      for (const [t, d] of mm.trace) { if (t > s0) break; const X = x1(t), Y = ys(d); started ? g.lineTo(X, Y) : g.moveTo(X, Y); started = true; }
+      g.stroke();
+      if (s1 == null) continue;
+      g.beginPath(); started = false;
+      for (const [t, d] of mm.trace) { if (t < s1) continue; const X = x2(t - s1), Y = ys(d); started ? g.lineTo(X, Y) : g.moveTo(X, Y); started = true; }
+      g.stroke();
     }
-    if (state.t >= tA && state.t <= tB) { g.strokeStyle = palette.text; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(xs(state.t), 6); g.lineTo(xs(state.t), h - B); g.stroke(); g.globalAlpha = 1; }
+    // now
+    let nx = null;
+    if (state.t >= c.t0 && state.t <= end1) nx = x1(state.t);
+    else if (s1sel != null && state.t >= s1sel && state.t <= s1sel + end2) nx = x2(state.t - s1sel);
+    if (nx != null) { g.strokeStyle = palette.text; g.globalAlpha = 0.5; g.beginPath(); g.moveTo(nx, 6); g.lineTo(nx, h - B); g.stroke(); g.globalAlpha = 1; }
   }
   function renderTimeline() {
     const w = tl.clientWidth, h = tl.clientHeight;

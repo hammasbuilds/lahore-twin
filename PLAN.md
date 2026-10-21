@@ -1330,3 +1330,11 @@ adaptive helps there. Ambulance to the call, green wave against no priority: −
   trips & shops / signals / the streaming map, junction fixes / ambulance green wave — each
   following its own data (`tools/isometric_tools.py`). 38 pages, and every one has its MP4 and
   poster: none left without a video, no architecture view skipped because tools share layers.
+
+**Round 4 — reading the ambulance view.** The time–distance diagram, the reason the view exists,
+sat below ten call rows, out of sight at 1440×900; and ten minutes standing at the call filled
+most of its width, squeezing both drives into slivers. *Fixed:* the diagram comes straight after
+the summary, in two panels on their own clocks — dispatch to the call, then leaving the call to
+the hospital — with each signal's band in the panel of the leg it is on. A call that no way
+finished before the run ended showed a blank hospital; it now says "still on its way when the
+run ended". UI check passes, no console errors.
