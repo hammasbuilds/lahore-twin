@@ -23,6 +23,7 @@ canvas#plan { cursor: grab; touch-action: none; }
 .bar s { position: absolute; top: -2px; bottom: -2px; width: 2px; background: var(--sig-red); }
 .sensors { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 14px; font-size: 12px; }
 .sensors li { display: flex; justify-content: space-between; gap: 6px; padding: 2px 0; break-inside: avoid; }
+.sensors li span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }   /* long and Urdu names on one line */
 .kpis.k3 { grid-template-columns: repeat(3, 1fr); }
 .kpi .v { font-size: 20px; }
 @media (max-width: 1400px) { header h1 span { display: none; } }     /* three switches need the room */

@@ -1497,3 +1497,10 @@ release assets). *Found:* the rain view first picked the underpass with the most
 stalled, Canal Road, which Connected never needed to close (0.14 m, under the 0.15 m gate depth),
 so its "gate closes" hop would have shown nothing; it now follows the underpass that stalled most
 drivers among those Connected closed (Ali Zaib Road: 7 stalled from 18:47 Today; gate shut 18:41).
+
+**Round 2.** Light theme, phone width and the Connected storm, looked at closely. Fixed: the smog
+map showed a mesh across the whole city in the light theme — each translucent cell was drawn
+0.6 px wider than its pitch so neighbours overlapped and doubled the fill along every edge; cells
+now meet on whole pixels. The sensor list wrapped long names onto two lines, and the Urdu name
+(پنجاب یونیورسٹی …) broke the right-to-left order in the middle of the list — names stay on one
+line in `<bdi>`, cut with an ellipsis, full name on hover.

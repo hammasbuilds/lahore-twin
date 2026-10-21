@@ -76,8 +76,11 @@
     ctx.globalAlpha = 0.5;
     if (f) {
       for (let j = 0; j < G.ny; j++) for (let i = 0; i < G.nx; i++) {
+        // cells meet on whole pixels: an overlap doubles the translucent fill and draws a mesh
         const v = f[j * G.nx + i]; ctx.fillStyle = P[band(v)[1]];
-        ctx.fillRect(SX(G.x0 + i * G.cell), SY(G.y0 + j * G.cell), cw + 0.6, cw + 0.6);
+        const xa = Math.round(SX(G.x0 + i * G.cell)), xb = Math.round(SX(G.x0 + (i + 1) * G.cell));
+        const ya = Math.round(SY(G.y0 + j * G.cell)), yb = Math.round(SY(G.y0 + (j + 1) * G.cell));
+        ctx.fillRect(Math.min(xa, xb), Math.min(ya, yb), Math.abs(xb - xa), Math.abs(yb - ya));
       }
     } else {
       ctx.fillStyle = P[band(S.official_map[k])[1]];
@@ -114,7 +117,7 @@
       <tr><td>Where it acted, µg/m³ at the peak</td><td class="num">${m.hotspot_before}</td><td class="num best">${m.hotspot_after}</td></tr>
       <tr><td>At the real hotspot</td><td class="num">${m.true_hotspot_before}</td><td class="num best">${m.true_hotspot_after}</td></tr></table>`;
     h += `<p class="note">Today the city has one official monitor, so its map is one number. Connected adds 25 low-cost sensors — 15 at schools, hospitals and colleges, 10 on main-road junction poles — each with its own gain error and noise, corrected against the one beside the monitor; the map is a regression of their readings on the traffic the signals' loop detectors count. Where it finds the worst hotspot, ${m.adaptive_signals} signals within 400 m go adaptive, cutting idling; the same trips are run again. The area mean at the peak is ${m.area_mean_peak} µg/m³ — Hazardous on the US AQI scale, as Lahore's winter evenings are.</p>`;
-    h += `<h3>The sensors now</h3><ul class="sensors">` + S.sensors.map((s, n) => ({ s, v: S.readings[k][n] })).sort((a, b) => b.v - a.v).map(({ s, v }) => `<li><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--${band(v)[1]})"></i>${esc(s.name.slice(0, 24))}</span><b class="num">${v}</b></li>`).join("") + `</ul>`;
+    h += `<h3>The sensors now</h3><ul class="sensors">` + S.sensors.map((s, n) => ({ s, v: S.readings[k][n] })).sort((a, b) => b.v - a.v).map(({ s, v }) => `<li title="${esc(s.name)}"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--${band(v)[1]})"></i><bdi>${esc(s.name)}</bdi></span><b class="num">${v}</b></li>`).join("") + `</ul>`;
     $("pane").innerHTML = h;
   }
 
