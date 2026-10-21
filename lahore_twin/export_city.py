@@ -21,7 +21,8 @@ def run_all(seed: int = 7, per_hour: int = 8000) -> dict:
     net = load()
     S = city.smog(seed=seed, per_hour=per_hour)
     F = city.flood(seed=seed, per_hour=max(2000, int(per_hour * 0.75)))
-    L = city.streetlights(seed=seed)
+    # the night's traffic scales with the evening's: 900 trips an hour at night for 8,000 at the peak
+    L = city.streetlights(seed=seed, per_hour=max(200, round(per_hour * 900 / 8000)))
     g = S["grid"]
     frames = list(range(0, S["minutes"], EVERY))
     peak = range(max(0, S["minutes"] - 15), S["minutes"])

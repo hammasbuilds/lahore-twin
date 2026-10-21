@@ -81,3 +81,27 @@ def test_committed_city_replay_matches_the_current_code():
     text = (ROOT / "viewer" / "city_replay.js").read_text(encoding="utf-8")
     meta = json.loads(text[len("window.CITY = "):].rstrip().rstrip(";"))["meta"]
     assert meta["digest"] == source_digest("city"), "run python demo_city.py to refresh the replay"
+
+
+def test_every_system_takes_the_demand_typed_in(monkeypatch):
+    """A 4,000-trips run once lit a night of the default 8,000's traffic: the streetlights ignored it."""
+    from lahore_twin import export_city
+    seen = {}
+
+    class Stop(Exception):
+        pass
+
+    def grab(name, stop=False):
+        def f(**kw):
+            seen[name] = kw
+            if stop:
+                raise Stop
+        return f
+    monkeypatch.setattr(city, "smog", grab("smog"))
+    monkeypatch.setattr(city, "flood", grab("flood"))
+    monkeypatch.setattr(city, "streetlights", grab("lights", stop=True))
+    with pytest.raises(Stop):
+        export_city.run_all(seed=11, per_hour=4000)
+    assert seen["smog"]["per_hour"] == 4000
+    assert seen["flood"]["per_hour"] == 3000
+    assert seen["lights"]["per_hour"] == 450 and seen["lights"]["seed"] == 11

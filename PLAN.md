@@ -1504,3 +1504,11 @@ map showed a mesh across the whole city in the light theme — each translucent 
 now meet on whole pixels. The sensor list wrapped long names onto two lines, and the Urdu name
 (پنجاب یونیورسٹی …) broke the right-to-left order in the middle of the list — names stay on one
 line in `<bdi>`, cut with an ellipsis, full name on hover.
+
+**Round 3.** Ran City Systems through "Run with your values" for the first time (seed 11, 4,000
+trips an hour; 82 s) and read every view of the result; `ui_check_app.js` now does this run and
+checks the inputs, the label and all six view/rule-set panels. *Found:* the night of a 4,000-trip
+run carried 4,883 trips — the default run's 4,824 — because the streetlights always simulated a
+fixed 900 trips an hour; the About promised "the storm and the night scale from it". The night
+now scales with the evening (900 per 8,000; the default replay is unchanged), and a test checks
+that each of the three systems receives the demand typed in.

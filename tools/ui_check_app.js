@@ -174,6 +174,16 @@ const log = (...a) => console.log(...a);
   if (jm.meta.junction !== "Ghalib Road / MM Alam Road" || jm.first !== jm.meta.junction || !jm.pick.includes("Ghalib Road")) fail("planner run ignored the picked junction: " + JSON.stringify(jm));
   if (!/Ghalib Road \/ MM Alam Road/.test(await f.textContent("#your-run"))) fail("the run label does not name the junction");
   await shot("07b-run-junction");
+  // city systems with other values: every view and rule set must read the new run
+  f = await runWith("city", { seed: 11, per_hour: 4000 }, "__city");
+  const cm = await f.evaluate(() => window.CITY.meta);
+  if (cm.seed !== 11 || cm.per_hour !== 4000) fail("city run ignored the inputs: " + JSON.stringify(cm));
+  if (!/seed 11/.test(await f.textContent("#your-run"))) fail("the city run label is wrong: " + (await f.textContent("#your-run")));
+  for (const v of ["smog", "rain", "night"]) for (const m of ["today", "connected"]) {
+    await f.click(`#views button[data-view="${v}"]`); await f.click(`#modes button[data-mode="${m}"]`);
+    if (/undefined|NaN/.test(await f.textContent("aside"))) fail(`city run ${v}/${m}: panel shows undefined`);
+  }
+  await shot("07c-run-city");
   f = await runWith("office", { staff: 20, visitors: 2 }, "__twin");
   const om = await f.evaluate(() => window.REPLAY.meta);
   if (om.staff !== 20) fail("office run ignored the staff count: " + JSON.stringify(om));
