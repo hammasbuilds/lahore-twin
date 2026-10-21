@@ -1349,3 +1349,27 @@ hour in 164 s. *Found on that page:* its note said "8,000 trips an hour" — har
 the run's own demand now. And a junction that loses 0.1 vehicle-hours, with no U-turn gap within
 reach, said neither — it now says it is quiet and no fix is worth digging for, and that crossing
 traffic goes round the block when there is no gap.
+
+**Round 6 — light theme.** Both views in light: routes, the three ambulance traces, signal bands,
+the best value in the fix table and the queue chart all stay distinct. No change needed.
+
+**Round 7 — does half an hour say what an hour says?** The planner runs 30 minutes to keep a
+typed run near three minutes. Over the full hour (seed 7): Firozpur Road / Wahdat Road loses 54.2
+vehicle-hours; retime 23.5, adaptive 23.5, underpass 21.1, U-turn conversion 17.4 (+667 km) — the
+same order, each fix cutting 57–68% (67–76% over the half hour). Green wave against no priority:
+−12% over the hour, −11% over the half. The half-hour answer stands.
+
+**Round 8 — watch the demo, start to finish.** New `tools/ui_check_demo.js` opens `/#demo` through
+the real server and records every caption until the end, failing on any page error, a "Demo
+stopped" or a module never shown. It ran 464 s, 30 captions, all five modules, no errors —
+including the planner's fixes and the green wave. *Found:* the opening still said "Four IoT
+systems" and the planner caption "six Rescue 1122 calls"; it counts the modules it plays now, and
+says ten calls.
+
+**Round 9 — the published media match the code.** The 38 isometric pages regenerate identical
+from the current replays (no stale numbers). The walkthrough's ambulance screenshot cut the
+time–distance diagram off at 720 px; it scrolls the panel to the diagram first now. Video and
+screenshots re-recorded.
+
+**Round 10 — final.** Full suite 110 passed, viewer core ok; planner, app and demo checks clean.
+Phase 5 complete; next: phase 6, city systems.

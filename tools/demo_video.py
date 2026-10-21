@@ -171,6 +171,8 @@ def main() -> None:
         shot("15b-junction-planner")
         f.click('#views button[data-view="amb"]')
         f.evaluate("() => { const J = window.__junctions; J.state.call = 1; J.state.t = J.calls[1].t0 + 120; J.render(); }")
+        # the time-distance diagram is the point of this view: scroll the panel to it
+        f.evaluate("() => document.getElementById('c-td').scrollIntoView({block: 'center'})")
         page.wait_for_timeout(900)
         shot("15c-ambulance-green-wave")
 

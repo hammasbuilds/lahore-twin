@@ -15,7 +15,7 @@
     { key: "traffic", glob: "__traffic", inputs: { seed: 7, per_hour: 8000, period: "evening" },
       about: "an evening peak of 8,000 trips an hour, with people stopping at real shops" },
     { key: "junctions", glob: "__junctions", inputs: { seed: 7, per_hour: 8000 },
-      about: "the three worst junctions under five fixes, and six Rescue 1122 calls three ways" },
+      about: "the three worst junctions under five fixes, and ten Rescue 1122 calls three ways" },
     { key: "home", glob: "__home", inputs: { seed: 3, season: "june", category: "V", pv_kwp: 6, battery_kwh: 10 },
       about: "a June day with 6 hours of load-shedding, 6 kWp of solar and a 10 kWh battery — four controllers, each after a warm-up day" },
   ];
@@ -172,7 +172,7 @@
     document.body.classList.add("demo-on");
     try {
       S.go("overview");
-      caption("Lahore Twin", "Four IoT systems for a city like Lahore. Each one is now being simulated from real inputs — watch.");
+      caption("Lahore Twin", `${["One", "Two", "Three", "Four", "Five", "Six"][PLAN.length - 1]} IoT systems for a city like Lahore. Each one is now being simulated from real inputs — watch.`);
       // ask for every run now: the server works through them while the first ones are shown
       const runs = PLAN.map((step) => ({ step, replay: runFor(step) }));
       await wait(5000);
