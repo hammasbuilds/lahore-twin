@@ -1520,3 +1520,10 @@ runs through every control. Fixed: a failed lamp's tooltip said only "reported b
 itself" — it now names the road and the time it failed ("Mian Abdul Waheed Street since 23:35");
 the time slider read out a minute count (130) to a screen reader — it now carries the clock as
 `aria-valuetext`.
+
+**Round 5.** Held across evenings: flood (seeds 11, 23) 31 → 0 and 25 → 0 stalled, 383 / 477 → 0
+gridlocked, 323 / 358 rerouted, +4.7 / +4.9 s median delay; streetlights 37.8% / 38.0% less
+energy, dark busy road-minutes 8,739 → 2,068 and 7,945 → 1,782. The self-running demo plays the
+five City scenes (`ui_check_demo.js`, 37 captions, no errors). Fixed: the smog caption ended
+"and the hotspot found" — it now gives what the action did at the real hotspot (733 → 644 µg/m³);
+the night caption showed kWh to one decimal and left out the battery on main roads.

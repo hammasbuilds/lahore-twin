@@ -139,7 +139,7 @@
       caption("City · smog, today", `One official monitor: the city sees one number, ${sm.official_reads_peak} µg/m³, everywhere.`);
       await wait(6000);
       click('#modes button[data-mode="connected"]');
-      caption("City · smog, connected", `25 low-cost sensors and the signals' traffic counts: map error ${sm.map_error_today} → ${sm.map_error_sensors} µg/m³, and the hotspot found.`);
+      caption("City · smog, connected", `25 low-cost sensors and the signals' traffic counts: map error ${sm.map_error_today} → ${sm.map_error_sensors} µg/m³; signals near the hotspot they find go adaptive, and the real hotspot falls ${sm.true_hotspot_before} → ${sm.true_hotspot_after}.`);
       await wait(7000);
       click('#views button[data-view="rain"]'); click('#modes button[data-mode="today"]'); X.state.t.rain = 50; X.frame(true);
       caption("City · a monsoon storm, today", `The power cuts out, the pumps stop: ${fl.today.stranded} vehicles stall in the underpasses.`);
@@ -148,7 +148,7 @@
       caption("City · a monsoon storm, connected", `Level sensors start the generator and close the gates: ${fl.connected.stranded} stalled, ${fl.connected.rerouted} rerouted over the surface.`);
       await wait(7000);
       click('#views button[data-view="night"]'); X.state.t.night = 130; X.frame(true);
-      caption("City · streetlights at night", `Roads dim when empty and brighten for traffic: ${li.today.kwh.toLocaleString("en")} → ${li.connected.kwh.toLocaleString("en")} kWh in a night.`);
+      caption("City · streetlights at night", `Roads dim when empty and brighten for traffic: ${Math.round(li.today.kwh).toLocaleString("en")} → ${Math.round(li.connected.kwh).toLocaleString("en")} kWh in a night, main roads lit through load-shedding.`);
       await wait(8000);
     },
     async home(w) {
