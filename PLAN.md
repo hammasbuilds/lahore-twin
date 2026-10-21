@@ -1494,3 +1494,10 @@ on the evening replay — the word was typed into the heading; it now comes from
 fallback for a replay without a period is the evening, the default. Checked, not a bug: the map
 labels "Firozpur Road" and "Ferozepur Road Fly Over" side by side — OpenStreetMap maps the flyover
 as its own way with its own name.
+
+**Round 10.** Final pass on a restarted server: `ui_check_app.js` (every module, About, theme, phone,
+and runs with typed values for hospital, home, traffic, junctions, city and office), and the
+home, hospital, junctions and city checks — no errors anywhere; 120 tests pass. The City run with
+typed values (seed 11, 4,000 trips an hour) now carries a night of its own: 2,459 trips (the
+default 8,000 gives 4,824), 5,339 → 2,853 kWh. Phase 6 complete; all six phases built and
+reviewed.
