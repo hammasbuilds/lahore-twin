@@ -1512,3 +1512,11 @@ run carried 4,883 trips — the default run's 4,824 — because the streetlights
 fixed 900 trips an hour; the About promised "the storm and the night scale from it". The night
 now scales with the evening (900 per 8,000; the default replay is unchanged), and a test checks
 that each of the three systems receives the demand typed in.
+
+**Round 4.** Physics against the numbers, then hover, keyboard and screen reader. The night chart
+looked as if Today fell to 0 kW in load-shedding; the data says 984 → 425 kW (only the east half
+is shed), so the chart was right. Every underpass and failed lamp has a tooltip and the tab order
+runs through every control. Fixed: a failed lamp's tooltip said only "reported by the lamp
+itself" — it now names the road and the time it failed ("Mian Abdul Waheed Street since 23:35");
+the time slider read out a minute count (130) to a screen reader — it now carries the clock as
+`aria-valuetext`.

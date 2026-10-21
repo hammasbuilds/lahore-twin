@@ -200,10 +200,10 @@
       ctx.lineWidth = Math.max(0.8, (Lt.main[n] ? 2.4 : 1.1) * Math.min(3, cam.z * 2)); strokePts(ctx, r.pts);
     });
     ctx.globalAlpha = 1;
-    if (state.mode === "connected") for (const [ri, fm_] of Lt.fails) if (fm_ <= m) {
+    if (state.mode === "connected") Lt.fails.forEach(([ri, fm_], n) => { if (fm_ > m) return;
       const p = ROADS[ri].pts[Math.floor(ROADS[ri].pts.length / 2)]; ctx.fillStyle = P["sig-red"]; ctx.beginPath(); ctx.arc(SX(p[0]), SY(p[1]), 3.5, 0, 7); ctx.fill();
-      hits.push({ x: SX(p[0]), y: SY(p[1]), r: 7, text: "Failed lamp - reported by the lamp itself" });
-    }
+      hits.push({ x: SX(p[0]), y: SY(p[1]), r: 7, text: `Failed lamp on ${(Lt.fail_names || [])[n] || "this road"} since ${C.clock(R.meta.night_start + fm_ * 60)}: it reported itself` });
+    });
   }
   function renderNight() {
     const m = Math.floor(state.t.night), mode = Lt.modes[state.mode], kwSoFar = mode.kw.slice(0, m + 1).reduce((a, b) => a + b, 0) / 60;
@@ -251,6 +251,7 @@
   function frame(force) {
     const V = VIEW[state.view];
     $("clock").textContent = C.clock(V.start + state.t[state.view] * 60);
+    $("scrub").setAttribute("aria-valuetext", $("clock").textContent);         // read the time, not the minute count
     draw(); renderTimeline();
     const now = performance.now();
     if (force || now - lastPanel > 400) { lastPanel = now; renderPanel(); }

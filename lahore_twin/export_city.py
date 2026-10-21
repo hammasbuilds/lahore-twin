@@ -54,7 +54,7 @@ def run_all(seed: int = 7, per_hour: int = 8000) -> dict:
         "flood": {k: F[k] for k in ("underpasses", "modes", "rain", "power_cut", "generator", "trips", "minutes")},
         "lights": {
             "roads": L["roads"], "lamps": [L["lamps"][i] for i in L["roads"]], "main": [int(L["main"][i]) for i in L["roads"]],
-            "fails": L["fails"], "minutes": L["minutes"], "trips": L["trips"], "lamp_count": L["lamp_count"],
+            "fails": L["fails"], "fail_names": [net.roads[i]["name"] or "an unnamed street" for i, _ in L["fails"]], "minutes": L["minutes"], "trips": L["trips"], "lamp_count": L["lamp_count"],
             "night_full_kwh": L["night_full_kwh"], "outage": list(city.OUTAGE), "dim": city.DIM,
             "modes": {m: {"kwh": v["kwh"], "busy_road_minutes_dark": v["busy_road_minutes_dark"],
                           "busy_road_minutes_lit": v["busy_road_minutes_lit"], "kw": v["kw"],
