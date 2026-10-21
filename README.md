@@ -16,7 +16,7 @@ simulated one without changing the rules.
 | **Office tower** | 3 floors (basement car park, ground, first), about 50 people who also step out for lunch, the bank, a client or the school pick-up; couriers at reception; badge doors, office Wi-Fi, lights, AC, CO₂ | motion + CO₂ uses **31% less** light and AC energy than a fixed timetable; badges + Wi-Fi keep the evacuation roll-call within **0.3** people on average (badges alone: 2.0) | ready |
 | **Home + GridSense** | double-storey house with roof solar (6 kWp), 10 kWh battery, a day of load-shedding; a family whose children take the school van, go to tuition, and whose relatives visit in the evening; a gate counter | GridSense keeps the house lit through every cut (**93 → 0** dark minutes); its eco setting costs about the same as the inverter default | ready |
 | **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2; patients' attendants and visitors | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
-| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes, 59 signals on a 60 s / 30 s plan; 7,097 trips in the evening peak with 1,763 stops at 432 real shops and amenities | adaptive signals cut median delay **105 → 60 s** and time stopped at signals **90 → 21** vehicle-hours | ready |
+| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes, 59 signals on a 60 s / 30 s plan; 7,097 trips in the evening peak with 1,763 stops at 432 real shops and amenities | adaptive signals cut median delay **105 → 60 s** and time stopped at signals **90 → 20** vehicle-hours | ready |
 | **Junction planner** | the evening's three worst junctions under five fixes (retime, adaptive, U-turn conversion, underpass), and ten Rescue 1122 calls from the real station | at Firozpur Road / Wahdat Road time lost falls **28.8 → 6.9–9.6** vehicle-hours; a green wave gets the ambulance to the call **11% sooner** (4:27 → 3:58) | ready |
 | **City systems** | on the same roads, driven by the traffic: PM2.5 on a smoggy November evening with 25 low-cost sensors; seven real underpasses in a monsoon storm with a power cut; 9,545 streetlights through a night of load-shedding | sensors cut the air map's error **91 → 55 µg/m³**; closed underpasses strand **28 → 0** vehicles; adaptive lights use **38% less** energy | ready |
 
@@ -181,11 +181,11 @@ Chowk Flyover 1,273 trips, Model Town Underpass 605):
 | | Fixed signals | Adaptive signals |
 |---|---|---|
 | Trips finished | 6,589 | 6,820 |
-| Median delay, s (time at the shop not counted) | 104.9 | 60.3 |
-| Stops per trip | 7.5 | 5.6 |
-| Stopped at signals, vehicle-hours | 89.8 | 20.7 |
-| Mean speed, km/h | 28.8 | 32.3 |
-| Stops at shops and amenities | 1,763 | 1,805 |
+| Median delay, s (time at the shop not counted) | 104.9 | 60.4 |
+| Stops per trip | 7.5 | 5.8 |
+| Stopped at signals, vehicle-hours | 89.8 | 19.6 |
+| Mean speed, km/h | 28.8 | 32.2 |
+| Stops at shops and amenities | 1,763 | 1,807 |
 | Still on the road 15 min after the peak | 508 | 277 |
 
 Over three other days, in both peaks, at 4,000, 8,000 and 12,000 trips an hour

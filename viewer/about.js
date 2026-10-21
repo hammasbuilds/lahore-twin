@@ -115,7 +115,7 @@ window.TWIN_ABOUT = {
       "Travel time, delay (not counting time at the shop), stops per trip, mean speed, stops made and the hotspot list, side by side for both rule sets, and why people drove",
       "Keys: Space play/pause, ← → a minute, Shift + arrows pan, + − zoom, f follow a vehicle, Esc stop following; Tab reaches every control and hotspot",
     ],
-    analysis: "On an evening of 8,000 trips an hour, adaptive signals cut the time vehicles spend stopped at signals by about three-quarters (90 to 21 vehicle-hours) and median delay from 105 to 60 seconds on the same trips. Firozpur Road / Wahdat Road is the worst junction by far. Signals here are placed at crossings of named through roads because OpenStreetMap maps only two in the area; trip purposes and stop times are assumptions.",
+    analysis: "On an evening of 8,000 trips an hour, adaptive signals cut the time vehicles spend stopped at signals by about three-quarters (90 to 20 vehicle-hours) and median delay from 105 to 60 seconds on the same trips. Firozpur Road / Wahdat Road is the worst junction by far. Signals here are placed at crossings of named through roads because OpenStreetMap maps only two in the area; trip purposes and stop times are assumptions.",
   },
   junctions: {
     title: "Junction planner",

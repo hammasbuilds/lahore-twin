@@ -1468,3 +1468,22 @@ work needed. Night in the light theme reads (gold lit, grey shed half). Fixed: o
 underpass circles kept their desktop size (up to 26 px radius) on a map a third as wide, so the
 five central ones merged into one blob — they now scale with the map (down to half size), and the
 label placement uses the same radius.
+
+**Round 8.** Ran City Systems at both ends of the range, 2,000 and 12,000 trips an hour.
+*Found:* (1) Both nights came back with the default's traffic (4,991 and 4,779 trips): my test
+server had imported the city code before round 3's fix, and Python keeps an imported module, yet
+`run_key` used the digest of the code on disk — old-code runs were filed under the new code's
+name. The server now keys runs by the digest of the code it actually loaded, and answers 409
+("restart serve.py") when the code on disk has changed; a test covers both. After a restart the
+nights scale: 1,254 and 7,209 trips, 54% and 33% less energy. (2) At 12,000 trips an hour adaptive
+signals made the hotspot *worse* (837 → 874 µg/m³, the real hotspot 875 → 899). Near it, 87% of
+vehicle-seconds were idling — gridlock — and the gap-out logic counted any vehicle on the loop,
+so a queue standing still because its exit was blocked held the green to its 1.5× cap and the
+signals drew more vehicles into the jam (vehicle-seconds near the hotspot +10%, network trips
+7,966 → 7,866). Real adaptive systems read a loop occupied with nothing flowing as wasted green;
+now only a vehicle moving over the loop (≥ 1 m/s) extends a green, while one waiting on the other
+phase still counts as demand. At 12,000: idling grams near the hotspot 464 → 435 (was 484), trips
+finished 7,966 → 8,129 (was 7,866). At 8,000 nothing moves: median delay 60.3 → 60.4 s, trips
+6,820 either way; the junction planner and ambulance results are unchanged to the decimal. Test:
+a car standing on the loop ends the green at MIN_GREEN + GAP_OUT; the same car moving keeps it
+(fails on the old code). Replays regenerated; README and About figures updated (19.6 veh-h).

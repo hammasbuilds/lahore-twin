@@ -160,3 +160,28 @@ def test_the_evening_has_shopping_and_the_morning_the_school_run(net):
     pm = {t.purpose for t in morn}
     assert {"shopping", "pharmacy", "home"} <= pe and "school run" not in pe
     assert {"school run", "work"} <= pm and "shopping" not in pm
+
+
+def test_a_blocked_queue_does_not_hold_the_green(net):
+    """At 12,000 trips an hour adaptive signals made a gridlocked hotspot worse: a queue standing on
+    the loop (its exit blocked) looked like traffic, so a green that moved nobody ran to its cap."""
+    from lahore_twin.traffic_sim import DETECT, MIN_GREEN, GAP_OUT, Vehicle
+    sim = TrafficSim(net, [], "adaptive", minutes=1)
+    s = sim.signals[0]
+    def stand(ph, speed):
+        lid = s.phases[ph][0]
+        v = Vehicle(f"v{ph}", "car", [lid], 0, 1.0)
+        v.pos, v.v = sim.links[lid].length - DETECT / 2, speed
+        sim.lanes[lid][0][:] = [v]
+    stand(0, 0.0)                                      # phase 0's green: a car on the loop that cannot move
+    stand(1, 0.0)                                      # phase 1: a car waiting for its green
+    assert sim._detect(s, 0) and not sim._detect(s, 0, moving=True)
+    s.phase, s.state, s.since = 0, "green", 0
+    ended = next(t for t in range(1, 200) if (sim.tick_signals(t), s.state)[1] != "green")
+    assert ended <= MIN_GREEN + GAP_OUT                 # not the 1.5x cap
+    stand(0, 8.0)                                      # the same car flowing: the green is kept for it
+    s.phase, s.state, s.since, s.last_detect = 0, "green", 0, {}
+    for t in range(1, MIN_GREEN + GAP_OUT + 3):
+        stand(0, 8.0)
+        sim.tick_signals(t)
+    assert s.state == "green"

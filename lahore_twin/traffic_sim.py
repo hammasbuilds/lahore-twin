@@ -54,6 +54,7 @@ SIREN_RED_WAIT = 3              # with a siren it stops at a red, looks, and cro
 MAIN_GREEN, SIDE_GREEN, EVEN_GREEN = 60, 30, 45     # fixed plan: main road, side road, two equal roads
 AMBER, ALL_RED = 3, 2
 MIN_GREEN, MAX_STRETCH, GAP_OUT, DETECT = 10, 1.5, 3, 40.0
+MOVING = 1.0                     # m/s: slower than this over the loop on green is a blocked queue, not flow
 
 # why people drive: purpose -> (POI kinds, stop seconds (low, high), trip ends there)
 # Assumptions, labelled: no published trip-purpose split for Gulberg was found.
@@ -461,13 +462,15 @@ class TrafficSim:
         sig, ph = s
         return sig.phase == ph and sig.state == "green"
 
-    def _detect(self, sig: Signal, ph: int) -> bool:
-        """A loop detector DETECT m upstream on any approach of phase ph sees a vehicle."""
+    def _detect(self, sig: Signal, ph: int, moving: bool = False) -> bool:
+        """A loop detector DETECT m upstream on any approach of phase ph sees a vehicle. With moving,
+        only one going over it counts: on green, a vehicle standing on the loop is a queue that
+        cannot leave (its exit is blocked), and holding the green for it wastes it."""
         for lid in sig.phases[ph]:
             lk = self.links[lid]
             for lane in self.lanes[lid]:
                 for v in lane:
-                    if lk.length - v.pos <= DETECT:
+                    if lk.length - v.pos <= DETECT and (not moving or v.v >= MOVING):
                         return True
                     break                                    # lanes are front-first: the rest are further back
         return False
@@ -518,7 +521,7 @@ class TrafficSim:
             elif not adaptive:
                 end = el >= s.greens[s.phase]
             else:
-                if self._detect(s, s.phase):
+                if self._detect(s, s.phase, moving=True):
                     s.last_detect[s.phase] = t
                 gap = t - s.last_detect.get(s.phase, s.since)
                 other = self._detect(s, 1 - s.phase)

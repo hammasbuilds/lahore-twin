@@ -71,11 +71,29 @@ def clean(module: str, raw: dict) -> dict:
     return out
 
 
+LOADED: dict[str, str] = {}             # module -> digest of the code this process runs
+
+
+def loaded_digest(module: str) -> str:
+    """The digest of the simulation code as this server process imported it. Python keeps a module
+    once imported, so after an edit on disk a running server still runs the old code: keying a run
+    by the digest on disk would file old-code results under the new code's name."""
+    if module not in LOADED:
+        from lahore_twin.export import source_digest
+        LOADED[module] = source_digest(module)
+    return LOADED[module]
+
+
+def stale(module: str) -> bool:
+    """True when the code on disk is no longer the code this process runs."""
+    from lahore_twin.export import source_digest
+    return loaded_digest(module) != source_digest(module)
+
+
 def run_key(module: str, p: dict) -> str:
     """The cache name of a run. The code's digest is part of it: a run cached before a change
     to the simulation would otherwise be served as if the current code had produced it."""
-    from lahore_twin.export import source_digest
-    return hashlib.sha256(json.dumps([module, p, source_digest(module)], sort_keys=True).encode()).hexdigest()[:12]
+    return hashlib.sha256(json.dumps([module, p, loaded_digest(module)], sort_keys=True).encode()).hexdigest()[:12]
 
 
 def simulate(module: str, p: dict) -> str:
@@ -147,6 +165,8 @@ class Handler(SimpleHTTPRequestHandler):
         except (ValueError, json.JSONDecodeError) as e:
             return self._json(400, {"error": str(e)})
         with LOCK:
+            if stale(parts[2]):
+                return self._json(409, {"error": "the simulation code changed since this server started: restart serve.py"})
             try:
                 rel = simulate(parts[2], p)
             except Exception as e:                # report the failure, do not hang the page

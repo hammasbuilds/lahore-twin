@@ -26,7 +26,22 @@ def test_a_code_change_never_serves_an_old_cached_run(monkeypatch):
     assert serve.run_key("home", p) == before                    # same code, same inputs: cached
     assert serve.run_key("home", {**p, "seed": 8}) != before
     monkeypatch.setattr(export, "source_digest", lambda module: "changed")
+    monkeypatch.setattr(serve, "LOADED", {})                     # a restarted server runs the new code
     assert serve.run_key("home", p) != before
+
+
+def test_a_running_server_never_files_old_code_under_the_new_name(monkeypatch):
+    """A server started before an edit kept running the old city code (Python keeps an imported
+    module) while keying its runs by the digest on disk: a 2,000-trip run came back with the
+    default night's traffic, filed as if the fixed code had made it."""
+    import lahore_twin.export as export
+    monkeypatch.setattr(serve, "LOADED", {})
+    p = serve.clean("city", {})
+    key = serve.run_key("city", p)
+    assert not serve.stale("city")
+    monkeypatch.setattr(export, "source_digest", lambda module: "edited on disk")
+    assert serve.run_key("city", p) == key                        # still the code it runs
+    assert serve.stale("city")                                    # and the server refuses to run it
 
 
 def test_any_signalised_junction_can_be_planned():
