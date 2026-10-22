@@ -51,7 +51,10 @@ KINDS = {
 AMB_MODES = ("none", "siren", "greenwave")
 PREEMPT_M = 300.0               # a signal turns green for the ambulance when it is this far along its route
 SIREN_RED_WAIT = 3              # with a siren it stops at a red, looks, and crosses slowly
-MAIN_GREEN, SIDE_GREEN, EVEN_GREEN = 60, 30, 45     # fixed plan: main road, side road, two equal roads
+# fixed plan: the main road gets 60 s of green and waits 15 s at red; the side road's green is what
+# fits in those 15 s with its amber and the two all-reds (15 - 3 - 2 - 2 = 8 s)
+MAIN_GREEN, MAIN_RED = 60, 15
+SIDE_GREEN = MAIN_RED - 3 - 2 - 2
 AMBER, ALL_RED = 3, 2
 MIN_GREEN, MAX_STRETCH, GAP_OUT, DETECT = 10, 1.5, 3, 40.0
 MOVING = 1.0                     # m/s: slower than this over the loop on green is a blocked queue, not flow
@@ -110,7 +113,7 @@ class Signal:
     nodes: list
     name: str
     phases: list                  # [[link ids], [link ids]] approaches per phase
-    greens: list = field(default_factory=lambda: [EVEN_GREEN, EVEN_GREEN])
+    greens: list = field(default_factory=lambda: [MAIN_GREEN, SIDE_GREEN])
     phase: int = 0
     adaptive: bool | None = None  # this junction's own rule, overriding the rule set (junction planner)
     state: str = "green"          # green | amber | allred
@@ -168,9 +171,9 @@ def build_signals(net: Network) -> list[Signal]:
         seen[name] = seen.get(name, 0) + 1
         if seen[name] > 1:                # a divided road meets the same road twice, far enough apart
             name = f"{name} ({seen[name]})"
-        r0 = max(net.links[l].rank for l in groups[0])
-        r1 = max(net.links[l].rank for l in groups[1])
-        greens = [MAIN_GREEN, SIDE_GREEN] if r0 > r1 else [SIDE_GREEN, MAIN_GREEN] if r1 > r0 else [EVEN_GREEN, EVEN_GREEN]
+        # the main road: the bigger class, then the wider (more lanes in), then the first group
+        size = [(max(net.links[l].rank for l in g), sum(net.links[l].lanes for l in g)) for g in groups[:2]]
+        greens = [MAIN_GREEN, SIDE_GREEN] if size[0] >= size[1] else [SIDE_GREEN, MAIN_GREEN]
         sg = Signal(i, group, name, [groups[0], groups[1]], greens)
         # the signals are not coordinated: each one is somewhere in its cycle when the hour starts
         sg.since = -((i * 37) % greens[0])
@@ -525,8 +528,11 @@ class TrafficSim:
                     s.last_detect[s.phase] = t
                 gap = t - s.last_detect.get(s.phase, s.since)
                 other = self._detect(s, 1 - s.phase)
-                cap = round(s.greens[s.phase] * MAX_STRETCH)
-                end = el >= cap and other or (el >= MIN_GREEN and gap >= GAP_OUT and other)
+                # the main road may stretch its green; the side road never past its plan, so the main
+                # road's red stays at 15 s; a short side green may end before MIN_GREEN
+                main = s.greens[s.phase] >= s.greens[1 - s.phase]
+                cap = round(s.greens[s.phase] * MAX_STRETCH) if main else s.greens[s.phase]
+                end = el >= cap and other or (el >= min(MIN_GREEN, cap) and gap >= GAP_OUT and other)
             if end:
                 s.state, s.since = "amber", t
                 s.log.append((t, s.phase, "amber"))

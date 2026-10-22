@@ -8,9 +8,11 @@
 <link rel="stylesheet" href="twin.css">
 <style>
 :root { --accent: #fbbf24; --water: #38bdf8; --haze: #f59e0b; --lamp: #fde68a; --lamp-dim: #a16207; --road: #46536f; --dark-road: #1b2232; --sig-red: #ef4444;
-        --aqi1: #22c55e; --aqi2: #eab308; --aqi3: #f97316; --aqi4: #ef4444; --aqi5: #a855f7; --aqi6: #9f1239; --aqi7: #6b1028; --aqi8: #3b0716; }
+        --aqi1: #22c55e; --aqi2: #eab308; --aqi3: #f97316; --aqi4: #ef4444; --aqi5: #a855f7; --aqi6: #9f1239; --aqi7: #6b1028; --aqi8: #3b0716;
+        --veh-moto: #a78bfa; --veh-car: #38bdf8; --veh-rick: #34d399; --veh-bus: #f472b6; }
 :root[data-theme="light"] { --accent: #b45309; --water: #0369a1; --haze: #b45309; --lamp: #ca8a04; --lamp-dim: #fde68a; --road: #94a3b8; --dark-road: #334155; --sig-red: #dc2626;
-        --aqi1: #16a34a; --aqi2: #ca8a04; --aqi3: #ea580c; --aqi4: #dc2626; --aqi5: #9333ea; --aqi6: #9f1239; --aqi7: #6b1028; --aqi8: #3b0716; }
+        --aqi1: #16a34a; --aqi2: #ca8a04; --aqi3: #ea580c; --aqi4: #dc2626; --aqi5: #9333ea; --aqi6: #9f1239; --aqi7: #6b1028; --aqi8: #3b0716;
+        --veh-moto: #7c3aed; --veh-car: #0369a1; --veh-rick: #047857; --veh-bus: #be185d; }
 #stage { overflow: hidden; }
 canvas#plan { cursor: grab; touch-action: none; }
 .note { font-size: 12px; color: var(--muted); margin: 6px 0 10px; }
@@ -76,6 +78,7 @@ canvas#plan { cursor: grab; touch-action: none; }
   document.write('<script src="' + src + '"><\/script>'); })();</script>
 <script src="about.js"></script>
 <script src="core.js"></script>
+<script src="tracks.js"></script>
 <script src="city.js"></script>
 <script src="embed.js"></script>
 </body>

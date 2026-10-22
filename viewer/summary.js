@@ -50,15 +50,15 @@ window.TWIN_SUMMARY = {
  "traffic": {
   "stats": [
    [
-    "105 → 60 s",
+    "63 → 50 s",
     "median delay (fixed → adaptive)"
    ],
    [
-    "7,097",
+    "7,089",
     "trips in the evening peak"
    ],
    [
-    "1,763",
+    "1,303",
     "stops at real shops and amenities"
    ]
   ]
@@ -66,15 +66,15 @@ window.TWIN_SUMMARY = {
  "city": {
   "stats": [
    [
-    "91 → 55",
+    "78 → 54",
     "air-map error, µg/m³ (1 monitor → 25 sensors)"
    ],
    [
-    "28 → 0",
+    "34 → 0",
     "vehicles stalled in flooded underpasses"
    ],
    [
-    "38%",
+    "40%",
     "less streetlight energy"
    ]
   ]
@@ -82,11 +82,11 @@ window.TWIN_SUMMARY = {
  "junctions": {
   "stats": [
    [
-    "29 → 7",
+    "79 → 2",
     "veh-h lost at the worst junction (u-turn conversion)"
    ],
    [
-    "4:27 → 3:58",
+    "4:03 → 3:53",
     "ambulance to the call (green wave)"
    ],
    [

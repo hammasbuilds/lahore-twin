@@ -1501,3 +1501,43 @@ home, hospital, junctions and city checks — no errors anywhere; 120 tests pass
 typed values (seed 11, 4,000 trips an hour) now carries a night of its own: 2,459 trips (the
 default 8,000 gives 4,824), 5,339 → 2,853 kWh. Phase 6 complete; all six phases built and
 reviewed.
+
+## Traffic you can see, and the owner's signal plan (user request, 2026-10-22)
+
+*Asked:* the junction planner and City Systems showed roads and no traffic; signals in Lahore
+traffic looked red nearly all the time; signals should run 60 s green and 15 s red.
+
+**Vehicles on every traffic page.** `lahore_twin/tracks.py` records each vehicle's point on the road
+(lane included) every few seconds, delta-encoded, a standing run stored once instead of every sample;
+`viewer/tracks.js` plays them back with the traffic page's colours and sizes. The planner draws every
+vehicle within 400 m of the junction under each fix, and its signal heads now follow the signal's
+real log (green, amber, red) instead of a fixed picture. City Systems draws every vehicle in each
+scenario (smog, storm, night), Today and Connected. Each page's traffic sits in its own file, loaded
+when that junction or view opens (0.5–5.7 MB each); a run from "Run with your values" carries it inline.
+*Found:* the first encoding stored a gridlocked queue's standing vehicles again every sample — 14.6 MB
+for one view; runs of standing are now one entry (5.7 MB). A Python-encode / browser-decode round trip
+over 300 random tracks with standing runs comes back exact.
+
+**Why the lights looked red.** Measured from the replay: with 35 of 59 junctions on 45 s / 45 s, an
+average light was green 44–47% of the time under fixed signals, and the main road's phase only 21%
+under adaptive. The owner's plan: the main road 60 s green and 15 s red, so the side road gets the
+8 s green that fits in the 15 s with its amber and the two all-reds. Tried first, with the evidence
+put to the owner: side 8 s gridlocks 1,447 vehicles under fixed signals (6,589 → 4,496 trips finished);
+side 15 s 868, side 20 s 732; the old plan none. The owner chose 60 / 15. Verified in the browser
+(`tools/ui_check_motion.js`): main green 60 s and main red 15 s (medians over 3,349 cycles); 20,509
+stop-line crossings, 4 during the 2 s all-red right after amber (a motorcycle already in the junction
+at 14 km/h — what the all-red is for), none later.
+
+**What the plan did to the results, and one method fixed because of it.** Fixed signals now finish
+4,496 of 7,089 trips (adaptive 5,652); the worst junction loses 79.2 vehicle-hours in half an hour
+(28.8 before). On the gridlocking evening the smog network, fitted to the signals' loop counts,
+placed the hotspot 4,011 m from the real one — the worst air was in a jam no signal counts. Real
+cities add probe data (navigation and ride-hailing phones); Connected's map now regresses the 25
+readings on both feeds — loop counts and where one vehicle in twenty reports standing still, slopes
+kept non-negative — and finds the hotspot in the right cell (0 m), map error 78.0 → 53.9 µg/m³.
+Adaptive signals there no longer help over the hour (1194.1 → 1198.2): timing cannot clear a jam
+that starts in the side streets.
+
+**Numbers no longer typed.** The README's module table and Results are rendered from the replays by
+`tools/results.py`; `tests/test_readme_numbers.py` fails when they differ, and checks that every figure
+in the traffic, junction and city About texts appears in that checked section.

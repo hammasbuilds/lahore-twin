@@ -11,14 +11,16 @@ simulated one without changing the rules.
 
 **Demo video (57 s):** [lahore-twin-demo.mp4](https://github.com/hammasbuilds/lahore-twin/releases/download/v0.4.0/lahore-twin-demo.mp4)
 
+<!-- modules:start -->
 | Module | What it simulates | Headline result | Status |
 |---|---|---|---|
-| **Office tower** | 3 floors (basement car park, ground, first), about 50 people who also step out for lunch, the bank, a client or the school pick-up; couriers at reception; badge doors, office Wi-Fi, lights, AC, CO₂ | motion + CO₂ uses **31% less** light and AC energy than a fixed timetable; badges + Wi-Fi keep the evacuation roll-call within **0.3** people on average (badges alone: 2.0) | ready |
-| **Home + GridSense** | double-storey house with roof solar (6 kWp), 10 kWh battery, a day of load-shedding; a family whose children take the school van, go to tuition, and whose relatives visit in the evening; a gate counter | GridSense keeps the house lit through every cut (**93 → 0** dark minutes); its eco setting costs about the same as the inverter default | ready |
-| **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a 36-bed ward on floor 2; patients' attendants and visitors | alarms nurses walk to **99 → 38**, equipment search **96 → 1 min**, bed turnaround **70 → 20 min** | ready |
-| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes, 59 signals on a 60 s / 30 s plan; 7,097 trips in the evening peak with 1,763 stops at 432 real shops and amenities | adaptive signals cut median delay **105 → 60 s** and time stopped at signals **90 → 20** vehicle-hours | ready |
-| **Junction planner** | the evening's three worst junctions under five fixes (retime, adaptive, U-turn conversion, underpass), and ten Rescue 1122 calls from the real station | at Firozpur Road / Wahdat Road time lost falls **28.8 → 6.9–9.6** vehicle-hours; a green wave gets the ambulance to the call **11% sooner** (4:27 → 3:58) | ready |
-| **City systems** | on the same roads, driven by the traffic: PM2.5 on a smoggy November evening with 25 low-cost sensors; seven real underpasses in a monsoon storm with a power cut; 9,545 streetlights through a night of load-shedding | sensors cut the air map's error **91 → 55 µg/m³**; closed underpasses strand **28 → 0** vehicles; adaptive lights use **38% less** energy | ready |
+| **Office tower** | 3 floors (basement car park, ground, first), 36 staff and 4 visitors who also step out for lunch, the bank, a client or the school pick-up; couriers at reception; badge doors, office Wi-Fi, lights, AC, CO₂ | motion + CO₂ uses **31% less** light and AC energy than a fixed timetable; badges + Wi-Fi keep the evacuation roll-call within **0.27** people on average (badges alone: 1.79) | ready |
+| **Home + GridSense** | double-storey house with roof solar (6 kWp), 10 kWh battery, a day of category IV load-shedding; a family whose children take the school van, go to tuition, and whose relatives visit in the evening; a gate counter | GridSense keeps the house lit through every cut (**93 → 0** dark minutes); a day's bill Rs 379 (inverter default) against Rs 385 (GridSense eco) | ready |
+| **Hospital** | Lahore General Hospital campus from OpenStreetMap; Emergency Department (2 floors) and a ward on floor 2; patients' attendants and visitors | monitor alarms that sounded **99 → 38**, equipment search **96.4 → 0.9 min**, bed turnaround **70.4 → 20.4 min** | ready |
+| **Lahore traffic** | Gulberg, Kalma Chowk, Garden Town, Canal Road from OpenStreetMap: flyovers, underpasses, one-way streets, lanes, 59 signals on a 60 s / 8 s green plan (the main road waits 15 s at red); 7,089 trips in the evening peak with stops at 432 real shops and amenities | adaptive signals finish **4,496 → 5,652** trips and cut time stopped at signals **184.1 → 70.2** vehicle-hours; fixed signals leave **1,447** vehicles gridlocked | ready |
+| **Junction planner** | the evening's three worst junctions under five fixes (retime, adaptive, U-turn conversion, underpass), every vehicle drawn; ten Rescue 1122 calls from the real station | at Firozpur Road / Wahdat Road time lost goes **79.2 → 2.4** vehicle-hours with the best fix; a green wave gets the ambulance to the call in **3:53** against 4:03 | ready |
+| **City systems** | on the same roads, driven by the traffic, every vehicle drawn: PM2.5 on a smoggy November evening with 25 low-cost sensors; 7 real underpasses in a monsoon storm with a power cut; 9,545 streetlights through a night of load-shedding | sensors cut the air map's error **78.0 → 53.9 µg/m³**; closed underpasses strand **34 → 0** vehicles; adaptive lights use **40% less** energy | ready |
+<!-- modules:end -->
 
 ## Run it
 
@@ -110,7 +112,13 @@ puts its rule sets side by side for the whole day.
 
 ## Results
 
-Office, one working day, same people under every rule set:
+<!-- results:start -->
+Every figure here is read from the replay the app shows, by `tools/results.py`;
+`tests/test_readme_numbers.py` fails if any of them stops matching. Nothing is trained, so there is
+no train, validation or test split: each module runs one seed under every rule set, on the same
+people, patients or trips. Shares, rates and capacities that are assumptions are labelled in the code.
+
+**Office tower**, one working day. *Source:* `viewer/replay.js` · seed 7, staff 36, visitors 4 · code digest `158b76eef069195c`
 
 | | Fixed schedule | Motion | Motion + CO₂ |
 |---|---|---|---|
@@ -119,19 +127,13 @@ Office, one working day, same people under every rule set:
 | Lights switched off on someone | 6 | 27 | 12 |
 | Room-minutes lit while empty | 16,766 | 4,650 | 4,475 |
 
-People step out and come back all day (lunch at a dhaba, the bank, the school pick-up) and
-tap out of one floor's door, then walk in behind a colleague at the other. The evacuation
-roll-call, 08:30–18:30, people off from the truth (mean / worst), on day 7:
+Evacuation roll-call, people off from the truth (mean / worst); tailgates caught 11 of 17, false alarms 0:
 
 | Door counters | Badge register | Register + tailgate alerts | Badges + phones on the Wi-Fi |
 |---|---|---|---|
 | 1.79 / 7 | 1.79 / 6 | 1.99 / 7 | **0.27 / 3** |
 
-A phone on the Wi-Fi means its owner is still in the building whatever the doors last said;
-over four days the Wi-Fi estimate stays at 0.2–0.4 people off, against 1.1–2.0 for badges alone.
-11 of 17 tailgates were caught, with no false alarms.
-
-Home, a June day of category IV load-shedding, same family and outages:
+**Home + GridSense**, a June day of category IV load-shedding. *Source:* `viewer/home_replay.js` · seed 7, season June, category IV, pv_kwp 6.0, battery_kwh 10.0 · code digest `7959ad8c66a86133`
 
 | | Inverter default | UPS circuit | GridSense eco | GridSense |
 |---|---|---|---|---|
@@ -139,18 +141,12 @@ Home, a June day of category IV load-shedding, same family and outages:
 | Too hot to sleep, person-min | 396 | 675 | 675 | 416 |
 | Day's bill, Rs | 379 | 548 | 385 | 492 |
 
-That day the school van leaves at 07:20, the mother is at the market and pharmacy from 10:32
-to 11:49, the children are at tuition from 16:45 to 18:35, and the father, out for groceries
-at 19:31, is back at 19:53 because three relatives arrived at 19:48. The gate counter logged
-24 crossings; the drawing-room fan and light came on with the guests and went off when they
-left at 22:04.
-
-Hospital, same patients and events:
+**Hospital**, one day, same patients and events. *Source:* `viewer/hospital_replay.js` · seed 7, arrivals_pct 100, alarm_delay_s 15 · code digest `d289ab293342a710`
 
 | | Today | Connected |
 |---|---|---|
 | HDU alarms that sounded | 99 | 38 |
-| Brief real events that never sounded (the cost of the 15 s delay) | 0 | 15 |
+| Brief real events that never sounded (the cost of the alarm delay) | 0 | 15 |
 | Minutes searching for equipment | 96.4 | 0.9 |
 | Drips run without a pump | 16 | 1 |
 | Fridge minutes above 8 °C | 551 | 42 |
@@ -162,100 +158,67 @@ Hospital, same patients and events:
 | Most visitors at one bed | 4 | 2 |
 | Families turned away after 18:00 (the cost of the pass desk) | 0 | 18 |
 
-Nobody comes alone: 319 relatives came with the day's emergency patients, one stays each
-night on the ward and goes down to the pharmacy for the medicines. One attendant card per
-patient halves the relatives in the bays; the pass desk ends visiting outside hours but packs
-the ward at 16:00 (32 visitors at once against 12) and turns late families away.
-
-Badges and sensors do not add doctors, so emergency waits barely move; a one-hour audit
-reports hand hygiene at about twice its true rate, while counting dispensers reports it as it is.
-
-Traffic, the same 7,097 trips in an hour of evening peak (17:30–18:30) plus 15 minutes to
-clear. People drive home, to shop, to the mall, for takeaway, to the pharmacy, the bank, fuel,
-prayers and tuition pick-ups, at real places from OpenStreetMap; short stops block the kerb
-lane, long ones pull off to park, rickshaws and wagons stop for passengers. Signals run 60 s
-green for the bigger road and 30 s for the side road. Drivers pick routes on free-flow time plus
-each approach's expected wait at red, so the flyovers and underpasses carry real loads (Kalma
-Chowk Flyover 1,273 trips, Model Town Underpass 605):
+**Lahore traffic**, the evening peak on real roads; every signal's main road gets 60 s of green and
+waits 15 s at red, so side roads get 8 s. *Source:* `viewer/traffic_replay.js` · seed 7, per_hour 8,000, minutes 60, period evening · code digest `a892e8b913776904`
 
 | | Fixed signals | Adaptive signals |
 |---|---|---|
-| Trips finished | 6,589 | 6,820 |
-| Median delay, s (time at the shop not counted) | 104.9 | 60.4 |
-| Stops per trip | 7.5 | 5.8 |
-| Stopped at signals, vehicle-hours | 89.8 | 19.6 |
-| Mean speed, km/h | 28.8 | 32.2 |
-| Stops at shops and amenities | 1,763 | 1,807 |
-| Still on the road 15 min after the peak | 508 | 277 |
+| Trips | 7,089 | 7,089 |
+| Trips finished | 4,496 | 5,652 |
+| Gridlocked (standing 5+ min) at the end | 1,447 | 532 |
+| Never got onto the road | 195 | 21 |
+| Median delay of finished trips, s | 62.9 | 50.3 |
+| Stops per trip | 6.62 | 5.62 |
+| Stopped at signals, vehicle-hours | 184.1 | 70.2 |
+| Mean speed, km/h | 25.1 | 30.6 |
+| Stops at shops and amenities | 1,303 | 1,543 |
 
-Over three other days, in both peaks, at 4,000, 8,000 and 12,000 trips an hour
-(`tools/sweep_traffic.py`, 36 runs): nobody exceeds the road's or the vehicle's speed, no
-parked car moves, and adaptive signals beat fixed ones every time. Up to 8,000 trips an hour
-nobody is gridlocked and everyone gets onto the map; median delay falls from 62–72 s to
-18–23 s at 4,000 and from 94–107 s to 51–64 s at 8,000. At 12,000 the area is past
-saturation: the fixed plan gridlocks in 4 of 6 runs (21–336 vehicles still for five minutes
-or more, in one-lane queues on North Avenue reaching back from a red light), adaptive signals
-in none; some cars cannot enter the map under either (up to 36).
+The median delay counts only trips that finished, so a gridlocked evening can show a lower median
+than a flowing one: read it with the trips finished and the gridlocked count beside it.
 
-Kerb stops and rickshaws picking up passengers now slow the kerb lane, as on-street stopping
-does in Lahore; pedestrians crossing and lane indiscipline are still not modelled, so the
-simulated peak may run faster than the real one. The only published network figure found
-(JICA's master plan) is a daily average above 30 km/h, not a peak-hour speed.
+**Junction planner**, the evening's three worst junctions, every fix on the same trips; vehicle-hours
+lost within 350 m. *Source:* `viewer/junctions_replay.js` · seed 7, per_hour 8,000, minutes 30, trips 3,570 · code digest `56253818ef07b302`
 
-Everything is simulated; rates and parameters that are assumptions are marked as such in the code.
+| Junction | As today | Retime | Adaptive | U-turn conversion | Underpass |
+|---|---|---|---|---|---|
+| Firozpur Road / Wahdat Road | 79.2 | 5.6 | 41.4 | 2.4 (+329 km) | 9.4 |
+| Ahmed Munir Shaheed Road / Malik Fazal Din Road | 136.8 | 136.8 | 136.1 | 116.0 (+63 km) | 138.1 |
+| D/E Diagonal Road / North Avenue | 9.6 | 4.9 | 3.1 | 3.9 (+73 km) | 4.4 |
 
-Junction planner, 30 minutes of the same evening (3,617 trips), every fix on the same trips.
-Firozpur Road / Wahdat Road, vehicle-hours lost within 350 m:
-
-| As today | Retime (Webster) | Adaptive | U-turn conversion | Underpass |
-|---|---|---|---|---|
-| 28.8 | 9.6 | 9.2 | **6.9** (+333 km driven, no pedestrian crossing) | 9.5 |
-
-Retiming alone gives Wahdat Road the long green, because Firozpur Road's through traffic rides
-the flyover above; the U-turn conversion does best at the junction but sends 759 trips 150–400 m
-on to turn back through a gap in the median. At Ahmed Munir Shaheed Road no fix helps much
-(16.0 → 12.8 at best).
-
-Rescue 1122, ten calls in the half hour from the station on OpenStreetMap, ten minutes at each,
-then to the nearest hospital with an emergency department:
+Rescue 1122, 10 calls from the real station:
 
 | | No priority | Siren | Green wave |
 |---|---|---|---|
-| To the call, mean | 4:27 | 4:16 | **3:58** |
-| On to hospital, mean (9 calls every way finished) | 2:23 | 2:17 | 2:09 |
-| Red lights met | 10 | 11 | 0 |
+| To the call, mean | 4:03 | 4:00 | **3:53** |
+| On to hospital, mean (9 calls every way finished) | 2:23 | 2:21 | 2:14 |
+| Red lights met | 6 | 7 | 0 |
+| Signals preempted | 0 | 0 | 63 |
 
-Field studies of signal preemption report 14–23% shorter emergency trips; this is 11% (9–11% over three
-evenings, seeds 7, 11 and 23). The calls
-are short (1.5–8 km, one to four signals), so there is less to gain than on a long corridor.
+**City systems.** *Source:* `viewer/city_replay.js` · seed 7, per_hour 8,000 · code digest `51a75ba262086d6c`
 
-City systems, the same evening (seed 7). Background haze, storm, pump and lamp figures are
-assumptions, labelled in the code and on each view.
-
-| Smog, 17:30–18:30 | One official monitor | + 25 low-cost sensors |
+| Smog, a November evening | One official monitor | + 25 low-cost sensors, loop counts and phone reports |
 |---|---|---|
-| Air-map error near roads, µg/m³ | 90.7 | **54.7** |
-| Hotspot placed (peak quarter-hour) | no | 424 m from the real one |
-| PM2.5 at the real hotspot, adaptive signals within 400 m of the found one | 733 | **644** |
+| Air-map error near roads, µg/m³ | 78.0 | **53.9** |
+| Hotspot placed, m from the real one | not placed | 0 |
+| PM2.5 at the real hotspot after adaptive signals there, µg/m³ | 1194.1 | 1198.2 |
 
-Area mean at the peak 203.5 µg/m³, worst street cell 1,018. Over three evenings the sensors place
-the hotspot 140–640 m off (their regression uses only the signals' loop detectors) and the action
-still cuts PM2.5 at the real hotspot by 12–28%.
+Area mean at the peak 203.5 µg/m³; worst street cell 1,652.9 µg/m³.
 
-| Monsoon storm, 18:00–19:15, power cut 18:25–19:05 | Today | Connected |
+| Monsoon storm with a power cut | Today | Connected |
 |---|---|---|
 | Deepest water, m | 0.52 | **0.17** |
-| Vehicles stalled in water | 28 | **0** |
-| Gridlocked behind them | 454 | **0** |
-| Rerouted round a closed underpass | 0 | 349 |
-| Trips finished | 4,670 | **5,146** |
-| Median delay, s | 84.6 | 89.1 |
+| Vehicles stalled in water | 34 | **0** |
+| Gridlocked | 839 | 534 |
+| Rerouted round a closed underpass | 0 | 367 |
+| Trips finished | 3,577 | 3,907 |
+| Median delay of finished trips, s | 52.0 | 55.7 |
 
-| Streetlights, 23:00–05:00 | Today | Connected |
+| Streetlights, 23:00–05:00 (9,545 lamps) | Today | Connected |
 |---|---|---|
-| Energy, kWh | 5,340 | **3,290** (−38%) |
-| Busy road-minutes in the dark | 8,695 | **1,803** |
+| Energy, kWh | 5,340.2 | **3,220.6** (40% less) |
+| Busy road-minutes in the dark | 8,429 | **1,559** |
 | Failed lamps known by morning | 0 of 42 | **42 of 42** |
+<!-- results:end -->
 
 ## How it works
 

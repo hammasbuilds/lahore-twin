@@ -97,7 +97,7 @@ window.TWIN_ABOUT = {
       "Builds the road network from the real map: every road class from the Canal Road to living streets, lane counts, one-way streets, flyovers above and underpasses below.",
       "Drives about 7,000 trips through a peak hour: each vehicle follows the one ahead, changes lane when another is better, gives way to the bigger road, stops at red and queues back through junctions. Vehicles keep left, as in Pakistan.",
       "Trips have reasons. Evening: home from work, shopping, the mall, takeaway, dinner out, the pharmacy, the bank, fuel, prayers, tuition pick-ups. Morning: the office, the school run, university, breakfast, fuel. Short stops block the kerb lane, long ones pull off to park, and rickshaws and wagons stop for passengers anywhere.",
-      "Signals stand where two named through roads cross at grade, as in Lahore: the main road 60 s green, the side road 30 s, 3 s amber, 2 s all-red, each junction at its own point in the cycle, so a light can turn red just as you reach it.",
+      "Signals stand where two named through roads cross at grade, as in Lahore: the main road gets 60 s of green and waits 15 s at red, so the side road gets 8 s of green; 3 s amber and 2 s all-red between, each junction at its own point in the cycle, so a light can turn red just as you reach it.",
       "Runs the same hour twice: those fixed-time signals, and adaptive signals that hold green while loop detectors still see traffic.",
       "Ranks the worst junctions by time vehicles spend stopped there — the list the junction planner starts from.",
     ],
@@ -115,7 +115,7 @@ window.TWIN_ABOUT = {
       "Travel time, delay (not counting time at the shop), stops per trip, mean speed, stops made and the hotspot list, side by side for both rule sets, and why people drove",
       "Keys: Space play/pause, ← → a minute, Shift + arrows pan, + − zoom, f follow a vehicle, Esc stop following; Tab reaches every control and hotspot",
     ],
-    analysis: "On an evening of 8,000 trips an hour, adaptive signals cut the time vehicles spend stopped at signals by about three-quarters (90 to 20 vehicle-hours) and median delay from 105 to 60 seconds on the same trips. Firozpur Road / Wahdat Road is the worst junction by far. Signals here are placed at crossings of named through roads because OpenStreetMap maps only two in the area; trip purposes and stop times are assumptions.",
+    analysis: "On an evening of 8,000 trips an hour, a plan that gives the main road 60 s of green and the side road 8 s gridlocks the side roads: with fixed signals 1,447 vehicles are still standing at the end and 4,496 of 7,089 trips finish. Adaptive signals, which end a green as soon as nobody is crossing, finish 5,652 and cut the time stopped at signals from 184.1 to 70.2 vehicle-hours. The median delay counts only finished trips, so it is lower on the gridlocked evening: read it with the trips finished. Signals are placed at crossings of named through roads because OpenStreetMap maps only two in the area; trip purposes and stop times are assumptions.",
   },
   junctions: {
     title: "Junction planner",
@@ -141,7 +141,7 @@ window.TWIN_ABOUT = {
       "Vehicle-hours lost at the junction, queue peak, network delay, extra kilometres and what pedestrians lose, for every fix",
       "The ambulance on its route, signals on the way, time to the call and to hospital, and a time–distance (green-wave) diagram",
     ],
-    analysis: "At the worst junction, Firozpur Road / Wahdat Road, every fix roughly thirds the time lost, and the U-turn conversion does best at the junction but adds hundreds of kilometres of driving and takes the crossing from pedestrians. Retiming alone hands the long green to Wahdat Road, because Firozpur's through traffic is on the flyover above. A green wave gets ambulances to their calls about 11% sooner than no priority (4:27 → 3:58), a little under the 14–23% field studies report: these calls are short, with one to four signals each.",
+    analysis: "With 8 s of green for the side road, Firozpur Road / Wahdat Road loses 79.2 vehicle-hours in half an hour; retiming the split to the real demand cuts that to 5.6 and the U-turn conversion to 2.4, at 329 extra km of driving and no protected crossing for pedestrians. At Ahmed Munir Shaheed Road / Malik Fazal Din Road no fix helps much (136.8 at best down to 116.0): the queues there come from the junctions around it. A green wave gets ambulances to their calls in 3:53 against 4:03 with no priority: these calls are short, with one to four signals each.",
   },
   city: {
     title: "City systems",
@@ -150,7 +150,7 @@ window.TWIN_ABOUT = {
     status: "ready",
     what: "Three city-wide IoT systems on Lahore's real roads, driven by the traffic module: a smog sensor network on a November evening, underpasses flooding in a monsoon storm with a power cut, and streetlights through a night of load-shedding.",
     does: [
-      "Smog: PM2.5 at street level every minute from the regional haze under a closing inversion plus what the traffic module's vehicles emit, exhaust and idling. One official monitor against 25 low-cost sensors at schools, hospitals and junction poles, mapped with the signals' loop-detector counts; the hotspot they find gets adaptive signals.",
+      "Smog: PM2.5 at street level every minute from the regional haze under a closing inversion plus what the traffic module's vehicles emit, exhaust and idling. One official monitor against 25 low-cost sensors at schools, hospitals and junction poles, mapped with the signals' loop-detector counts and the standing-still reports from one vehicle's phone in twenty; the hotspot they find gets adaptive signals.",
       "Rain: each real underpass a basin filling from the streets around it, pumped until LESCO's feeder trips. Today the water finds the drivers; Connected's level sensors start the generator, close the gate at 0.15 m and route traffic over the surface.",
       "Night: about 9,500 LED streetlights. Connected dims each road to 30% unless traffic is on or next to it, keeps main roads lit on a battery through load-shedding, and every lamp reports its own failure.",
     ],
@@ -165,7 +165,7 @@ window.TWIN_ABOUT = {
       "Every road's light level minute by minute, the shed feeder, failed lamps, power drawn",
       "Today against Connected for each: map error, water depth, vehicles stalled, kWh, roads left dark",
     ],
-    analysis: "Twenty-five low-cost sensors with the signals' traffic counts cut the error of the city's air map by 20–40% and place the worst quarter-hour's hotspot 140–640 m from where it really is: close enough that adaptive signals within 400 m of it cut PM2.5 at the real hotspot by 12–28% (three evenings). In the storm the water reaches about half a metre and strands drivers Today; Connected closes the gates first, nobody stalls, and more trips get home at a few seconds' detour. Adaptive streetlights use about 38% less energy and keep main roads lit through the cut. Background, storm, pumps and lamp figures are assumptions, labelled on each view.",
+    analysis: "Twenty-five low-cost sensors with two traffic feeds, the signals' loop detectors and the phones of one vehicle in twenty, cut the error of the city's air map from 78.0 to 53.9 µg/m³ and find the worst hotspot in the right 100 m cell; with the loop detectors alone they placed it kilometres away (see PLAN.md), because on the gridlocking evening the worst air is in a jam no signal counts. Adaptive signals there do not help over the full hour (1194.1 to 1198.2 µg/m³): signal timing cannot clear a jam that starts in the side streets. In the storm the water reaches 0.52 m and strands 34 drivers Today; Connected closes the gates first and nobody stalls. Adaptive streetlights use 40% less energy and keep main roads lit through the cut. Background, storm, pumps, the phones' share and lamp figures are assumptions, labelled on each view.",
   },
 };
 

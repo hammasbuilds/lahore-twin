@@ -19,11 +19,54 @@
   let palette = {};
   function readPalette() {
     for (const k of ["bg", "panel", "panel-2", "text", "muted", "line", "accent", "floor-out", "rescue", "sig-red", "sig-green",
-      "road-major", "road-mid", "road-minor", "road-edge", "siren", "none", "warn"]) palette[k] = css("--" + k);
+      "road-major", "road-mid", "road-minor", "road-edge", "siren", "none", "warn", "sig-amber",
+      "veh-moto", "veh-car", "veh-rick", "veh-bus"]) palette[k] = css("--" + k);
+  }
+  const VCOL = () => ({ motorcycle: palette["veh-moto"], car: palette["veh-car"], rickshaw: palette["veh-rick"], bus: palette["veh-bus"], ambulance: palette.rescue });
+
+  // ---- traffic at the junction: each fix's vehicles, inline in a run, or a file per junction ----
+  const decodedTracks = {}, requested = {};
+  function tracksFor(j, fix) {
+    const key = j + "/" + fix;
+    if (key in decodedTracks) return decodedTracks[key];
+    const inline = R.junctions[j].fixes[fix].tracks;
+    const side = window.JUNCTION_TRAFFIC && window.JUNCTION_TRAFFIC[j];
+    const data = inline || (side && side.fixes[fix]);
+    if (data) return (decodedTracks[key] = TwinTracks.decode(data));
+    if (!requested[j]) {                         // the committed replay keeps them beside it
+      requested[j] = true;
+      const s = document.createElement("script");
+      s.src = `junctions_traffic_${j}.js`;
+      s.onload = () => frame();
+      s.onerror = () => { decodedTracks[key] = null; };
+      document.head.appendChild(s);
+    }
+    return null;
+  }
+  // the traffic around the ambulance's routes, one set per way of running the signals
+  let ambAsked = false;
+  function ambTraffic(mode) {
+    const key = "amb/" + mode;
+    if (key in decodedTracks) return decodedTracks[key];
+    const src = R.ambulance.tracks || (window.JUNCTION_AMB_TRAFFIC && window.JUNCTION_AMB_TRAFFIC.modes);
+    if (src) return (decodedTracks[key] = TwinTracks.decode(src[mode]));
+    if (!ambAsked) {
+      ambAsked = true;
+      const s = document.createElement("script"); s.src = "junctions_traffic_amb.js"; s.onload = () => frame();
+      document.head.appendChild(s);
+    }
+    return null;
+  }
+  // the junction's signal at time t: [phase, state] from its log ("green" | "amber" | "allred")
+  function signalAt(log, t) {
+    if (!log || !log.length) return null;
+    let i = C.bisectRight(log, t, (e) => e[0]) - 1;
+    return i < 0 ? [log[0][1], "green"] : [log[i][1], log[i][2]];
   }
   const MODE_COL = () => ({ none: palette.none, siren: palette.siren, greenwave: palette.rescue });
 
-  const state = { view: "plan", j: 0, fix: "uturn", call: 0, mode: "greenwave", t: 0, playing: false };
+  // open ten minutes in, when the evening's traffic has built up at the junction
+  const state = { view: "plan", j: 0, fix: "uturn", call: 0, mode: "greenwave", t: Math.min(600, R.meta.t1 - 1), playing: false };
   try {
     const saved = JSON.parse(localStorage.getItem("junction-planner") || "{}");
     if (saved.theme) document.documentElement.dataset.theme = saved.theme;
@@ -43,7 +86,7 @@
 
   // ---- canvas ----
   const cv = $("plan"), ctx = cv.getContext("2d"), tl = $("tl"), tctx = tl.getContext("2d");
-  let W = 0, H = 0, hits = [];
+  let W = 0, H = 0, hits = [], vehNow = 0;
   function fit() {
     const dpr = window.devicePixelRatio || 1;
     W = cv.clientWidth; H = cv.clientHeight;
@@ -74,6 +117,9 @@
       }
     }
     ctx.globalAlpha = 1;
+    // the traffic: every vehicle within 400 m under this fix, at this second
+    const tr = tracksFor(state.j, state.fix);
+    vehNow = TwinTracks.draw(ctx, tr, state.t, SX, SY, view.s, VCOL(), hits, { rim: palette.bg });
     // the fix, drawn
     const ap = j.approaches;
     if (under) {
@@ -97,11 +143,14 @@
       }
       label("Crossing closed: no signal, side roads turn left only", 0, -R0 * 0.85);
     } else {
-      // signal heads, coloured by phase; the long green bold
-      const r = j.fixes[state.fix];
+      // signal heads as the simulation ran them: green, amber or red at this second
+      const r = j.fixes[state.fix], now = signalAt(r && r.signal_log, state.t);
       for (const [ph, x, y] of ap) {
-        ctx.fillStyle = ph === j.main_phase ? palette["sig-green"] : palette["sig-red"]; ctx.strokeStyle = palette.bg; ctx.lineWidth = 1.5;
-        ctx.beginPath(); ctx.arc(SX(x), SY(y), 6, 0, 7); ctx.fill(); ctx.stroke();
+        const lit = !now ? (ph === j.main_phase ? "green" : "red") : now[0] === ph && now[1] !== "allred" ? now[1] : "red";
+        ctx.fillStyle = palette[lit === "green" ? "sig-green" : lit === "amber" ? "sig-amber" : "sig-red"];
+        ctx.strokeStyle = palette.bg; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(SX(x), SY(y), 7, 0, 7); ctx.fill(); ctx.stroke();
+        hits.push({ x: SX(x), y: SY(y), r: 9, text: `Signal: ${lit} for ${ph === j.main_phase ? j.main.join(", ") : (j.side.join(", ") || "the side road")}` });
       }
       if (state.fix === "adaptive") label("Adaptive: loop detectors 40 m back hold the green while traffic comes", 0, -R0 * 0.85);
       else if (r && r.greens) label(`${state.fix === "baseline" ? "Today" : "Retimed"}: ${j.main.join(", ")} ${r.greens[j.main_phase]} s · ${j.side.join(", ") || "side road"} ${r.greens[1 - j.main_phase]} s green`, 0, -R0 * 0.85);
@@ -110,6 +159,11 @@
     ctx.strokeStyle = palette.muted; ctx.lineWidth = 2; const bar = 100 * view.s;
     ctx.beginPath(); ctx.moveTo(14, H - 18); ctx.lineTo(14 + bar, H - 18); ctx.stroke();
     ctx.fillStyle = palette.muted; ctx.font = "11px Segoe UI, system-ui"; ctx.textAlign = "left"; ctx.fillText("100 m", 18 + bar, H - 14);
+    // on a panel: drawn bare, a grey digit over the yellow main road could not be read
+    const txt = tr ? `${vehNow} vehicles within 400 m` : "loading traffic…", tw = ctx.measureText(txt).width;
+    // top right: at the bottom the legend covers it when the planner sits inside the app
+    ctx.fillStyle = palette.panel; ctx.globalAlpha = 0.9; ctx.fillRect(W - 22 - tw, 8, tw + 16, 22); ctx.globalAlpha = 1;
+    ctx.fillStyle = palette.text; ctx.textAlign = "right"; ctx.fillText(txt, W - 14, 24);
   }
   function label(text, x, y) {
     ctx.font = "600 13px Segoe UI, system-ui"; ctx.textAlign = "center";
@@ -144,6 +198,8 @@
     for (const r of AREA) { ctx.strokeStyle = r.major ? palette["road-major"] : palette["road-minor"]; ctx.globalAlpha = r.layer < 0 ? 0.4 : 0.7; ctx.lineWidth = r.major ? 2.4 : 0.8; line(r.pts); }
     ctx.globalAlpha = 1;
     ctx.strokeStyle = palette.rescue; ctx.lineWidth = 5; ctx.globalAlpha = 0.85; line(c.pts); ctx.globalAlpha = 1;
+    // everyone else on the roads near the routes, under this way of running the signals
+    vehNow = TwinTracks.draw(ctx, ambTraffic(state.mode), state.t, SX, SY, view.s, VCOL(), hits, { rim: palette.bg, dot: 2.2 });
     // signals on the route, coloured as the chosen mode had them at this moment
     const m = c.modes[state.mode];
     c.signals.forEach(([d, , , name], k) => {
@@ -303,7 +359,7 @@
   }
   function renderLegend() {
     $("legend").innerHTML = state.view === "plan"
-      ? `<span><i style="background:${palette["sig-green"]}"></i>Main road's signal</span><span><i style="background:${palette["sig-red"]}"></i>Side road's signal</span><span><i class="sq" style="background:${palette["road-major"]}"></i>Main road</span><span><i class="sq" style="border:1.5px dashed ${palette.accent};background:transparent"></i>Underpass</span><span>100 m bar bottom left</span>`
+      ? `<span><i class="sq" style="background:${palette["veh-moto"]}"></i>Motorcycle</span><span><i class="sq" style="background:${palette["veh-car"]}"></i>Car</span><span><i class="sq" style="background:${palette["veh-rick"]}"></i>Rickshaw</span><span><i class="sq" style="background:${palette["veh-bus"]}"></i>Bus / van</span><span><i style="background:${palette["sig-green"]}"></i><i style="background:${palette["sig-amber"]}"></i><i style="background:${palette["sig-red"]}"></i>Signal now</span><span><i class="sq" style="background:${palette["road-major"]}"></i>Main road</span><span><i class="sq" style="border:1.5px dashed ${palette.accent};background:transparent"></i>Underpass</span><span>100 m bar bottom left</span>`
       : `<span><i style="background:${palette.rescue}"></i>Route · green wave</span><span><i style="background:${palette.siren}"></i>Siren</span><span><i style="background:${palette.none}"></i>No priority</span><span><i style="background:${palette.accent}"></i>Hospital</span><span><i style="background:${palette.warn}"></i>The call</span>`;
   }
 
@@ -319,7 +375,8 @@
   let prev = null;
   function loop(ts) {
     if (state.playing) {
-      if (prev != null) state.t = Math.min(R.meta.t1 - 1, state.t + (ts - prev) / 1000 * 30);
+      // the junction view plays at 5x so the cars can be followed; the ambulance at 30x
+      if (prev != null) state.t = Math.min(R.meta.t1 - 1, state.t + (ts - prev) / 1000 * (state.view === "plan" ? 5 : 30));
       if (state.t >= R.meta.t1 - 1) setPlaying(false);
       frame();
     }
@@ -352,7 +409,8 @@
   $("theme").onclick = () => { const d = document.documentElement.dataset.theme !== "light"; document.documentElement.dataset.theme = d ? "light" : "dark"; $("theme").textContent = d ? "Dark" : "Light"; readPalette(); try { localStorage.setItem("junction-planner", JSON.stringify({ theme: document.documentElement.dataset.theme })); } catch (e) { /* ignore */ } render(); };
   cv.addEventListener("mousemove", (e) => {
     const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, tip = $("tip");
-    const h = hits.find((x) => Math.hypot(x.x - mx, x.y - my) < x.r);
+    // a signal, a gap or a call under the pointer wins over a vehicle passing it
+    const near = hits.filter((x) => Math.hypot(x.x - mx, x.y - my) < x.r), h = near.find((x) => !x.veh) || near[0];
     if (!h) { tip.style.display = "none"; return; }
     tip.innerHTML = esc(h.text); tip.style.display = "block"; tip.style.left = (mx + 14) + "px"; tip.style.top = (my + 14) + "px";
   });
@@ -367,5 +425,5 @@
 
   $("theme").textContent = document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
   readPalette(); fit(); render(); requestAnimationFrame(loop);
-  window.__junctions = { state, render, frame, setView, hits: () => hits, calls: CALLS };
+  window.__junctions = { state, render, frame, setView, hits: () => hits, calls: CALLS, vehicles: () => vehNow, traffic: tracksFor, signalAt };
 })();

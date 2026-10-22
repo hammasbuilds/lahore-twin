@@ -29,10 +29,10 @@ SOURCES = {
                  "../plans/osm/lgh_campus.json"],
     "traffic": ["roads.py", "traffic_sim.py", "export_traffic.py", "export.py", "../plans/osm/lahore_gulberg_roads.json",
                 "../plans/osm/lahore_gulberg_pois.json"],
-    "junctions": ["roads.py", "traffic_sim.py", "junctions.py", "export_junctions.py", "export.py",
+    "junctions": ["roads.py", "traffic_sim.py", "junctions.py", "tracks.py", "export_junctions.py", "export.py",
                   "../plans/osm/lahore_gulberg_roads.json", "../plans/osm/lahore_gulberg_pois.json",
                   "../plans/osm/rescue_1122.json"],
-    "city": ["roads.py", "traffic_sim.py", "junctions.py", "city.py", "export_city.py", "export.py",
+    "city": ["roads.py", "traffic_sim.py", "junctions.py", "tracks.py", "city.py", "export_city.py", "export.py",
              "../plans/osm/lahore_gulberg_roads.json", "../plans/osm/lahore_gulberg_pois.json"],
 }
 

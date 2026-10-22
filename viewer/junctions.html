@@ -7,8 +7,10 @@
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect x='3' y='3' width='26' height='26' rx='6' fill='%2314b8a6'/%3E%3Cpath d='M16 7v18M7 16h18' stroke='%230b1220' stroke-width='3'/%3E%3C/svg%3E">
 <link rel="stylesheet" href="twin.css">
 <style>
-:root { --accent: #2dd4bf; --rescue: #f87171; --sig-red: #ef4444; --sig-green: #22c55e; --road-major: #e8b04b; --road-mid: #c9d3e3; --road-minor: #7c8aa5; --road-edge: #0b1120; --siren: #fbbf24; --none: #94a3b8; }
-:root[data-theme="light"] { --accent: #0f766e; --rescue: #dc2626; --sig-red: #dc2626; --sig-green: #16a34a; --road-major: #d97706; --road-mid: #ffffff; --road-minor: #cbd5e1; --road-edge: #94a3b8; --siren: #b45309; --none: #64748b; }
+:root { --accent: #2dd4bf; --rescue: #f87171; --sig-red: #ef4444; --sig-green: #22c55e; --road-major: #e8b04b; --road-mid: #c9d3e3; --road-minor: #7c8aa5; --road-edge: #0b1120; --siren: #fbbf24; --none: #94a3b8;
+        --sig-amber: #f59e0b; --veh-moto: #a78bfa; --veh-car: #38bdf8; --veh-rick: #34d399; --veh-bus: #f472b6; }
+:root[data-theme="light"] { --accent: #0f766e; --rescue: #dc2626; --sig-red: #dc2626; --sig-green: #16a34a; --road-major: #d97706; --road-mid: #ffffff; --road-minor: #cbd5e1; --road-edge: #94a3b8; --siren: #b45309; --none: #64748b;
+        --sig-amber: #d97706; --veh-moto: #7c3aed; --veh-car: #0369a1; --veh-rick: #047857; --veh-bus: #be185d; }
 #stage { overflow: hidden; }
 .fixrow { cursor: pointer; }
 .fixrow:hover td, .fixrow:focus-visible td { background: var(--panel-2); }
@@ -64,6 +66,7 @@
   document.write('<script src="' + src + '"><\/script>'); })();</script>
 <script src="about.js"></script>
 <script src="core.js"></script>
+<script src="tracks.js"></script>
 <script src="junctions.js"></script>
 <script src="embed.js"></script>
 </body>

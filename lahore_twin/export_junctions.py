@@ -129,6 +129,8 @@ def run_all(seed: int = 7, per_hour: int = 8000, minutes: int = 30, junctions: i
         "fix_names": J.FIX_NAMES,
         "junctions": out_j,
         "ambulance": {"station": [round(st[0], 1), round(st[1], 1)], "calls": calls, "summary": summary,
+                      # the traffic around the calls' routes, per way of running the signals
+                      "tracks": {mode: amb[mode]["tracks"] for mode in ("none", "siren", "greenwave")},
                       "hospitals": [[round(p["x"], 1), round(p["y"], 1), p["name"]] for p in pois.values()
                                     if p["kind"] == "hospital" and p["name"] in J.EMERGENCY]},
         # the whole area, thin, so the ambulance's route has a city around it
@@ -139,7 +141,22 @@ def run_all(seed: int = 7, per_hour: int = 8000, minutes: int = 30, junctions: i
 
 
 def write(replay: dict, out: Path | None = None) -> Path:
+    """The committed replay, with each junction's vehicle tracks in a file of their own
+    (viewer/junctions_traffic_<i>.js) that the planner loads when that junction is opened.
+    A run from "Run with your values" keeps them inline instead."""
     out = out or ROOT / "viewer" / "junctions_replay.js"
-    out.write_bytes(("window.JUNCTIONS = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False)
+    slim = json.loads(json.dumps(replay))
+    amb = slim["ambulance"].pop("tracks", None)
+    if amb:
+        (out.parent / "junctions_traffic_amb.js").write_bytes(
+            ("window.JUNCTION_AMB_TRAFFIC = " + json.dumps({"digest": replay["meta"]["digest"], "modes": amb},
+                                                          separators=(",", ":")) + ";\n").encode("utf-8"))
+    for i, jn in enumerate(slim["junctions"]):
+        side = {"digest": replay["meta"]["digest"],
+                "fixes": {f: r.pop("tracks") for f, r in jn["fixes"].items() if "tracks" in r}}
+        (out.parent / f"junctions_traffic_{i}.js").write_bytes(
+            (f"(window.JUNCTION_TRAFFIC = window.JUNCTION_TRAFFIC || {{}})[{i}] = "
+             + json.dumps(side, separators=(",", ":")) + ";\n").encode("utf-8"))
+    out.write_bytes(("window.JUNCTIONS = " + json.dumps(slim, separators=(",", ":"), ensure_ascii=False)
                      + ";\n").encode("utf-8"))
     return out

@@ -15,8 +15,8 @@ Sensing. Today: one official monitor. Connected: 25 low-cost sensors - 15 at rea
 hospitals and colleges (OpenStreetMap), 10 on poles at signalised junctions of the main roads -
 each with its own gain error and noise, corrected network-wide against the sensor beside the
 official monitor. Today's map is the monitor's one number everywhere; Connected's is a land-use
-regression - the readings against the traffic the signals' loop detectors count - with its
-residuals interpolated. Acting: where the low-cost network finds the worst hotspot, the signals within 400 m
+regression - the readings against two traffic feeds, what the signals' loop detectors count and
+where the phones of 5% of vehicles report standing still - with its residuals interpolated. Acting: where the low-cost network finds the worst hotspot, the signals within 400 m
 switch to adaptive control to cut idling, and the same trips are run again.
 
 Emission factors, the background curve and the sensor errors are assumptions, labelled.
@@ -26,12 +26,15 @@ from __future__ import annotations
 
 import math
 import random
+import zlib
 
+from . import tracks
 from .junctions import Movements
 from .roads import Network, load
 from .traffic_sim import TrafficSim, build_signals, make_demand, snap_pois
 
 CELL = 100.0
+TRACK_STRIDE, TRACK_Q = 2, 2.0  # vehicles for the page: every 8 s, to 2 m (the whole city fits on one screen)
 SIGMA = 250.0                   # street-level mixing; 150 m gave peaks twice the highest hourly readings reported
 REACH = 3 * SIGMA
 TRAFFIC_SHARE = 0.36
@@ -46,6 +49,51 @@ def background(minute: int, minutes: int) -> float:
     return 95 + 55 * f * f * (3 - 2 * f)
 
 
+PROBE_SHARE = 0.05          # vehicles whose phones report position and speed (assumption)
+
+
+def _reports(vid) -> bool:
+    """A fixed sample: the same vehicles report in every run (not Python's per-process str hash)."""
+    return zlib.crc32(str(vid).encode()) % 1000 < PROBE_SHARE * 1000
+
+
+def _fit(xs: list[list[float]], ys: list[float]) -> list[float]:
+    """Least squares y = c0 + c1 x1 + ... with every slope at least 0 (more traffic never cleans the air):
+    a feed whose slope comes out negative is dropped and the rest refitted."""
+    use = list(range(len(xs[0])))
+    while True:
+        k = len(use) + 1
+        A = [[0.0] * k for _ in range(k)]
+        bvec = [0.0] * k
+        for row, y in zip(xs, ys):
+            f = [1.0] + [row[i] for i in use]
+            for i in range(k):
+                bvec[i] += f[i] * y
+                for j in range(k):
+                    A[i][j] += f[i] * f[j]
+        for i in range(k):
+            A[i][i] += 1e-9                                  # a feed that saw nothing this minute
+        # Gaussian elimination
+        M = [A[i] + [bvec[i]] for i in range(k)]
+        for c in range(k):
+            piv = max(range(c, k), key=lambda r: abs(M[r][c]))
+            M[c], M[piv] = M[piv], M[c]
+            if abs(M[c][c]) < 1e-12:
+                continue
+            for r in range(k):
+                if r != c:
+                    fct = M[r][c] / M[c][c]
+                    M[r] = [a - fct * b for a, b in zip(M[r], M[c])]
+        coef = [M[i][k] / M[i][i] if abs(M[i][i]) > 1e-12 else 0.0 for i in range(k)]
+        neg = [use[i - 1] for i in range(1, k) if coef[i] < 0]
+        if not neg:
+            out = [coef[0]] + [0.0] * len(xs[0])
+            for i, u in enumerate(use):
+                out[u + 1] = coef[i + 1]
+            return out
+        use = [u for u in use if u not in neg]
+
+
 class Emissions:
     """Hooks a TrafficSim: grams of PM2.5 per link per minute."""
 
@@ -53,6 +101,9 @@ class Emissions:
         self.sim = sim
         self.g: dict[int, dict[int, float]] = {}       # minute -> link -> grams
         self.counts: dict[int, dict[int, float]] = {}  # minute -> approach link -> vehicle-seconds (loop detectors)
+        # minute -> link -> vehicle-seconds standing, from the phones of a fixed PROBE_SHARE of vehicles
+        # (ride-hailing and navigation apps), scaled up to the whole fleet
+        self.probe: dict[int, dict[int, float]] = {}
         step = sim.step
 
         def watched(t):
@@ -68,6 +119,9 @@ class Emissions:
                 if lid in sim.sig_of:          # only signal approaches have detectors
                     cnt = self.counts.setdefault(m, {})
                     cnt[lid] = cnt.get(lid, 0.0) + 1.0
+                if v.v < 0.5 and _reports(v.id):
+                    pr = self.probe.setdefault(m, {})
+                    pr[lid] = pr.get(lid, 0.0) + 1.0 / PROBE_SHARE
         sim.step = watched
 
 
@@ -209,18 +263,16 @@ def smog(seed: int = 7, per_hour: int = 8000, minutes: int = 60) -> dict:
         cal = [v * corr for v in raw]
         readings[m] = [round(v, 1) for v in cal]
         est_today[m] = off
-        # Connected: a land-use regression refitted every minute - the 25 readings against the
-        # traffic the signals' loop detectors counted, spread like the smoke - then the residuals
-        # interpolated. Detectors sit only on signal approaches, so this is no copy of the truth.
-        proxy = grid.spread(em0.counts.get(m, {}))
-        xs_, ys_ = [proxy[c] for c in cell_s], cal
-        n_ = len(xs_)
-        mx, my = sum(xs_) / n_, sum(ys_) / n_
-        vx = sum((x - mx) ** 2 for x in xs_)
-        b = max(0.0, sum((x - mx) * (y - my) for x, y in zip(xs_, ys_)) / vx) if vx > 0 else 0.0
-        a = my - b * mx
-        res = [(s["x"], s["y"], y - (a + b * x)) for s, x, y in zip(sensors, xs_, ys_)]
-        est_conn[m] = [a + b * proxy[k] + idw(res, *grid.centre(k)) for k in range(grid.nx * grid.ny)]
+        # Connected: a land-use regression refitted every minute - the 25 readings against two
+        # traffic feeds, each spread like the smoke: what the signals' loop detectors count (signal
+        # approaches only) and where the reporting phones stand still (a 5% sample, anywhere) -
+        # then the residuals interpolated. Neither feed is a copy of the truth: the detectors miss
+        # every jam away from a signal, the phones see one vehicle in twenty.
+        loops = grid.spread(em0.counts.get(m, {}))
+        phones = grid.spread(em0.probe.get(m, {}))
+        c0, c1, c2 = _fit([[loops[c], phones[c]] for c in cell_s], cal)
+        res = [(s["x"], s["y"], y - (c0 + c1 * loops[c] + c2 * phones[c])) for s, c, y in zip(sensors, cell_s, cal)]
+        est_conn[m] = [c0 + c1 * loops[k] + c2 * phones[k] + idw(res, *grid.centre(k)) for k in range(grid.nx * grid.ny)]
     # the hotspot: the worst cell over the peak quarter-hour, by truth and by the network. One
     # minute's worst cell jumps between junctions as queues come and go; a city acts on a mean
     def worst(fields):
@@ -273,6 +325,9 @@ def smog(seed: int = 7, per_hour: int = 8000, minutes: int = 60) -> dict:
             "adaptive_signals": sum(1 for s in sim1.signals if s.adaptive),
         },
         "hotspot": [round(hx, 1), round(hy, 1)],
+        # the traffic both evenings: as it is, and with adaptive signals at the hotspot the sensors found
+        "tracks": {"today": tracks.record(sim0, stride=TRACK_STRIDE, quant=TRACK_Q),
+                   "connected": tracks.record(sim1, stride=TRACK_STRIDE, quant=TRACK_Q)},
     }
 
 
@@ -421,7 +476,8 @@ def flood(seed: int = 7, per_hour: int = 6000, minutes: int = 60) -> dict:
                      "stranded_at": {k: sum(1 for _, (_, u) in stranded.items() if u == k) for k in depth},
                      "closed": closed, "closed_min": {k: round(sum(((b or T) - a) for a, b in v) / 60) for k, v in closed.items()},
                      "rerouted": len(rerouted), "delay_median_s": m["delay_median_s"], "completed": m["completed"],
-                     "gridlocked": m["gridlocked"], "trips": m["trips"]}
+                     "gridlocked": m["gridlocked"], "trips": m["trips"],
+                     "tracks": tracks.record(sim, stride=TRACK_STRIDE, quant=TRACK_Q)}
     return {"underpasses": [{k: (round(v, 1) if isinstance(v, float) else v) for k, v in u.items()} for u in ups],
             "modes": res, "rain": [round(rain_mmh(t), 1) for t in range(0, T, 30)], "power_cut": list(POWER_CUT),
             "generator": {"today": GEN_TODAY, "connected": GEN_CONNECTED}, "trips": len(trips), "minutes": minutes}
@@ -510,7 +566,8 @@ def streetlights(seed: int = 7, per_hour: int = 900, minutes: int = 360) -> dict
                      "changes": changes}
     return {"roads": roads, "lamps": lamps, "main": main, "fails": fails, "modes": out, "minutes": minutes,
             "trips": len(trips), "lamp_count": sum(lamps.values()),
-            "night_full_kwh": round(sum(lamps[i] * WATTS[main[i]] for i in roads) / 1000 * minutes / 60, 1)}
+            "night_full_kwh": round(sum(lamps[i] * WATTS[main[i]] for i in roads) / 1000 * minutes / 60, 1),
+            "tracks": tracks.record(sim, stride=TRACK_STRIDE, quant=TRACK_Q)}
 
 
 def _len(pts) -> float:

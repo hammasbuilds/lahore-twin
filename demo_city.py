@@ -25,7 +25,7 @@ def main() -> None:
     m = r["smog"]["metrics"]
     print("Smog, a November evening (PM2.5, µg/m³):")
     print(f"  area mean at the peak {m['area_mean_peak']}, worst street cell {m['worst_cell_peak']}")
-    print(f"  map error near roads: one official monitor {m['map_error_today']}, 25 sensors + loop counts {m['map_error_sensors']}")
+    print(f"  map error near roads: one official monitor {m['map_error_today']}, 25 sensors + loop counts + phone reports {m['map_error_sensors']}")
     print(f"  hotspot found {m['hotspot_found_m']} m from the true one; adaptive signals there: "
           f"{m['hotspot_before']} -> {m['hotspot_after']} ({m['adaptive_signals']} signals)")
     print("\nUnderpass flooding, a monsoon storm with an 18:25-19:05 power cut:")

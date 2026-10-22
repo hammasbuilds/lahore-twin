@@ -13,7 +13,29 @@
   let P = {};
   function readPalette() {
     for (const k of ["bg", "panel", "panel-2", "text", "muted", "line", "accent", "floor-out", "water", "haze", "lamp", "lamp-dim", "road", "dark-road", "sig-red",
-      "aqi1", "aqi2", "aqi3", "aqi4", "aqi5", "aqi6", "aqi7", "aqi8", "ok", "warn", "alert"]) P[k] = css("--" + k);
+      "aqi1", "aqi2", "aqi3", "aqi4", "aqi5", "aqi6", "aqi7", "aqi8", "ok", "warn", "alert",
+      "veh-moto", "veh-car", "veh-rick", "veh-bus"]) P[k] = css("--" + k);
+  }
+  const VCOL = () => ({ motorcycle: P["veh-moto"], car: P["veh-car"], rickshaw: P["veh-rick"], bus: P["veh-bus"], ambulance: P["sig-red"] });
+
+  // ---- the traffic in each scenario: inline in a run, or a file per view beside the committed replay ----
+  const decodedTraffic = {}, askedTraffic = {};
+  let vehNow = 0;
+  function trafficFor(view, mode) {
+    const key = view + "/" + mode;
+    if (key in decodedTraffic) return decodedTraffic[key];
+    const inline = R.traffic && R.traffic[view];
+    const side = window.CITY_TRAFFIC && window.CITY_TRAFFIC[view];
+    const src = inline || (side && side.modes);
+    if (src) return (decodedTraffic[key] = TwinTracks.decode(src[mode] || src.today));
+    if (!askedTraffic[view]) {
+      askedTraffic[view] = true;
+      const s = document.createElement("script");
+      s.src = `city_traffic_${view}.js`;
+      s.onload = () => frame(true);
+      document.head.appendChild(s);
+    }
+    return null;
   }
   const RANK = { motorway: 7, trunk: 6, primary: 5, secondary: 4, tertiary: 3, unclassified: 2, residential: 1, living_street: 0, service: 0,
     trunk_link: 5, primary_link: 4, secondary_link: 3, tertiary_link: 2, motorway_link: 6 };
@@ -116,7 +138,7 @@
       <tr><td>Hotspot found</td><td class="num">no</td><td class="num best">${m.hotspot_found_m} m away</td></tr>
       <tr><td>Where it acted, µg/m³ at the peak</td><td class="num">${m.hotspot_before}</td><td class="num best">${m.hotspot_after}</td></tr>
       <tr><td>At the real hotspot</td><td class="num">${m.true_hotspot_before}</td><td class="num best">${m.true_hotspot_after}</td></tr></table>`;
-    h += `<p class="note">Today the city has one official monitor, so its map is one number. Connected adds 25 low-cost sensors — 15 at schools, hospitals and colleges, 10 on main-road junction poles — each with its own gain error and noise, corrected against the one beside the monitor; the map is a regression of their readings on the traffic the signals' loop detectors count. Where it finds the worst hotspot, ${m.adaptive_signals} signals within 400 m go adaptive, cutting idling; the same trips are run again. The area mean at the peak is ${m.area_mean_peak} µg/m³ — Hazardous on the US AQI scale, as Lahore's winter evenings are.</p>`;
+    h += `<p class="note">Today the city has one official monitor, so its map is one number. Connected adds 25 low-cost sensors — 15 at schools, hospitals and colleges, 10 on main-road junction poles — each with its own gain error and noise, corrected against the one beside the monitor; the map is a regression of their readings on two traffic feeds: what the signals' loop detectors count, and where the phones of one vehicle in twenty report standing still (ride-hailing and navigation apps; the share is an assumption). The detectors alone miss every jam away from a signal. Where it finds the worst hotspot, ${m.adaptive_signals} signals within 400 m go adaptive, cutting idling; the same trips are run again. The area mean at the peak is ${m.area_mean_peak} µg/m³ — Hazardous on the US AQI scale, as Lahore's winter evenings are.</p>`;
     h += `<h3>The sensors now</h3><ul class="sensors">` + S.sensors.map((s, n) => ({ s, v: S.readings[k][n] })).sort((a, b) => b.v - a.v).map(({ s, v }) => `<li title="${esc(s.name)}"><span><i style="display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:5px;background:var(--${band(v)[1]})"></i><bdi>${esc(s.name)}</bdi></span><b class="num">${v}</b></li>`).join("") + `</ul>`;
     $("pane").innerHTML = h;
   }
@@ -239,6 +261,13 @@
     hits = [];
     ctx.drawImage(baseMap(), 0, 0, W, H);
     if (state.view === "smog") drawSmog(); else if (state.view === "rain") drawRain(); else drawNight();
+    // every vehicle on the road in this scenario, at this second, on top
+    const tr = trafficFor(state.view, state.mode);
+    vehNow = TwinTracks.draw(ctx, tr, state.t[state.view] * 60, SX, SY, cam.z, VCOL(), hits, { rim: P.bg, dot: cam.z < 0.3 ? 1.8 : 2.4 });
+    ctx.font = "11px Segoe UI, system-ui"; ctx.textAlign = "right";
+    const txt = tr ? `${vehNow.toLocaleString("en")} vehicles on the road` : "loading traffic…", tw = ctx.measureText(txt).width;
+    ctx.fillStyle = P.panel; ctx.globalAlpha = 0.9; ctx.fillRect(W - 20 - tw, 6, tw + 16, 20); ctx.globalAlpha = 1;
+    ctx.fillStyle = P.text; ctx.fillText(txt, W - 12, 20);
   }
   function renderPanel() { if (state.view === "smog") renderSmog(); else if (state.view === "rain") renderRain(); else renderNight(); }
   function renderTimeline() {
@@ -285,7 +314,7 @@
   $("theme").onclick = () => { const d = document.documentElement.dataset.theme !== "light"; document.documentElement.dataset.theme = d ? "light" : "dark"; $("theme").textContent = d ? "Dark" : "Light"; readPalette(); base = null; renderLegend(); try { localStorage.setItem("city-twin", JSON.stringify({ theme: document.documentElement.dataset.theme })); } catch (e) { /* ignore */ } frame(true); };
   cv.addEventListener("mousemove", (e) => {
     const r = cv.getBoundingClientRect(), mx = e.clientX - r.left, my = e.clientY - r.top, tip = $("tip");
-    const hh = hits.filter((x) => Math.hypot(x.x - mx, x.y - my) < x.r).sort((a, b) => a.r - b.r)[0];
+    const hh = hits.filter((x) => Math.hypot(x.x - mx, x.y - my) < x.r).sort((a, b) => (!!a.veh - !!b.veh) || a.r - b.r)[0];   // features before vehicles
     if (!hh) { tip.style.display = "none"; return; }
     tip.innerHTML = esc(hh.text); tip.style.display = "block"; tip.style.left = (mx + 14) + "px"; tip.style.top = (my + 14) + "px";
   });
@@ -307,5 +336,5 @@
 
   $("theme").textContent = document.documentElement.dataset.theme === "light" ? "Dark" : "Light";
   readPalette(); fit(); renderLegend(); frame(true); requestAnimationFrame(loop);
-  window.__city = { state, frame, hits: () => hits };
+  window.__city = { state, frame, hits: () => hits, vehicles: () => vehNow, traffic: trafficFor };
 })();

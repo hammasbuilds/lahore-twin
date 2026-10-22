@@ -112,12 +112,14 @@ def test_a_metre_long_stub_does_not_freeze_the_road(net):
 
 
 def test_fixed_signals_run_the_real_plan(runs):
-    """The bigger road gets 60 s of green, the side road 30 s, then 3 s amber and 2 s all-red."""
+    """The main road gets 60 s of green and 15 s of red (the owner's plan): the side road's 8 s green
+    with the 3 s amber and the two 2 s all-reds fill the main road's red exactly."""
     _, sims = runs
     s = sims["fixed"]
     timed = 0
     for sg in s.signals:
-        assert sorted(sg.greens) in ([30, 60], [45, 45])
+        assert sorted(sg.greens) == [8, 60]
+        assert min(sg.greens) + 3 + 2 + 2 == 15                  # the main road's red
         for (t0, ph0, st0), (t1, ph1, st1) in zip(sg.log, sg.log[1:]):
             if st0 == "green":
                 assert t1 - t0 == sg.greens[ph0] and st1 == "amber"

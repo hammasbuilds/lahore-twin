@@ -51,7 +51,11 @@ def run_all(seed: int = 7, per_hour: int = 8000) -> dict:
             "official": {"name": S["official"]["name"], "x": round(S["official"]["x"], 1), "y": round(S["official"]["y"], 1)},
             "hotspot": S["hotspot"], "metrics": S["metrics"], "minutes": S["minutes"], "trips": S["trips"],
         },
-        "flood": {k: F[k] for k in ("underpasses", "modes", "rain", "power_cut", "generator", "trips", "minutes")},
+        "flood": {**{k: F[k] for k in ("underpasses", "rain", "power_cut", "generator", "trips", "minutes")},
+                  "modes": {m: {k: v for k, v in r.items() if k != "tracks"} for m, r in F["modes"].items()}},
+        # every vehicle in each scenario; write() moves these to files of their own, loaded per view
+        "traffic": {"smog": S["tracks"], "rain": {m: r["tracks"] for m, r in F["modes"].items()},
+                    "night": {"today": L["tracks"], "connected": L["tracks"]}},
         "lights": {
             "roads": L["roads"], "lamps": [L["lamps"][i] for i in L["roads"]], "main": [int(L["main"][i]) for i in L["roads"]],
             "fails": L["fails"], "fail_names": [net.roads[i]["name"] or "an unnamed street" for i, _ in L["fails"]], "minutes": L["minutes"], "trips": L["trips"], "lamp_count": L["lamp_count"],
@@ -66,6 +70,15 @@ def run_all(seed: int = 7, per_hour: int = 8000) -> dict:
 
 
 def write(replay: dict, out: Path | None = None) -> Path:
+    """The committed replay, with each view's traffic in viewer/city_traffic_<view>.js, loaded when
+    that view opens. A run from "Run with your values" keeps the traffic inline instead."""
     out = out or ROOT / "viewer" / "city_replay.js"
-    out.write_bytes(("window.CITY = " + json.dumps(replay, separators=(",", ":"), ensure_ascii=False) + ";\n").encode("utf-8"))
+    slim = {k: v for k, v in replay.items() if k != "traffic"}
+    for view, modes in replay.get("traffic", {}).items():
+        same = modes.get("today") is modes.get("connected")      # the night: one traffic for both rule sets
+        body = {"digest": replay["meta"]["digest"], "modes": {"today": modes["today"]} if same else modes, "same": same}
+        (out.parent / f"city_traffic_{view}.js").write_bytes(
+            (f"(window.CITY_TRAFFIC = window.CITY_TRAFFIC || {{}}).{view} = "
+             + json.dumps(body, separators=(",", ":")) + ";\n").encode("utf-8"))
+    out.write_bytes(("window.CITY = " + json.dumps(slim, separators=(",", ":"), ensure_ascii=False) + ";\n").encode("utf-8"))
     return out

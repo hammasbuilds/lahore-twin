@@ -26,6 +26,7 @@ import random
 from pathlib import Path
 
 from .roads import Network, _project, load
+from . import tracks
 from .traffic_sim import (AMBER, ALL_RED, Signal, TrafficSim, Trip, build_signals, expected_wait, make_demand,
                           snap_pois)
 
@@ -271,6 +272,9 @@ def _watch(sim: TrafficSim, sig: Signal, centre, every: int = 30):
     return series, near
 
 
+TRACK_M = 400.0                   # vehicles drawn this far from the junction centre
+
+
 def run_fix(net: Network, trips: list[Trip], sig_name: str, fix: str, minutes: int) -> dict:
     sim_trips, extra = trips, {}
     base_sigs = {s.name: s for s in build_signals(net)}
@@ -311,6 +315,10 @@ def run_fix(net: Network, trips: list[Trip], sig_name: str, fix: str, minutes: i
         "pedestrian_crossing": {"baseline": "signal", "retime": "signal", "adaptive": "signal",
                                 "uturn": "none: the signal-protected crossing is gone",
                                 "underpass": "signal (surface)"}[fix],
+        # every vehicle inside the close map, for the planner to draw (moved to its own file on export)
+        "tracks": tracks.record(sim, centre=centre, radius=TRACK_M, origin=centre),
+        # the junction's own signal, phase by phase, so the planner's heads change with the clock
+        "signal_log": [list(e) for e in s.log] if fix != "uturn" else [],
         **extra,
     }
 
@@ -403,7 +411,11 @@ def run_ambulance(net: Network, trips: list[Trip], calls: list[Trip], amb_mode: 
                     "reds": len(sim.amb_reds.get(v.id, ())), "stops": v.stops, "trace": trace,
                     "scene_at": [scene[0], scene[1]] if scene else None, "hospital": hosp[2] if hosp else None})
     m = sim.metrics()
+    # the traffic each ambulance drove through: every vehicle within 250 m of any call's route
+    lines = [[p for lid in v.route for p in net.links[lid].pts] for v in sim.vehicles if v.kind == "ambulance"]
+    near_routes = tracks.corridor(lines, 250.0)
     return {"mode": amb_mode, "calls": out, "delay_median_s": m["delay_median_s"], "completed": m["completed"],
+            "tracks": tracks.record(sim, keep=near_routes, quant=2.0),
             "preemptions": len(sim.preempt_log), "signal_delay_veh_h": m["signal_delay_veh_h"],
             "signal_logs": {str(s.id): s.log for s in sim.signals}}
 

@@ -37,7 +37,7 @@ process.on("unhandledRejection", (e) => { console.error("UI CHECK FAILED:", e &&
   }
   // a U-turn gap tooltip
   await page.selectOption("#pick", "0"); await page.click('tr[data-fix="uturn"]');
-  const gap = await page.evaluate(() => { const h = window.__junctions.hits()[0]; const r = document.getElementById("plan").getBoundingClientRect(); return h ? { x: r.left + h.x, y: r.top + h.y } : null; });
+  const gap = await page.evaluate(() => { const h = window.__junctions.hits().find((x) => /U-turn gap/.test(x.text)); const r = document.getElementById("plan").getBoundingClientRect(); return h ? { x: r.left + h.x, y: r.top + h.y } : null; });
   if (!gap) fail("no U-turn gap drawn");
   await page.mouse.move(gap.x, gap.y); await page.waitForTimeout(150);
   if (!/U-turn/.test(await page.textContent("#tip"))) fail("U-turn gap has no tooltip");
